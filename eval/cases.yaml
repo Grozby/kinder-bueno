@@ -1,0 +1,114 @@
+# Case eval (#73): example business models (fictional companies, docs/examples) with the entities the case
+# analysis should count as matches. Run with `navigator case-eval`; the report goes to eval/case_report.md.
+#
+# needs: pinned from an Apertus read on 2026-10-18, so matching changes are measured on the same input.
+#   Remove them to have Apertus read the PDF again (the report then shows the new needs).
+# must_match: entities whose shown claims serve a need. Includes some the data cannot match today (a person
+#   with no unit link, a project with only its name): they show up as "missed" and measure coverage.
+# must_not_match: loose matches seen in the first run (generic claims like "clinical studies", or a lab from
+#   another field). Not exhaustive: read the "Matched entity" table of the report for new ones.
+# score: plausible range of the overall score. The low-fit case (vinora) checks the score does not flatter.
+# Matching rules as in eval/gold.yaml: people match when every word of the name is in the result name.
+#
+# Picked by an agent from the shared DB's claims (2026-10-18), not from search results.
+# NOT yet reviewed by a human (like eval/gold.yaml, #60).
+
+cases:
+  - id: glucora
+    pdf: docs/examples/glucora-business-model.pdf
+    score: [55, 90]
+    needs:
+      - clinical validation of sensor accuracy
+      - continuous glucose monitoring research
+      - artificial pancreas systems
+      - AI for meal carbohydrate estimation
+      - wearable biosensor interface development
+    must_match:
+      - {name: "Diabetes Center Berne", type: unit}
+      - {name: "DCB Research AG", type: unit}
+      - {name: "AI in Health and Nutrition", type: unit}
+      - {name: "Lilian Witthauer", type: person}
+      - {name: "Stavroula Mougiakakou", type: person}
+      - {name: "Intelligent Nutrition", type: project}
+      - {name: "enhance-d", type: project}
+      - {name: "SPN-005", type: project}
+      - {name: "GoCARB", type: project}
+      - {name: "goFOOD", type: project}
+      - {name: "Adaptive Diabetes Management", type: project}
+    must_not_match:
+      - {name: "Rubin Lab", type: unit}
+      - {name: "Motor Learning and Neurorehabilitation laboratory", type: unit}
+      - {name: "Acoustic Robotics Systems Lab", type: unit}
+      - {name: "Cardiovascular Research Cluster Bern", type: unit}
+      - {name: "Artificial Intelligence and Translational Theranostics", type: unit}
+      - {name: "Personalized Lung Care", type: project}
+      - {name: "Daniel Ahmed", type: person}
+      - {name: "Brice-Olivier Demory", type: person}
+      - {name: "Kuangyu Shi", type: person}
+
+  - id: repolar
+    pdf: docs/examples/repolar-business-model.pdf
+    score: [55, 90]
+    needs:
+      - transgenic animal models of arrhythmia
+      - human iPSC-derived cardiomyocytes for cardiotoxicity testing
+      - clinical registry for channelopathy risk stratification
+      - pharmacology of anti-arrhythmic drugs
+      - cardiac electrophysiology research expertise
+    must_match:
+      - {name: "Odening Lab", type: unit}
+      - {name: "Schinner Lab", type: unit}
+      - {name: "Zuppinger Lab", type: unit}
+      - {name: "Christian Zuppinger", type: person}
+      - {name: "Drug-effects on cardiac repolarization in LQTS and SQTS: Evaluation of pro-arrhythmia and novel mechanism-based anti-arrhythmic pharmacological therapies", type: project}
+      - {name: "Mechanisms of arrhythmogenesis SQTS", type: project}
+      - {name: "Electro-mechano-electrical interactions and arrhythmogenesis in LQTS and SQTS", type: project}
+      - {name: "Bedside to bench: Biophysical characterization of novel mutations identified in patients with genetic arrhythmia syndromes", type: project}
+      - {name: "transgenic rabbit models", type: infrastructure}
+    must_not_match:
+      - {name: "Diabetes Center Berne", type: unit}
+      - {name: "Meyer Lab", type: unit}
+      - {name: "Porret Lab", type: unit}
+      - {name: "Allam Lab", type: unit}
+      - {name: "Rubin Lab", type: unit}
+
+  - id: precisa
+    pdf: docs/examples/precisa-business-model.pdf
+    score: [55, 90]
+    needs:
+      - image-guided surgical navigation
+      - surgical robotics precision validation
+      - cochlear implantation clinical trials
+      - temporal bone CT segmentation AI
+      - patient-specific 3D anatomical models for surgery
+    must_match:
+      - {name: "Chair for Image-guided Therapy", type: unit}
+      - {name: "Neuro Robotics Group", type: unit}
+      - {name: "Hearing Research Laboratory", type: unit}
+      - {name: "ARTORG 3D-Printing Core Facility", type: unit}
+      - {name: "Artificial Intelligence in Medical Imaging", type: unit}
+      - {name: "Stefan Weber", type: person}
+      - {name: "Manuela Eugster", type: person}
+      - {name: "Philipp Aebischer", type: person}
+      - {name: "Raphael Sznitman", type: person}
+      - {name: "3D-Printing", type: infrastructure}
+      - {name: "robotic devices", type: infrastructure}
+    must_not_match:
+      - {name: "Chouvardas Lab", type: unit}
+      - {name: "DCB and Tidepool", type: unit}
+      - {name: "Cardiovascular Research Cluster Bern", type: unit}
+      - {name: "AI in Health and Nutrition", type: unit}
+      - {name: "enhance-d", type: project}
+      - {name: "SPN-005 – Pilot study on painless glucose monitoring", type: project}
+      - {name: "Personalized Lung Care", type: project}
+      - {name: "Lilian Witthauer", type: person}
+
+  - id: vinora
+    pdf: docs/examples/vinora-business-model.pdf
+    score: [0, 30]
+    needs:
+      - plant pathology downy mildew grapevines
+      - remote sensing multispectral crop analysis
+      - soil science irrigation climate adaptation
+      - precision viticulture test fields
+      - yield forecasting veraison

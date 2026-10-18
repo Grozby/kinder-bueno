@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repolar Diagnostics – Business Model</title>
+<style>
+  @page { size: A4; margin: 18mm 18mm 20mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1d1d1d; margin: 0; }
+  h1 { font-size: 26pt; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 { font-size: 13.5pt; margin: 18pt 0 6pt; padding-bottom: 3pt; border-bottom: 1.5pt solid #0b6e5b; color: #0b6e5b; }
+  h3 { font-size: 11pt; margin: 10pt 0 3pt; }
+  p { margin: 0 0 7pt; }
+  ul { margin: 0 0 7pt; padding-left: 16pt; }
+  li { margin-bottom: 2pt; }
+  .cover { border-left: 5pt solid #0b6e5b; padding: 6pt 0 6pt 14pt; margin-bottom: 14pt; }
+  .tagline { font-size: 13pt; color: #4a4a4a; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4pt 18pt; margin-top: 10pt; font-size: 9.5pt; color: #4a4a4a; }
+  .meta b { color: #1d1d1d; }
+  .box { background: #eef6f3; border-radius: 6pt; padding: 9pt 12pt; margin: 8pt 0 10pt; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.5pt; }
+  th, td { text-align: left; padding: 4pt 6pt; border-bottom: 0.75pt solid #d8d8d8; vertical-align: top; }
+  th { background: #f3f3f3; font-weight: 700; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18pt; }
+  .page-break { break-before: page; }
+  h2, h3 { break-after: avoid; }
+  .two, table, .box, li { break-inside: avoid; }
+  .footer-note { margin-top: 16pt; font-size: 8.5pt; color: #777; border-top: 0.75pt solid #d8d8d8; padding-top: 6pt; }
+</style>
+</head>
+<body>
+
+
+<div class="cover">
+  <h1>Repolar Diagnostics</h1>
+  <p class="tagline">AI risk scores for inherited arrhythmias and drug-induced QT prolongation</p>
+  <div class="meta">
+    <span><b>Legal form:</b> SAS (Lyon, FR)</span>
+    <span><b>Founded:</b> 2022</span>
+    <span><b>Employees:</b> 21</span>
+    <span><b>Stage:</b> Seed+ (EUR 6 M, closed Q1 2026)</span>
+    <span><b>Contact:</b> Partnerships, Repolar Diagnostics</span>
+  </div>
+</div>
+
+<h2>1. Executive summary</h2>
+<p>Repolar Diagnostics develops <b>RepoScore</b>, software that estimates the risk of life-threatening arrhythmias in
+patients with inherited channelopathies such as long QT syndrome (LQTS) and short QT syndrome (SQTS), from 12-lead and
+wearable ECG recordings combined with genetic findings. A second product, <b>RepoTox</b>, screens drug candidates for
+QT prolongation and cardiotoxicity for pharmaceutical companies.</p>
+<p>We want to open a <b>Swiss research and validation site</b> in 2027 and are evaluating Canton Bern, because of its
+cardiovascular research and its university hospital.</p>
+
+<div class="box">
+  <b>What we are looking for in Bern</b>
+  <ul style="margin:4pt 0 0">
+    <li>Research groups in <b>cardiac electrophysiology and genetic arrhythmia syndromes</b> (LQTS, SQTS, arrhythmogenic cardiomyopathy).</li>
+    <li>Experimental models of arrhythmia, such as <b>transgenic animal models</b>, to validate our risk markers.</li>
+    <li>Expertise in <b>cardiotoxicity testing</b> with human iPSC-derived cardiomyocytes for RepoTox.</li>
+    <li>Clinical partners for a registry study on <b>personalized risk stratification</b> of channelopathy patients.</li>
+    <li>Know-how in pharmacology of <b>anti-arrhythmic drugs</b> and drug effects on cardiac repolarization.</li>
+  </ul>
+</div>
+
+<h2>2. Problem</h2>
+<ul>
+  <li>Inherited arrhythmia syndromes affect about 1 in 2,000 people and are a leading cause of sudden cardiac death in the young.</li>
+  <li>Today's risk scores use the QT interval alone and miss many patients at risk, while others get defibrillators they never need.</li>
+  <li>About one in ten drug candidates fails in development because of cardiac safety findings, often late and at high cost.</li>
+</ul>
+
+<h2>3. Solution and technology</h2>
+<div class="two">
+  <div>
+    <h3>RepoScore</h3>
+    <ul>
+      <li>Deep-learning model on ECG morphology, heart-rate dynamics and genotype.</li>
+      <li>Works with 12-lead ECGs and with single-lead wearable recordings.</li>
+      <li>Retrospective validation on 3,400 patients: AUC 0.86 for arrhythmic events.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>RepoTox</h3>
+    <ul>
+      <li>In-vitro assay on human iPSC-derived cardiomyocytes with field-potential recordings.</li>
+      <li>Combined with in-silico action-potential models of repolarization.</li>
+      <li>Service for pharma: report within 3 weeks per compound.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>4. Market and business model</h2>
+<table>
+  <tr><th>Product</th><th>Customer</th><th>Price</th></tr>
+  <tr><td>RepoScore licence</td><td>Cardiology clinics, ECG device makers</td><td>CHF 18,000 / clinic / year</td></tr>
+  <tr><td>RepoTox screening</td><td>Pharmaceutical and biotech companies</td><td>CHF 25,000 / compound</td></tr>
+</table>
+<p>Competitors: classic QT-based risk calculators and contract research organisations offering hERG assays only.</p>
+
+<h2>5. Plans for Switzerland</h2>
+<ul>
+  <li><b>Team:</b> 12 people in Bern by 2028 (data scientists, electrophysiologists, lab technicians).</li>
+  <li><b>Space:</b> 250 m² offices and a BSL-1 cell culture lab.</li>
+  <li><b>Regulatory path:</b> RepoScore as software as a medical device (MDR class IIa), CE marking planned for 2028.</li>
+</ul>
+
+<h2>6. Team</h2>
+<ul>
+  <li><b>CEO:</b> co-founder, former head of cardiac safety at a pharmaceutical company.</li>
+  <li><b>CSO:</b> co-founder, cardiologist and electrophysiologist, 40 publications on channelopathies.</li>
+  <li><b>Head of AI:</b> PhD in signal processing of ECG data.</li>
+</ul>
+
+<p class="footer-note">Fictional company and figures, created as a demo input for the HackApertus Bern Fit prototype.
+Any resemblance to real companies is coincidental.</p>
+
+</body>
+</html>

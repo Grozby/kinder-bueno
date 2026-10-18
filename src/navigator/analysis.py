@@ -234,6 +234,27 @@ def find_references(
     return [(e, s, needs_of[e]) for e, s in capped]
 
 
+@dataclass
+class Scored:
+    refs: list[tuple[int, float, list[str]]]  # (entity id, score, needs it was found for), best first
+    results: list[Result]
+    matches: dict[int, list[Match]]
+    score: int
+    rows: list[ScoreItem]
+
+
+def score_needs(
+    conn: psycopg.Connection, needs: list[str], embed: Callable[[str], np.ndarray],
+    embed_many: Callable[[list[str]], np.ndarray],
+) -> Scored:
+    """References, matches and score for a list of needs; no LLM call (also used by `navigator case-eval`)."""
+    refs = find_references(conn, needs, embed)
+    results = build_results(conn, [(e, s) for e, s, _ in refs])
+    matches = match_needs(results, needs, embed_many, umbrella_units(conn))
+    score, rows = score_case(needs, results, matches)
+    return Scored(refs, results, matches, score, rows)
+
+
 def analyze(
     conn: psycopg.Connection,
     case_id: str,
@@ -249,10 +270,8 @@ def analyze(
         return
     try:
         info = read(found[0])
-        refs = find_references(conn, info.needs, embed)
-        results = build_results(conn, [(e, s) for e, s, _ in refs])
-        matches = match_needs(results, info.needs, embed_many, umbrella_units(conn))
-        score, rows = score_case(info.needs, results, matches)
+        scored = score_needs(conn, info.needs, embed, embed_many)
+        refs, results, matches, score, rows = scored.refs, scored.results, scored.matches, scored.score, scored.rows
         # The need each reference is explained with: its best match, else the first need it was found for
         found_for = {e: n for e, _, n in refs}
         need_of = {
