@@ -5,6 +5,8 @@
 import { X } from '@lucide/vue'
 import { nextTick, onBeforeUnmount, useTemplateRef, watch } from 'vue'
 
+import { trapFocus } from '@/composables/focusTrap'
+
 const props = withDefaults(
   defineProps<{
     open: boolean
@@ -59,6 +61,7 @@ onBeforeUnmount(() => {
           :aria-label="title"
           tabindex="-1"
           :class="{ fixed: height }"
+          @keydown="trapFocus($event, panel)"
           :style="{ '--panel-width': width, '--panel-height': height }"
         >
           <header class="panel-head">
@@ -133,7 +136,7 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .panel-title h2 {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .close {
   flex: none;

@@ -553,12 +553,12 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 h1 {
-  font-size: clamp(28px, 3vw, 36px);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
 }
 .lead {
   max-width: 62ch;
   margin-top: 0.5rem;
-  font-size: 17px;
+  font-size: 1.0625rem;
   color: var(--text-muted);
 }
 
@@ -616,12 +616,12 @@ h1 {
   gap: 0.5rem;
 }
 .kpis dt {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--text-muted);
 }
 .kpis dd {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -654,7 +654,7 @@ h1 {
   grid-column: 1 / -1;
 }
 .field-label {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .field.toggle {
@@ -665,7 +665,7 @@ h1 {
 }
 .field.toggle small {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .segmented {
   display: flex;
@@ -761,13 +761,13 @@ h1 {
   gap: 0.3rem;
 }
 .info h3 {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .host {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--bern-red);
   text-decoration: none;
 }
@@ -780,12 +780,12 @@ dl {
   margin-top: 0.5rem;
 }
 dt {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-muted);
 }
 dd {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -805,7 +805,7 @@ dd {
 }
 .when {
   margin-top: 0.4rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--text-faint);
 }
 
@@ -822,7 +822,7 @@ dd {
   justify-content: center;
   gap: 1rem;
   margin-top: 0.5rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--text-muted);
 }
 .lg {
@@ -858,7 +858,7 @@ dd {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   font-family: var(--mono);
-  font-size: 14.5px;
+  font-size: 0.9062rem;
 }
 .pages li {
   display: flex;
@@ -908,7 +908,7 @@ dd {
 }
 .mono {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .input[aria-invalid='true'] {
   border-color: var(--bad);
@@ -921,7 +921,7 @@ dd {
   overflow-y: auto;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  font-size: 16px;
+  font-size: 1rem;
 }
 .hits li {
   display: flex;
@@ -938,7 +938,7 @@ dd {
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .similar .submit {
   display: flex;

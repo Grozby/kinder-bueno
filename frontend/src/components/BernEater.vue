@@ -219,7 +219,7 @@ onBeforeUnmount(() => registerBernEater(null))
   border: 1px solid var(--border-strong);
   color: var(--text);
   font-weight: 700;
-  font-size: 16px;
+  font-size: 1rem;
   white-space: nowrap;
   box-shadow: var(--shadow-lg);
 }

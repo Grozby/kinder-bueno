@@ -192,6 +192,17 @@ async function copyPitch() {
           >
             Accept
           </BaseButton>
+          <BaseButton
+            v-if="item.status === 'accepted'"
+            variant="primary"
+            :icon="Sparkles"
+            :loading="pitchLoading"
+            :disabled="selectedIds.size === 0"
+            :title="selectedIds.size === 0 ? 'Select at least one reference first' : undefined"
+            @click="generate"
+          >
+            {{ pitch ? 'Regenerate pitch' : 'Generate pitch' }}
+          </BaseButton>
         </div>
       </div>
     </template>
@@ -336,25 +347,14 @@ async function copyPitch() {
             <CaseChat :case-id="item.id" />
           </section>
 
-          <section>
-            <div class="section-head">
-              <h3 class="section-label">Sales pitch</h3>
-              <BaseButton
-                v-if="item.status === 'accepted'"
-                variant="primary"
-                size="sm"
-                :icon="Sparkles"
-                :loading="pitchLoading"
-                :disabled="selectedIds.size === 0"
-                @click="generate"
-              >
-                {{ pitch ? 'Regenerate' : 'Generate pitch' }}
-              </BaseButton>
-            </div>
-            <p v-if="item.status !== 'accepted'" class="muted small">
-              Accept this company to generate a pitch from the selected references.
+          <!-- Only once there is something to show; the button lives in the header -->
+          <section v-if="pitch || pitchLoading || pitchError">
+            <h3 class="section-label">Sales pitch</h3>
+            <p v-if="pitchError" class="notice text-error">{{ pitchError }}</p>
+            <p v-else-if="pitchLoading" class="notice" role="status">
+              <LoaderCircle class="spin" :size="16" /> Writing the pitch from the selected
+              references…
             </p>
-            <p v-else-if="pitchError" class="notice text-error">{{ pitchError }}</p>
             <div v-else-if="pitch" class="pitch">
               <div class="pitch-bar">
                 <span class="muted small">
@@ -372,9 +372,6 @@ async function copyPitch() {
               </div>
               <p class="pitch-text">{{ pitch.text }}</p>
             </div>
-            <p v-else class="muted small">
-              Select the references you want, then generate. Only selected references are used.
-            </p>
           </section>
         </div>
       </div>
@@ -404,14 +401,14 @@ async function copyPitch() {
   gap: 0.15rem;
 }
 .rings figcaption {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 .head h2 {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 .meta {
   display: flex;
@@ -419,7 +416,7 @@ async function copyPitch() {
   align-items: center;
   gap: 0.4rem;
   margin-top: 0.3rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .actions {
   display: flex;
@@ -436,7 +433,7 @@ async function copyPitch() {
   border-radius: var(--radius);
 }
 .small {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .layout {
@@ -490,11 +487,11 @@ section > .section-label {
   text-align: center;
 }
 .criteria strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.25;
 }
 .rationale {
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.35;
   color: var(--text-muted);
   display: -webkit-box;
@@ -547,7 +544,7 @@ section > .section-label {
   flex: none;
   width: 1.3rem;
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -567,10 +564,10 @@ section > .section-label {
   white-space: nowrap;
 }
 .ref-line {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .why {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-muted);
 }
 .icon-btn {

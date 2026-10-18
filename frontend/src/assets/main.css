@@ -10,10 +10,11 @@
   --surface: #ffffff;
   --surface-alt: #f6f6f6;
   --border: #dedede;
-  --border-strong: #b8b8b8;
+  /* WCAG 2.2 AA: field borders ≥ 3:1 (1.4.11), all text ≥ 4.5:1 (1.4.3), also on the grey columns */
+  --border-strong: #8a8a8a;
   --text: #1d1d1d;
   --text-muted: #5c5c5c;
-  --text-faint: #8c8c8c;
+  --text-faint: #666666;
   --focus: #1d1d1d;
 
   /* Fit scores from the Okabe-Ito palette: vermillion, orange, bluish green. Built for
@@ -50,12 +51,18 @@
   margin: 0;
 }
 
+/* Every size is in rem, so this one value scales the whole app and the user's own browser text
+   size still applies (WCAG 1.4.4). 106.25 % of the default 16 px = 17 px. */
+html {
+  font-size: 106.25%;
+}
+
 body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -113,7 +120,7 @@ h3 {
   background: var(--surface-alt);
   border: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 14.5px;
+  font-size: 0.9062rem;
   white-space: nowrap;
 }
 .tag-good {
@@ -133,7 +140,7 @@ h3 {
 }
 
 .section-label {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;

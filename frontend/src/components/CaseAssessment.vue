@@ -2,7 +2,7 @@
 // The reviewer's side of a case: their own 0-100 score with a required reason, kept next to the
 // AI score, and a timeline of notes. Notes are internal; they never go into the sales pitch.
 import { LoaderCircle, Pencil, Send, Trash2 } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 
 import type { Case } from '@/api'
 import { reviewerName } from '@/composables/reviewer'
@@ -17,6 +17,7 @@ const store = useCasesStore()
 // A gap this big between the reviewer and the AI is worth pointing out
 const DIFFERS_BY = 20
 
+const reasonErrorId = useId()
 const editing = ref(false)
 const score = ref(50)
 const reason = ref('')
@@ -148,9 +149,13 @@ function addNote() {
           class="input"
           rows="2"
           placeholder="e.g. I know the founders from a previous role; strong team."
+          aria-required="true"
           :aria-invalid="reasonMissing"
+          :aria-describedby="reasonMissing ? reasonErrorId : undefined"
         />
-        <small v-if="reasonMissing" class="text-error">Add a reason for your score.</small>
+        <small v-if="reasonMissing" :id="reasonErrorId" class="text-error" role="alert">
+          Add a reason for your score.
+        </small>
       </label>
       <div class="form-actions">
         <BaseButton v-if="review" size="sm" @click="editing = false">Cancel</BaseButton>
@@ -178,6 +183,7 @@ function addNote() {
           class="input"
           rows="2"
           placeholder="Add a note for the team (internal, never in the pitch)"
+          aria-label="New note"
           @keydown.ctrl.enter.prevent="addNote"
           @keydown.meta.enter.prevent="addNote"
         />
@@ -220,10 +226,10 @@ function addNote() {
   gap: 1rem;
 }
 .small {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .field-label {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -243,14 +249,14 @@ function addNote() {
   flex-wrap: wrap;
   gap: 0.2rem 0.5rem;
   align-items: baseline;
-  font-size: 16px;
+  font-size: 1rem;
 }
 .review-head .muted {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .reason {
   margin-top: 0.2rem;
-  font-size: 16px;
+  font-size: 1rem;
   font-style: italic;
 }
 .compare {
@@ -258,7 +264,7 @@ function addNote() {
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.35rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .review-actions {
   display: flex;
@@ -320,7 +326,7 @@ textarea.input[aria-invalid='true'] {
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.5rem;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .note-form {
   display: flex;
@@ -363,10 +369,10 @@ li {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .note-text {
-  font-size: 16px;
+  font-size: 1rem;
   white-space: pre-wrap;
 }
 .delete {

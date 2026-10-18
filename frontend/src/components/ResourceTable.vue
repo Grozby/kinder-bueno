@@ -98,7 +98,13 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
     <div class="filters">
       <label class="search">
         <Search :size="16" />
-        <input v-model="query" class="input" type="search" placeholder="Filter by title or URL" />
+        <input
+          v-model="query"
+          class="input"
+          type="search"
+          placeholder="Filter by title or URL"
+          aria-label="Filter pages by title or URL"
+        />
       </label>
       <div class="chips" role="radiogroup" aria-label="Source">
         <button
@@ -289,7 +295,7 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 16px;
+  font-size: 1rem;
   cursor: pointer;
 }
 .chips button:hover:not(.on) {
@@ -309,17 +315,17 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
   width: auto;
   height: 32px;
   border-radius: 999px;
-  font-size: 16px;
+  font-size: 1rem;
 }
 .toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 16px;
+  font-size: 1rem;
 }
 .count {
   margin-left: auto;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .load-error {
@@ -345,7 +351,7 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 16px;
+  font-size: 1rem;
 }
 th {
   position: sticky;
@@ -355,7 +361,7 @@ th {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   text-align: left;
-  font-size: 14.5px;
+  font-size: 0.9062rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -416,7 +422,7 @@ tbody tr:focus-visible {
 }
 .page a {
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-muted);
   text-decoration: none;
 }

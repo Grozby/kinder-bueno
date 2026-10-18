@@ -90,10 +90,10 @@ function onPick(e: Event) {
   color: var(--bern-red);
 }
 strong {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 p {
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--text-muted);
 }
 </style>

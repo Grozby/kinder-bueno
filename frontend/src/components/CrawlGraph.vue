@@ -112,7 +112,7 @@ function edgePath(from: Node, to: Node) {
 }
 .edge {
   fill: none;
-  stroke: var(--border-strong);
+  stroke: var(--border);
   stroke-width: 1;
 }
 .node {

@@ -140,7 +140,7 @@ header {
   min-width: 0;
 }
 h3 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -150,7 +150,7 @@ h3 {
   align-items: center;
   gap: 0.3rem;
   margin-top: 0.15rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -167,14 +167,14 @@ h3 {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .criteria {
   list-style: none;
   padding: 0;
   display: grid;
   gap: 0.3rem;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--text-muted);
 }
 .criteria li {
@@ -191,7 +191,7 @@ h3 {
 }
 .num {
   color: var(--text);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -219,7 +219,7 @@ h3 {
   gap: 0.15rem;
 }
 .rings figcaption {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -247,7 +247,7 @@ footer .tag {
   background: none;
   color: var(--text-muted);
   font: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   cursor: pointer;
 }
 .similar svg {

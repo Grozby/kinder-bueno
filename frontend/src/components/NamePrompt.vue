@@ -3,12 +3,14 @@
 // with their scores and notes; there are no user accounts.
 import { nextTick, ref, useTemplateRef, watch } from 'vue'
 
+import { trapFocus } from '@/composables/focusTrap'
 import { askingName, reviewerName, setReviewerName } from '@/composables/reviewer'
 import BernBear from './BernBear.vue'
 import BaseButton from './ui/BaseButton.vue'
 
 const draft = ref('')
 const input = useTemplateRef<HTMLInputElement>('input')
+const panel = useTemplateRef<HTMLFormElement>('panel')
 
 function save() {
   if (draft.value.trim()) setReviewerName(draft.value)
@@ -36,15 +38,18 @@ watch(
     <Transition name="prompt" appear>
       <div v-if="askingName" class="backdrop" @mousedown.self="cancel" @keydown.esc="cancel">
         <form
+          ref="panel"
           class="panel"
           role="dialog"
           aria-modal="true"
           aria-labelledby="name-title"
+          aria-describedby="name-help"
+          @keydown="trapFocus($event, panel)"
           @submit.prevent="save"
         >
           <BernBear class="logo" />
           <h2 id="name-title">{{ reviewerName ? 'Change your name' : 'Welcome to Bern Fit' }}</h2>
-          <p class="muted">
+          <p id="name-help" class="muted">
             What is your name? It is shown with the scores and notes you give, so the team knows who
             wrote what. It is kept in this browser only.
           </p>
@@ -93,10 +98,10 @@ watch(
   height: 70px;
 }
 h2 {
-  font-size: 22px;
+  font-size: 1.375rem;
 }
 .muted {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .input {
   text-align: center;

@@ -281,12 +281,12 @@ function onBearDrop(e: DragEvent) {
   flex-wrap: wrap;
 }
 h1 {
-  font-size: clamp(26px, 2.6vw, 34px);
+  font-size: clamp(1.625rem, 2.6vw, 2.125rem);
 }
 .lead {
   max-width: 62ch;
   margin-top: 0.35rem;
-  font-size: 17px;
+  font-size: 1.0625rem;
   color: var(--text-muted);
 }
 .upload {
@@ -312,12 +312,12 @@ h1 {
   gap: 0.5rem;
 }
 .kpis dt {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--text-muted);
 }
 .kpis dd {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -380,7 +380,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  font-size: 19px;
+  font-size: 1.1875rem;
 }
 .column h2::before {
   content: '';
@@ -391,7 +391,7 @@ h1 {
 }
 .hint {
   margin-left: calc(10px + 0.55rem);
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--text-muted);
 }
 .count {
@@ -403,7 +403,7 @@ h1 {
   border-radius: 999px;
   background: var(--text);
   color: #fff;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -429,7 +429,7 @@ h1 {
   border: 2px dashed #d4d4d4;
   border-radius: var(--radius-lg);
   color: var(--text-faint);
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .rejected-list {
@@ -452,7 +452,7 @@ h1 {
   border: 2px dashed var(--border-strong);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   transition: border-color 0.15s;
 }

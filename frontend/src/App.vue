@@ -124,10 +124,10 @@ onMounted(() => {
   line-height: 1.15;
 }
 .brand-text strong {
-  font-size: 19px;
+  font-size: 1.1875rem;
 }
 .brand-text span {
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--text-muted);
 }
 
@@ -181,7 +181,7 @@ nav.discarding a.router-link-exact-active {
   background: var(--text);
   color: #fff;
   text-align: center;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .sidebar-foot {
@@ -203,7 +203,7 @@ nav.discarding a.router-link-exact-active {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   text-align: left;
   cursor: pointer;

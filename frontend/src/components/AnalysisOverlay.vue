@@ -6,6 +6,7 @@ import { Check, LoaderCircle, TriangleAlert } from '@lucide/vue'
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 
 import type { Case } from '@/api'
+import { trapFocus } from '@/composables/focusTrap'
 import { scoreBand } from '@/utils/format'
 import BernBear from './BernBear.vue'
 import BaseButton from './ui/BaseButton.vue'
@@ -110,6 +111,7 @@ onBeforeUnmount(() => {
           aria-modal="true"
           :aria-label="`Analysis of ${item.file_name}`"
           tabindex="-1"
+          @keydown="trapFocus($event, panel)"
         >
           <div class="hero" :class="{ done, failed }">
             <svg viewBox="0 0 220 220" aria-hidden="true">
@@ -282,20 +284,20 @@ onBeforeUnmount(() => {
   line-height: 1;
 }
 .score strong {
-  font-size: 64px;
+  font-size: 4rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .score span {
   margin-top: 0.35rem;
-  font-size: 14px;
+  font-size: 0.875rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .eyebrow {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -306,12 +308,12 @@ onBeforeUnmount(() => {
 }
 h2 {
   margin-top: 0.3rem;
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 .file {
   margin-top: 0.2rem;
   font-family: var(--mono);
-  font-size: 14.5px;
+  font-size: 0.9062rem;
   color: var(--text-muted);
 }
 
@@ -323,7 +325,7 @@ h2 {
   margin: 1.5rem auto 0;
   padding: 0;
   text-align: left;
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--text-faint);
 }
 .steps li {
