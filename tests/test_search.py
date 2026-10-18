@@ -5,7 +5,7 @@ import psycopg
 import pytest
 
 from navigator import chunks_db
-from navigator.search import keyword_search, query_words, rrf, search_chunks
+from navigator.search import ChunkHit, cap_per_page, keyword_search, query_words, rrf, search_chunks
 from navigator.settings import get_settings
 
 DIM = 1024
@@ -22,6 +22,17 @@ def test_rrf_orders_best_first_and_breaks_ties_by_id():
     assert [i for i, _ in rrf([[5, 7], [7, 5]])] == [5, 7]
     assert [i for i, _ in rrf([[1, 2], [2]])] == [2, 1]
     assert rrf([]) == []
+
+
+def _hit(chunk_id: int, page_id: int) -> ChunkHit:
+    return ChunkHit(chunk_id, page_id, f"https://p{page_id}", "", 1.0 / chunk_id, None)
+
+
+def test_cap_per_page_keeps_the_best_hits_of_each_page_in_order():
+    hits = [_hit(1, 10), _hit(2, 10), _hit(3, 20), _hit(4, 10), _hit(5, 20), _hit(6, 30)]
+    assert [h.chunk_id for h in cap_per_page(hits, 2)] == [1, 2, 3, 5, 6]
+    assert [h.chunk_id for h in cap_per_page(hits, 1)] == [1, 3, 6]
+    assert cap_per_page([], 2) == []
 
 
 def _onehot(i: int) -> np.ndarray:
@@ -100,3 +111,14 @@ def test_search_chunks_fuses_keyword_and_semantic(conn, test_source):
     assert top.text.startswith("T\n\nquuxglucose")
     assert top.similarity == pytest.approx(1.0)
     assert top.score > hits[1].score
+
+
+def test_search_chunks_caps_chunks_per_page(conn, test_source):
+    # Regression for #3: one long page used to fill the top of the list.
+    def fake_embed(q):
+        return _onehot(3)
+
+    capped = search_chunks(conn, "zzwidgets", embed=fake_embed, max_per_page=1)
+    assert [h.page_id for h in capped].count(test_source) == 1
+    uncapped = search_chunks(conn, "zzwidgets", embed=fake_embed, max_per_page=None)
+    assert [h.page_id for h in uncapped].count(test_source) == 2
