@@ -120,7 +120,7 @@ def get_seeds() -> dict[str, str]:
     return {s.id: s.seeds[0] for s in load_sources(get_settings().sources_file).sources}
 
 
-def get_page_rules(conn: Annotated[psycopg.Connection, Depends(get_conn)]) -> dict[str, pages.SourceRules]:
+def get_page_rules(conn: Annotated[psycopg.Connection, Depends(get_conn, scope="function")]) -> dict[str, pages.SourceRules]:
     """Exclude and priority patterns per source: the stored rules (#79), else config/sources.yaml."""
     return rules.page_rules(conn, load_sources(get_settings().sources_file))
 
@@ -201,7 +201,9 @@ def get_make_documents(request: Request) -> Callable[[str], None]:
     return run
 
 
-Conn = Annotated[psycopg.Connection, Depends(get_conn)]
+# Commit before the response is sent (scope "function"): with the default, the commit runs after it, and the
+# client's next request (save the selection, then make the documents) could read the old rows
+Conn = Annotated[psycopg.Connection, Depends(get_conn, scope="function")]
 Seeds = Annotated[dict[str, str], Depends(get_seeds)]
 PageRules = Annotated[dict[str, pages.SourceRules], Depends(get_page_rules)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]

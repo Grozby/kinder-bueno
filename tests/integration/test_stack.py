@@ -157,7 +157,7 @@ def test_case_flow(stack, api, db):
     assert api.post(f"/api/cases/{case_id}/pitch", json={"entity_ids": [-1]}).status_code == 404
 
     # Partner report and slides (#96), from the stored selection, in the background
-    assert api.put(f"/api/cases/{case_id}/selection", json={"entity_ids": [r["entity_id"] for r in selected]}).ok
+    assert api.put(f"/api/cases/{case_id}/selection", json={"entity_ids": [r["entity_id"] for r in selected]}).is_success
     docs = api.post(f"/api/cases/{case_id}/documents").json()
     deadline = time.monotonic() + ANALYSIS_TIMEOUT
     while docs["status"] == "pending":
