@@ -6,6 +6,7 @@ Run: `uv run pytest -m integration` (about 10–15 min; the real Apertus gateway
 - The checkpoint is a `pg_dump` of the source database (IT_SOURCE_DATABASE_URL, default DATABASE_URL), taken once
   into `checkpoints/it.dump` and reused. Delete the file (or set IT_CHECKPOINT to another dump) for a new one.
 - IT_KEEP=1 leaves the stack running after the tests (`docker compose -p navigator-it down -v` removes it).
+- The app's log is saved to `checkpoints/it-app.log` before the stack is removed, for slow or failed requests.
 """
 
 import os
@@ -28,6 +29,7 @@ DB_PORT = int(os.environ.get("IT_DB_PORT", "55432"))
 API_PORT = int(os.environ.get("IT_API_PORT", "18000"))
 UI_PORT = int(os.environ.get("IT_UI_PORT", "15173"))
 CHECKPOINT = Path(os.environ.get("IT_CHECKPOINT", PROJECT_ROOT / "checkpoints" / "it.dump"))
+APP_LOG = CHECKPOINT.parent / "it-app.log"
 API_TIMEOUT = 120.0  # one request; search and chat call the gateway (expansion, explanations)
 
 
@@ -114,6 +116,8 @@ def stack() -> Stack:
         compose(token, "logs", "--tail", "50", check=False)
         raise
     finally:
+        with APP_LOG.open("w") as log:
+            compose(token, "logs", "--timestamps", "app", check=False, stdout=log, stderr=subprocess.STDOUT)
         if not os.environ.get("IT_KEEP"):
             compose(token, "down", "-v", check=False, capture_output=True)
 

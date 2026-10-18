@@ -214,5 +214,7 @@ citation in a "why" sentence or a pitch belongs to the cards shown.
 | `IT_SOURCE_DATABASE_URL` | the database to dump (default: `DATABASE_URL`) |
 | `IT_KEEP=1` | leave the stack running after the tests |
 
+The app log of the last run is saved to `checkpoints/it-app.log`.
+
 Delete `checkpoints/it.dump` to take a new checkpoint. The dump is also a backup of the database before a demo:
 restore it with `pg_restore --clean --if-exists --no-owner -d <database url> checkpoints/it.dump`.
