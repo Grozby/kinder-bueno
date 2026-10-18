@@ -17,9 +17,9 @@ from navigator.explain import (
 from navigator.models import Evidence, Result
 
 
-def _ev(claim_id: int, field: str, value: str = "v", quote: str = "q") -> Evidence:
+def _ev(claim_id: int, field: str, value: str = "v", quote: str = "q", via_unit: str | None = None) -> Evidence:
     return Evidence(claim_id=claim_id, field=field, value=value, quote=quote, url="https://u",
-                    judge_verdict=None, judge_reason=None)
+                    judge_verdict=None, judge_reason=None, via_unit=via_unit)
 
 
 def _result(entity_id: int, name: str, evidence: list[Evidence]) -> Result:
@@ -76,7 +76,35 @@ def test_format_results_numbers_claims():
     ],
 )
 def test_check_sentence(sentence, expected):
-    assert check_sentence(sentence, {12, 13}) == expected
+    assert check_sentence(sentence, {e.claim_id: e for e in ANNA.evidence if e.claim_id in (12, 13)}) == expected
+
+
+BEN = _result(4, "Ben Beispiel", [_ev(30, "role", "PhD student"),
+                                 _ev(31, "unit_expertise", "glucose monitoring", via_unit="Sensor  Lab")])
+BEN_CLAIMS = {e.claim_id: e for e in BEN.evidence}
+
+
+@pytest.mark.parametrize(
+    "sentence, ok",
+    [
+        ("PhD student in the Sensor Lab, which works on glucose monitoring [30][31].", True),
+        ("PhD student in the sensor lab, which works on glucose monitoring [31].", True),  # case and spaces
+        ("PhD student with expertise in glucose monitoring [30][31].", False),  # lab topic, lab not named
+        ("PhD student [30].", True),                                           # no lab topic cited
+        ("Ben works in unit_expertise: glucose monitoring [31] at the Sensor Lab.", False),  # copied row
+        ("Role: PhD student [30].", False),                                    # copied field name
+    ],
+)
+def test_check_sentence_lab_topics_must_name_the_unit(sentence, ok):
+    assert (check_sentence(sentence, BEN_CLAIMS) is not None) is ok
+
+
+def test_lab_topics_are_labelled_and_come_right_after_own_expertise():
+    person = _result(5, "Cara", [_ev(40, "role", "Postdoc"), _ev(41, "name", "Cara"),
+                                 _ev(42, "unit_expertise", "cochlear implants", via_unit="Hearing Lab"),
+                                 _ev(43, "expertise", "audiology")])
+    assert [e.claim_id for e in prompt_claims(person.evidence)] == [43, 42, 40, 41]
+    assert '[42] lab topic (via Hearing Lab): cochlear implants — "q"' in format_results("q", [person])
 
 
 def test_cited_ids():

@@ -9,19 +9,22 @@ import re
 from dataclasses import dataclass
 
 from navigator.llm import LLM
-from navigator.models import Result
+from navigator.models import Evidence, Result
 
 log = logging.getLogger(__name__)
 
 TIMEOUT = 90.0  # seconds per query; a failed or slow call leaves the query "not judged"
 MAX_EVIDENCE = 8  # evidence rows per result, so ten results fit one prompt
 MAX_QUOTE = 200
+FIELD_ORDER = ("expertise", "unit_expertise", "description", "role")  # topic rows first, so the cap keeps them
 
 SYSTEM = """You judge results of an expert search in the Bern research ecosystem.
 For each result, decide if this person or unit is a good match for the query.
 Use ONLY the evidence listed. Do not use your own knowledge.
 - relevant = true: the evidence shows work on the query topic or a close sub-topic.
 - relevant = false: otherwise, or if the evidence is too thin to tell.
+- A "lab topic (via <unit>)" is a topic of the person's unit: a person is relevant if their unit's
+  topics match the query (they are listed in that unit). Say so in the reason.
 Return ONLY JSON: {"<entity_id>": {"relevant": true|false, "reason": "<one short sentence>"}, ...}
 Use the number at the start of each result as the key, without the name."""
 
@@ -32,11 +35,21 @@ class Verdict:
     reason: str
 
 
+def judged_evidence(evidence: list[Evidence]) -> list[Evidence]:
+    """Topic rows first (own expertise, then the unit's via #44), at most MAX_EVIDENCE."""
+    rank = {f: i for i, f in enumerate(FIELD_ORDER)}
+    return sorted(evidence, key=lambda e: rank.get(e.field, len(FIELD_ORDER)))[:MAX_EVIDENCE]
+
+
+def _label(e: Evidence) -> str:
+    return f"lab topic (via {e.via_unit})" if e.via_unit else e.field
+
+
 def format_results(results: list[Result]) -> str:
     """Name, type and shown evidence per result. No URLs or scores: the judge must not see the ranking."""
     blocks = []
     for r in results:
-        rows = [f'  - {e.field}: {e.value} — "{e.quote[:MAX_QUOTE]}"' for e in r.evidence[:MAX_EVIDENCE]]
+        rows = [f'  - {_label(e)}: {e.value} — "{e.quote[:MAX_QUOTE]}"' for e in judged_evidence(r.evidence)]
         blocks.append("\n".join([f"{r.entity_id} {r.name} ({r.type})", *rows]))
     return "\n".join(blocks)
 

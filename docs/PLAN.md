@@ -649,6 +649,8 @@ As built (`explain.py`, wired into `/api/search`):
 - `EXPLAIN_MODEL` (optional) runs explanations on another model, e.g. 8B while the gateway is slow.
 - Known gap: people whose own evidence is only a role or a member-page listing get true but bland sentences ("… is the contact person [9953]"). Their unit's claims are not on their card, so they can't be cited (follow-up issue).
 
+With lab topics (#42, on top of #44): person evidence may include `unit_expertise` rows with `via_unit`. They are the lab's topics, not the person's. The prompt labels them `lab topic (via <unit>)`, ranks them right after own expertise, and has a worked example ("PhD student in the Sensor Lab, which works on …"). The check adds two rules: a sentence citing a lab topic must name that unit, and a sentence that copies rows (`unit_expertise:`, `role:` …) is rejected. Before, Apertus often turned lab topics into personal expertise ("X specializes in …"). After, 12 of 16 people on 3 queries got a sentence that frames the topic as the lab's; the other 4 keep #44's template. Known limit: a sentence that names the unit but still says "X works on <lab topic> at <unit>" passes the check.
+
 ### 8.7 No reliable result
 
 If the best semantic similarity across all chunks is below `MIN_SIM` (start at 0.45, tune with the eval set) AND the keyword search returns no hits → return no results and show:
@@ -881,6 +883,7 @@ Results:
 Save every verdict with its reason to `eval/judge_log.jsonl`, so a human can spot-check it later (section 16).
 
 As built (`eval_judge.py`, not `judge.py`, so it does not collide with the claim judge in 7.8): the prompt above plus one line asking for the bare id as the key (Apertus sometimes copies "4 ARTORG Center" as the key; the parser also accepts a leading id). Max 8 evidence rows per result (a big unit has 120+), quotes cut to 200 characters, 90 s timeout per query, calls in parallel. `navigator eval --no-judge` skips it.
+With lab topics (#42): the judge sees `lab topic (via <unit>)` rows first (the 8-row cap used to cut them off), and the prompt says a person is relevant if their unit's topics match. Judge gold agreement 85% → 95–100% (3 runs), judged precision@10 63% → 65%. It still rejects people whose lab doesn't match (e.g. Daniel Ahmed, micro/nanorobotics, for "surgical robots").
 First run (2026-10-18): **judged precision@10 47%** over 9 queries, judge gold agreement 100% (6 / 6). Results vary between runs because the expansion terms vary, and the result lists change with them.
 
 ---

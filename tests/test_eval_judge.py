@@ -20,9 +20,9 @@ def _result(entity_id: int, name: str, evidence: list[Evidence] = ()) -> Result:
                   evidence=list(evidence))
 
 
-def _evidence(field: str, value: str, quote: str) -> Evidence:
+def _evidence(field: str, value: str, quote: str, via_unit: str | None = None) -> Evidence:
     return Evidence(claim_id=1, field=field, value=value, quote=quote, url="https://secret.example/page",
-                    judge_verdict=None, judge_reason=None)
+                    judge_verdict=None, judge_reason=None, via_unit=via_unit)
 
 
 class FakeLLM:
@@ -88,3 +88,14 @@ def test_judge_all_and_precision_and_log():
         {"query": "a", "rank": 1, "entity_id": 1, "name": "One", "type": "person", "relevant": True, "reason": "fits"},
         {"query": "a", "rank": 2, "entity_id": 2, "name": "Two", "type": "person", "relevant": False, "reason": "off topic"},
     ]
+
+
+def test_lab_topics_are_labelled_and_kept_by_the_cap():
+    # Ten own rows (role, emails, …) used to push the lab's topics past the 8-row cap.
+    own = [_evidence("email", f"a{i}@x.ch", "q") for i in range(9)] + [_evidence("role", "Group Head", "Anna, Group Head")]
+    lab = [_evidence("unit_expertise", "cochlear implants", "The Hearing Lab builds cochlear implants.", "Hearing Lab")]
+    text = format_results([_result(7, "Anna Muster", own + lab)])
+    lines = text.splitlines()
+    assert lines[1] == '  - lab topic (via Hearing Lab): cochlear implants — "The Hearing Lab builds cochlear implants."'
+    assert lines[2] == '  - role: Group Head — "Anna, Group Head"'
+    assert len(lines) == 1 + 8
