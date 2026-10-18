@@ -23,7 +23,6 @@ services:
     environment:
       DATABASE_URL: postgresql://navigator:${POSTGRES_PASSWORD:-navigator}@db:5432/navigator
       HF_HOME: /cache/hf
-      EXTRACT_MODEL: ${EXTRACT_MODEL:-apertus-v1-5-8b}  # 70B is too slow on the shared gateway (plan 3)
     depends_on:
       db: { condition: service_healthy }
     ports: ["${API_PORT:-8000}:8000"]

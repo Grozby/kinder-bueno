@@ -55,7 +55,7 @@ docker compose up -d app frontend                          # API + UI
   `hf_cache` volume. The app image is ~2 GB (CPU-only torch).
 - Extraction uses `apertus-v1-5-8b` by default (`EXTRACT_MODEL`): 70B was slower and not better (plan section 3).
   `navigator llm-speed` shows the current gateway speed per model.
-  Override with `EXTRACT_MODEL=apertus-v1-5-70b docker compose run ...`.
+  Override with `EXTRACT_MODEL=apertus-v1-5-70b` in `.env`, or `docker compose run -e EXTRACT_MODEL=apertus-v1-5-70b ...`. The same default applies outside Docker.
 - Host ports can be changed with `DB_PORT`, `API_PORT` and `UI_PORT`, e.g. to run a second stack with its
   own data: `DB_PORT=55432 API_PORT=18000 UI_PORT=15173 docker compose -p navclean up -d`.
 - Single steps also work in the container: `docker compose run --rm app uv run navigator <command>`.
