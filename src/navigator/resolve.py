@@ -14,12 +14,15 @@ from unidecode import unidecode
 
 from navigator.verify import PageText, norm
 
-TITLES = {"prof", "dr", "pd", "med", "phil", "nat", "rer", "sc", "phd", "md", "msc", "bsc", "dipl", "ing"}
+TITLES = {"prof", "dr", "pd", "med", "phil", "nat", "rer", "sc", "phd", "md", "msc", "bsc", "dipl", "ing",
+          "ass", "assoc", "asst", "em", "dent", "dr.-ing"}  # "Ass. Prof. Dr." and "Prof. Dr." are one person (#75)
 
 Mention = tuple[str, str, int]  # (entity_type, raw name, page_id)
 
 # Member pages (#23): ".../<lab>/group_members/index_eng.html" or ".../team/". The lab is named on the parent page.
 MEMBER_PAGE = re.compile(r"^(.*/)(?:group_members|team)/(index_eng\.html)?$")
+# A person's profile under a lab (#75): ".../group_members/persons/dr_debeire_kevin/index_eng.html"
+PROFILE_PAGE = re.compile(r"/group_members/(?:persons/)?[a-z]+_[a-z0-9_]+/(index_eng\.html)?$")
 FIXED_UNITS = {"https://www.dcberne.com/en/team/": "Diabetes Center Berne"}  # its parent page starts with a slogan
 MEMBER_REL = ("member_of", "listed_in")  # both give a person's unit
 LAB_TOPIC_FIELDS = ("expertise", "description")  # moved from the umbrella to the lab on the lab's own pages (#70)
@@ -170,13 +173,15 @@ def site_name(title: str) -> str:
     return title.rsplit(" - ", 1)[1].strip() if " - " in title else ""
 
 
-def move_umbrella_topics(conn: psycopg.Connection, claims: list, listed_relations: list) -> tuple[list, int]:
+def move_umbrella_topics(conn: psycopg.Connection, claims: list, listed_relations: list) -> tuple[list, int, int]:
     """Give a lab the topic claims the extractor credited to the umbrella unit on the lab's own pages (#70).
 
     A lab's pages (".../research/aihn/...", the folder of its member page) often do not name the lab; only the
     page title names the site ("... - ARTORG Center ..."), so the extractor credits the site. A unit claim whose
     name is part of the page title's site name, on a page under a lab's folder, moves to that lab (the deepest
-    folder wins). The quote is unchanged: it is still exact page text. Returns the claims and the number moved.
+    folder wins). The quote is unchanged: it is still exact page text. On a person's profile page those topics
+    are the person's (#75), already extracted as theirs: they are dropped, not moved to the lab.
+    Returns the claims, the number moved and the number dropped.
     """
     pages = {pid: (url, title or "") for pid, url, title in conn.execute("SELECT id, url, title FROM page")}
     homes: dict[str, str] = {}  # lab folder -> lab name, from the member pages
@@ -184,19 +189,22 @@ def move_umbrella_topics(conn: psycopg.Connection, claims: list, listed_relation
         m = MEMBER_PAGE.match(pages[page_id][0])
         if m:
             homes[m.group(1)] = lab
-    moved, out = 0, []
+    moved, dropped, out = 0, 0, []
     for row in claims:
         etype, name, page_id, source, fld, value, quote = row
         url, title = pages[page_id]
         site = norm_unit(site_name(title))
         if etype == "unit" and fld in LAB_TOPIC_FIELDS and site and norm_unit(name) in site:
             owners = [folder for folder in homes if url.startswith(folder)]
+            if owners and PROFILE_PAGE.search(url):
+                dropped += 1
+                continue
             if owners:
                 lab = homes[max(owners, key=len)]
                 if norm_unit(lab) != norm_unit(name):
                     row, moved = (etype, lab, page_id, source, fld, value, quote), moved + 1
         out.append(row)
-    return out, moved
+    return out, moved, dropped
 
 
 def _load(conn: psycopg.Connection) -> tuple[list, list]:
@@ -224,6 +232,27 @@ def acronym_aliases(unit_names: dict[str, str]) -> dict[str, str]:
         for key, name in unit_names.items()
         if name.isupper() and " " not in key and len(initials.get(key, [])) == 1
     }
+
+
+def unit_variant(key: str) -> str:
+    """"acoustic robotic systems lab (arsl)" -> "acoustic robotic system lab": no trailing "(...)", no plural "s"."""
+    words = re.sub(r"\s*\([^)]*\)$", "", key).split()
+    return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words)
+
+
+def variant_aliases(mentions: Counter) -> dict[str, str]:
+    """{key: key} merging unit keys that differ only by a plural "s" or a trailing "(ACRONYM)" ("Neuro Robotic
+    Group", "Neuro Robotics Group") into the most mentioned one of them (#75). `mentions` counts mentions per key.
+    Only these duplicates get another key, so the other units keep their ids."""
+    groups: dict[str, list[str]] = defaultdict(list)
+    for key in mentions:
+        groups[unit_variant(key)].append(key)
+    out = {}
+    for keys in groups.values():
+        if len(keys) > 1:
+            main = max(keys, key=lambda k: (mentions[k], -len(k), k))
+            out |= {k: main for k in keys if k != main}
+    return out
 
 
 # "spn-005 - pilot study on painless glucose monitoring": a project code, a dash (unidecode turns "–" into "-") or a
@@ -263,11 +292,13 @@ def mention_keys(claims: list, relations: list) -> dict[Mention, str]:
         add(ttype, tname, page_id, source)
         if ftype == "person" and rel in MEMBER_REL:
             people[m].units.add(norm_unit(tname))
+    variants = variant_aliases(Counter(k for m, k in keys.items() if m[0] == "unit"))
+    keys = {m: variants.get(k, k) if m[0] == "unit" else k for m, k in keys.items()}
     aliases = acronym_aliases({k: name for (etype, name, _), k in keys.items() if etype == "unit"})
     codes = project_code_aliases({k for m, k in keys.items() if m[0] == "project"})
     keys = {m: (aliases if m[0] == "unit" else codes if m[0] == "project" else {}).get(k, k) for m, k in keys.items()}
     for p in people.values():
-        p.units = {aliases.get(u, u) for u in p.units}
+        p.units = {aliases.get(variants.get(u, u), variants.get(u, u)) for u in p.units}
     return keys | person_keys(people)
 
 
@@ -280,7 +311,9 @@ def resolve(conn: psycopg.Connection) -> Counter:
     """Rebuild entity, claim and relation from the raw tables. Returns counts for the report."""
     claims, relations = _load(conn)
     listed_claims, listed_relations, counts = member_page_rows(conn, claims)
-    claims, counts["lab topics moved from the umbrella"] = move_umbrella_topics(conn, claims, listed_relations)
+    claims, counts["lab topics moved from the umbrella"], counts["umbrella topics dropped on profiles"] = (
+        move_umbrella_topics(conn, claims, listed_relations)
+    )
     claims, relations = claims + listed_claims, relations + listed_relations
     keys = mention_keys(claims, relations)
     names: dict[tuple[str, str], Counter] = defaultdict(Counter)

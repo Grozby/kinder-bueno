@@ -1,5 +1,7 @@
 """resolve: name normalisation (unit tests) and the merge rules on the run's own test database (tests/conftest.py)."""
 
+from collections import Counter
+
 import pytest
 from psycopg import sql
 
@@ -13,6 +15,8 @@ from navigator.resolve import (
     project_code_aliases,
     resolve,
     site_name,
+    unit_variant,
+    variant_aliases,
 )
 from navigator.results import build_results
 
@@ -27,6 +31,8 @@ def test_norm_name_drops_titles_and_accents():
     assert norm_name("PD Dr. Francesco Clavica") == "francesco clavica"
     assert norm_name("Dr. Martina Rothenbühler") == "martina rothenbuhler"
     assert norm_name("Dominik Obrist, PhD") == "dominik obrist"
+    assert norm_name("Ass. Prof. Dr. Marco Osterwalder") == norm_name("Marco Osterwalder")
+    assert norm_name("Prof. em. Dr.-Ing. Hans Muster") == "hans muster"
     assert norm_unit("The ARTORG Center") == "artorg center"
 
 
@@ -326,3 +332,53 @@ def test_project_code_is_merged_in_resolve(conn):
     ]
     assert conn.execute("SELECT count(*) FROM claim").fetchone()[0] == 3
 
+
+
+def test_umbrella_topics_on_a_profile_page_are_dropped(conn):
+    """A person's profile under a lab: the extractor credits the person's topics to the site as well (#75)."""
+    _member_pages(conn)
+    profile = conn.execute(
+        "INSERT INTO page (source_id, url, title, text) VALUES ('artorg', %s, %s, 'Kevin Debeire') RETURNING id",
+        (AIHN + "group_members/persons/dr_debeire_kevin/index_eng.html",
+         "Dr. Kevin Debeire - ARTORG Center for Biomedical Engineering Research"),
+    ).fetchone()[0]
+    _claim(conn, profile, "person", "Dr. Kevin Debeire", "expertise", "causal discovery")
+    _claim(conn, profile, "unit", "ARTORG Center", "expertise", "causal discovery")
+    counts = resolve(conn)
+    rows = conn.execute(
+        "SELECT e.type, e.name, c.value FROM claim c JOIN entity e ON e.id = c.entity_id WHERE c.field = 'expertise'"
+    ).fetchall()
+    assert rows == [("person", "Dr. Kevin Debeire", "causal discovery")]
+    assert counts["umbrella topics dropped on profiles"] == 1
+    assert counts["lab topics moved from the umbrella"] == 0
+
+
+def test_unit_variant():
+    assert unit_variant("acoustic robotic systems lab (arsl)") == unit_variant("acoustic robotics systems lab")
+    assert unit_variant("neuro robotic group") == unit_variant("neuro robotics group")
+    assert unit_variant("swiss tph") != unit_variant("swiss tphs lab")
+
+
+def test_unit_spelling_variants_merge_into_the_most_mentioned():
+    mentions = Counter({"acoustic robotics systems lab": 5, "acoustic robotic systems lab": 2,
+                        "acoustic robotic systems lab (arsl)": 1, "neuro robotic group": 1, "neuro robotics group": 3,
+                        "diabetes center berne": 9})
+    assert variant_aliases(mentions) == {
+        "acoustic robotic systems lab": "acoustic robotics systems lab",
+        "acoustic robotic systems lab (arsl)": "acoustic robotics systems lab",
+        "neuro robotic group": "neuro robotics group",
+    }
+
+
+def test_unit_spelling_variants_are_merged_in_resolve(conn):
+    p1, p2 = _page(conn, "artorg", "https://a/1"), _page(conn, "artorg", "https://a/2")
+    _claim(conn, p1, "unit", "Neuro Robotics Group", "expertise", "surgical robots")
+    _claim(conn, p1, "unit", "Neuro Robotics Group", "name", "Neuro Robotics Group")
+    _claim(conn, p2, "unit", "Neuro Robotic Group", "expertise", "cochlear implants")
+    _claim(conn, p2, "person", "Ass. Prof. Dr. Anna Muster", "role", "Group head")
+    _claim(conn, p1, "person", "Anna Muster", "role", "Group head")
+    resolve(conn)
+    assert conn.execute("SELECT type, count(*) FROM entity GROUP BY type ORDER BY type").fetchall() == [
+        ("person", 1), ("unit", 1)
+    ]
+    assert conn.execute("SELECT name FROM entity WHERE type = 'unit'").fetchone()[0] == "Neuro Robotics Group"

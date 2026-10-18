@@ -939,6 +939,7 @@ Topic match with person profiles, #75 (2026-10-18). The deeper crawl (340 pages,
 - `TOPIC_WEIGHT` 0.3 → 0.4.
 - Recall@10 60% / 48% → **64% / 58%**; lay-term 61% / 49% → **67% / 61%**. Case eval: shared 17 → 18 of 31 matches and 6 → 3 false matches; deeper crawl unchanged (15 of 31, 2 false). Swept: `TOPIC_MIN` 0.5–0.65, `TOPIC_WEIGHT` 0.15–0.4, person share 0–1, top-k 1–3; with 9 queries a ±2-point difference is noise.
 - Left on the deeper crawl, outside ranking: duplicates the resolver keeps ("Marco Osterwalder" and "Ass. Prof. Dr. Marco Osterwalder"; "Neuro Robotic(s) Group"; three "Acoustic Robotic(s) Systems Lab"), which take top-10 places, and a profile's expertise stored on the lab (Dr. Debeire's causal-discovery topics on "AI in Health and Nutrition").
+- Fixed in resolve (#75 blockers): titles "Ass.", "Assoc.", "Asst.", "em.", "dent.", "Dr.-Ing." are dropped from person keys; unit keys that differ only by a plural "s" or a trailing "(ACRONYM)" merge into the most mentioned one (only those keys change, so other ids stay); on a profile page (`/group_members/(persons/)?<slug>/`) the umbrella-unit topics are the person's and are dropped instead of moved to the lab (59 on the deeper crawl). Measured on copies: deeper crawl recall@10 58% → **62%**, lay-term 61% → **66%**; shared DB unchanged (64% / 67%), 5 entity keys changed there (2 merges, 3 title-only renames). Case eval unchanged apart from "SPN-005", which `eval/cases.yaml` still named by its code after #127 merged it into its titled project.
 
 ### 10.3 Eval judge (`eval_judge.py`) — [PoC]
 
