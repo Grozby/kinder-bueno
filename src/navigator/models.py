@@ -36,6 +36,7 @@ class Result(BaseModel):
     score: float
     sources: list[str]          # distinct page URLs of the claims shown
     evidence: list[Evidence]    # one row per claim shown
+    added: bool = False         # case references only: added from the chat, not found by the analysis (#81)
 
 
 class Expansion(BaseModel):
@@ -213,3 +214,25 @@ class PageFact(BaseModel):
 
 class PageDetail(ResourcePage):
     facts: list[PageFact]       # the shown claims from the page
+
+
+class Selection(BaseModel):
+    """The references chosen for the pitch (#81)."""
+    entity_ids: list[int]
+
+
+class AddReference(BaseModel):
+    entity_id: int              # a chat result of the case's session
+
+
+class CaseChatTurn(BaseModel):
+    """A stored chat turn of the case drawer (#81); `response` is rebuilt from the current claims."""
+    message: str
+    response: ChatResponse
+    created_at: datetime
+
+
+class CaseFeedback(BaseModel):
+    """The feedback given in the case's chat session (#81): the last 👍/👎 per entity and the flagged claims."""
+    ratings: dict[int, Literal["up", "down"]]
+    flagged: list[int]          # claim ids rated "wrong_fact"

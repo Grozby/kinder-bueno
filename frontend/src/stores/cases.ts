@@ -114,26 +114,48 @@ export const useCasesStore = defineStore('cases', () => {
     }
   }
 
+  // The drawer's state is kept by the backend (#81): references (top 25 plus the ones added from
+  // the chat), the selection, the chat turns and the feedback all come back after a reload
   async function loadReferences(id: string) {
     if (references.value[id]) return
-    const refs = await backend.listReferences(id, MAX_REFERENCES)
+    const [refs, selection, turns, feedback] = await Promise.all([
+      backend.listReferences(id, MAX_REFERENCES),
+      backend.getSelection(id),
+      backend.getCaseChat(id),
+      backend.getCaseFeedback(id),
+    ])
     references.value[id] = refs
-    selected.value[id] ??= refs.slice(0, DEFAULT_REFERENCES).map((r) => r.entity_id)
+    selected.value[id] = selection.entity_ids
+    chats.value[id] ??= turns.map((t) => ({ message: t.message, response: t.response, error: null }))
+    ratings.value[id] = { ...feedback.ratings, ...ratings.value[id] }
+    flagged.value[id] = [...new Set([...feedback.flagged, ...(flagged.value[id] ?? [])])]
+  }
+
+  // Optimistic: the checkbox changes right away and changes back if the backend refuses
+  async function saveSelection(caseId: string, entityIds: number[]) {
+    const previous = selected.value[caseId] ?? []
+    selected.value[caseId] = entityIds
+    try {
+      selected.value[caseId] = (await backend.setSelection(caseId, entityIds)).entity_ids
+    } catch (e) {
+      selected.value[caseId] = previous
+      throw e
+    }
   }
 
   function toggleReference(caseId: string, entityId: number) {
-    const list = (selected.value[caseId] ??= [])
-    const i = list.indexOf(entityId)
-    if (i === -1) list.push(entityId)
-    else list.splice(i, 1)
+    const list = selected.value[caseId] ?? []
+    const next = list.includes(entityId) ? list.filter((e) => e !== entityId) : [...list, entityId]
+    return saveSelection(caseId, next)
   }
 
   // A chat result the user liked: becomes a reference of the case, selected for the pitch
-  function addReference(caseId: string, result: Result) {
+  async function addReference(caseId: string, result: Result) {
+    const added = await backend.addReference(caseId, result.entity_id)
     const list = (references.value[caseId] ??= [])
-    if (!list.some((r) => r.entity_id === result.entity_id)) list.push(result)
-    const chosen = (selected.value[caseId] ??= [])
-    if (!chosen.includes(result.entity_id)) chosen.push(result.entity_id)
+    if (!list.some((r) => r.entity_id === added.entity_id)) list.push(added)
+    const chosen = selected.value[caseId] ?? []
+    if (!chosen.includes(added.entity_id)) await saveSelection(caseId, [...chosen, added.entity_id])
   }
 
   async function sendChat(caseId: string, message: string) {

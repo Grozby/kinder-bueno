@@ -129,10 +129,29 @@ CREATE TABLE IF NOT EXISTS "case" (
   pdf_text        text NOT NULL,
   needs           jsonb NOT NULL DEFAULT '[]',  -- analysis output (#53): search queries
   refs            jsonb NOT NULL DEFAULT '[]',  -- analysis output (#53): [{entity_id, needs}], best first
-  pitch           jsonb                         -- last sales pitch (#54): {text, entity_ids, generated_at}
+  pitch           jsonb,                        -- last sales pitch (#54): {text, entity_ids, generated_at}
+  selection       jsonb,                        -- entity ids chosen for the pitch (#81); NULL: the first 10 references
+  added_refs      jsonb NOT NULL DEFAULT '[]'   -- added from the chat (#81): [{entity_id, score, why}]
 );
 CREATE INDEX IF NOT EXISTS case_uploaded_idx ON "case"(uploaded_at DESC);
 ALTER TABLE "case" ADD COLUMN IF NOT EXISTS pitch jsonb;
+ALTER TABLE "case" ADD COLUMN IF NOT EXISTS selection jsonb;
+ALTER TABLE "case" ADD COLUMN IF NOT EXISTS added_refs jsonb NOT NULL DEFAULT '[]';
+
+-- Chat turns of the case drawer (session "case-<id>", #81), so the history survives a reload. The results are
+-- stored as ids, scores and "why" sentences, and rebuilt from the current claims when read.
+CREATE TABLE IF NOT EXISTS chat_turn (
+  id          serial PRIMARY KEY,
+  session_id  text NOT NULL,
+  message     text NOT NULL,
+  query       text NOT NULL,                -- the query searched (a blank message re-runs the last one)
+  reply       text NOT NULL,
+  filters     jsonb NOT NULL,               -- ChatFilters
+  expansion   jsonb,                        -- Expansion or NULL
+  results     jsonb NOT NULL DEFAULT '[]',  -- [{entity_id, score, why}]
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS chat_turn_session_idx ON chat_turn(session_id, id);
 
 -- Sources added from the UI (POST /api/sources, #55). Sources from config/sources.yaml keep config NULL and
 -- status 'ready'. ALTER so existing databases get the columns too.

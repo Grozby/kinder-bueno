@@ -103,6 +103,11 @@ def check_sentence(sentence: object, claims: dict[int, Evidence]) -> str | None:
     return text
 
 
+def recheck(sentence: object, result: Result) -> str | None:
+    """A stored sentence checked again against the result's current claims (claims change on re-ingest)."""
+    return check_sentence(sentence, {e.claim_id: e for e in prompt_claims(result.evidence)})
+
+
 def parse_why(data: dict, results: list[Result]) -> dict[int, str]:
     """Checked sentences by entity id. Keys may carry the name after the id ("4 ARTORG Center")."""
     allowed = {r.entity_id: {e.claim_id: e for e in prompt_claims(r.evidence)} for r in results}
