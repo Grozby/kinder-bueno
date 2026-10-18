@@ -1,16 +1,159 @@
 <script setup lang="ts">
-import { BadgeCheck, ExternalLink, LoaderCircle, Plus, TriangleAlert } from '@lucide/vue'
-import { computed, onMounted, reactive, ref } from 'vue'
+import {
+  Ban,
+  BadgeCheck,
+  ExternalLink,
+  ListOrdered,
+  LoaderCircle,
+  Plus,
+  TriangleAlert,
+} from '@lucide/vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
-import type { Source } from '@/api'
+import type { ResourcePage, RuleKind, Source } from '@/api'
 import CrawlGraph from '@/components/CrawlGraph.vue'
+import CrawlRules from '@/components/CrawlRules.vue'
+import PageDetail from '@/components/PageDetail.vue'
+import ResourceTable from '@/components/ResourceTable.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseOverlay from '@/components/ui/BaseOverlay.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import { useSourcesStore } from '@/stores/sources'
 import { hostOf, timeAgo } from '@/utils/format'
+import { exactPattern, folderPattern, isValidPattern, matches } from '@/utils/patterns'
 
 const store = useSourcesStore()
+
+// --- Resources tab: ranked pages, block / prioritise ---
+
+const tab = ref<'sources' | 'resources'>('sources')
+const pageSource = ref<string | null>(null)
+const openPageId = ref<number | null>(null)
+
+watch(tab, (t) => {
+  if (t === 'resources' && !store.pages.length) store.loadPages()
+})
+
+function showResources(sourceId: string) {
+  openId.value = null
+  pageSource.value = sourceId
+  tab.value = 'resources'
+}
+
+const notice = ref<{ text: string; undo?: () => Promise<void> } | null>(null)
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+
+function notify(text: string, undo?: () => Promise<void>) {
+  clearTimeout(noticeTimer)
+  notice.value = { text, undo }
+  noticeTimer = setTimeout(() => (notice.value = null), 6000)
+}
+
+async function undo() {
+  const action = notice.value?.undo
+  notice.value = null
+  if (action) await act(action, 'Undone.')
+}
+
+async function act(action: () => Promise<void>, text: string, undoAction?: () => Promise<void>) {
+  try {
+    await action()
+    notify(text, undoAction)
+  } catch (e) {
+    notify(`That did not work: ${(e as Error).message}`)
+  }
+}
+
+function pagesMatching(sourceId: string, pattern: string) {
+  return store.pages.filter((p) => p.source_id === sourceId && matches(pattern, p.url))
+}
+
+function addAndUndo(page: ResourcePage, kind: RuleKind, pattern: string, text: string) {
+  return act(
+    () => store.addRule(page.source_id, kind, pattern),
+    text,
+    () => store.removeRule(page.source_id, kind, pattern),
+  )
+}
+
+function removeAndUndo(page: ResourcePage, kind: RuleKind, pattern: string, text: string) {
+  return act(
+    () => store.removeRule(page.source_id, kind, pattern),
+    text,
+    () => store.addRule(page.source_id, kind, pattern),
+  )
+}
+
+function block(page: ResourcePage) {
+  addAndUndo(
+    page,
+    'exclude_patterns',
+    exactPattern(page.url),
+    `Blocked “${page.title}”. It no longer appears in results.`,
+  )
+}
+
+// Unblocking removes the rule, which can free more pages than this one; the toast says how many
+function unblock(page: ResourcePage) {
+  const pattern = page.blocked_by!
+  const n = pagesMatching(page.source_id, pattern).length
+  removeAndUndo(
+    page,
+    'exclude_patterns',
+    pattern,
+    n > 1
+      ? `Removed the rule ${pattern}: ${n} pages are back in the results.`
+      : `Unblocked “${page.title}”.`,
+  )
+}
+
+function prioritise(page: ResourcePage) {
+  addAndUndo(
+    page,
+    'priority_patterns',
+    exactPattern(page.url),
+    `“${page.title}” will be crawled first next time.`,
+  )
+}
+
+function unprioritise(page: ResourcePage) {
+  const pattern = page.prioritised_by!
+  const n = pagesMatching(page.source_id, pattern).length
+  removeAndUndo(
+    page,
+    'priority_patterns',
+    pattern,
+    n > 1
+      ? `Removed the priority rule ${pattern} (${n} pages).`
+      : `Removed the priority of “${page.title}”.`,
+  )
+}
+
+// "Block similar…": an editable pattern, prefilled with the page's folder, and what it would hit
+const similar = reactive({ page: null as ResourcePage | null, pattern: '' })
+const similarValid = computed(() => isValidPattern(similar.pattern))
+const similarHits = computed(() =>
+  similar.page && similarValid.value ? pagesMatching(similar.page.source_id, similar.pattern) : [],
+)
+
+function openSimilar(page: ResourcePage) {
+  similar.page = page
+  similar.pattern = folderPattern(page.url)
+}
+
+async function blockSimilar() {
+  const page = similar.page
+  if (!page || !similarValid.value) return
+  const pattern = similar.pattern
+  const n = similarHits.value.length
+  similar.page = null
+  await addAndUndo(
+    page,
+    'exclude_patterns',
+    pattern,
+    `Blocked ${n} page${n === 1 ? '' : 's'} matching ${pattern}.`,
+  )
+}
 
 const showForm = ref(false)
 const submitting = ref(false)
@@ -84,24 +227,44 @@ onMounted(() => {
       <BaseButton variant="primary" :icon="Plus" @click="showForm = true">Add source</BaseButton>
     </section>
 
-    <dl class="kpis toolbar">
-      <div>
-        <dt>Sources</dt>
-        <dd>{{ store.sources.length }}</dd>
+    <div class="toolbar">
+      <div class="tabs" role="tablist" aria-label="View">
+        <button
+          role="tab"
+          :aria-selected="tab === 'sources'"
+          :class="{ on: tab === 'sources' }"
+          @click="tab = 'sources'"
+        >
+          Sources
+        </button>
+        <button
+          role="tab"
+          :aria-selected="tab === 'resources'"
+          :class="{ on: tab === 'resources' }"
+          @click="tab = 'resources'"
+        >
+          <ListOrdered :size="16" /> Ranked pages
+        </button>
       </div>
-      <div>
-        <dt>Pages</dt>
-        <dd>{{ totals.pages }}</dd>
-      </div>
-      <div>
-        <dt>Entities</dt>
-        <dd>{{ totals.entities }}</dd>
-      </div>
-      <div>
-        <dt>Verified facts</dt>
-        <dd>{{ totals.claims }}</dd>
-      </div>
-    </dl>
+      <dl class="kpis">
+        <div>
+          <dt>Sources</dt>
+          <dd>{{ store.sources.length }}</dd>
+        </div>
+        <div>
+          <dt>Pages</dt>
+          <dd>{{ totals.pages }}</dd>
+        </div>
+        <div>
+          <dt>Entities</dt>
+          <dd>{{ totals.entities }}</dd>
+        </div>
+        <div>
+          <dt>Verified facts</dt>
+          <dd>{{ totals.claims }}</dd>
+        </div>
+      </dl>
+    </div>
 
     <BaseOverlay
       :open="showForm"
@@ -186,7 +349,21 @@ onMounted(() => {
       <TriangleAlert :size="16" /> The sources could not be loaded: {{ store.error }}
     </p>
 
-    <section class="grid">
+    <ResourceTable
+      v-if="tab === 'resources'"
+      v-model:source="pageSource"
+      :pages="store.pages"
+      :sources="store.sources"
+      :loading="store.pagesLoading"
+      :error="store.pagesError"
+      @open="(id) => (openPageId = id)"
+      @block="block"
+      @unblock="unblock"
+      @prioritise="prioritise"
+      @unprioritise="unprioritise"
+    />
+
+    <section v-else class="grid">
       <article
         v-for="s in store.sources"
         :key="s.id"
@@ -272,8 +449,78 @@ onMounted(() => {
             </li>
           </ul>
         </div>
+        <div class="detail-actions">
+          <BaseButton :icon="ListOrdered" @click="showResources(openSource.id)">
+            Ranked pages of this source
+          </BaseButton>
+        </div>
+        <CrawlRules :key="openSource.id" class="detail-rules" :source="openSource" />
       </div>
     </BaseOverlay>
+
+    <PageDetail
+      :id="openPageId"
+      @close="openPageId = null"
+      @block="block"
+      @block-pattern="openSimilar"
+      @unblock="unblock"
+      @prioritise="prioritise"
+      @unprioritise="unprioritise"
+    />
+
+    <BaseOverlay
+      :open="similar.page !== null"
+      side="center"
+      width="640px"
+      title="Block similar pages"
+      @close="similar.page = null"
+    >
+      <form v-if="similar.page" class="similar" @submit.prevent="blockSimilar">
+        <p class="muted">
+          Pages whose URL matches this pattern are hidden from results at once and skipped by the
+          next crawl. It starts as the folder of “{{ similar.page.title }}”; edit it to widen or
+          narrow it.
+        </p>
+        <label class="field">
+          <span class="field-label">URL pattern (regular expression)</span>
+          <input v-model="similar.pattern" class="input mono" :aria-invalid="!similarValid" />
+          <small v-if="!similarValid" class="text-error">This is not a valid pattern.</small>
+        </label>
+        <div class="hits">
+          <strong
+            >Matches {{ similarHits.length }} page{{ similarHits.length === 1 ? '' : 's' }}</strong
+          >
+          <ul>
+            <li v-for="p in similarHits.slice(0, 8)" :key="p.id">
+              <Ban :size="13" /> {{ p.title }} <span class="muted">{{ p.url }}</span>
+            </li>
+            <li v-if="similarHits.length > 8" class="muted">
+              and {{ similarHits.length - 8 }} more
+            </li>
+          </ul>
+        </div>
+        <div class="submit">
+          <BaseButton @click="similar.page = null">Cancel</BaseButton>
+          <BaseButton
+            type="submit"
+            variant="danger"
+            :icon="Ban"
+            :disabled="!similarValid || !similarHits.length"
+          >
+            Block {{ similarHits.length }} page{{ similarHits.length === 1 ? '' : 's' }}
+          </BaseButton>
+        </div>
+      </form>
+    </BaseOverlay>
+
+    <Teleport to="body">
+      <Transition name="toast">
+        <div v-if="notice" class="toast" role="status">
+          <span>{{ notice.text }}</span>
+          <button v-if="notice.undo" @click="undo">Undo</button>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -304,13 +551,53 @@ h1 {
   color: var(--text-muted);
 }
 
-.kpis {
+.toolbar {
   flex: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border-soft);
+}
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--border-soft);
+}
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 34px;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tabs button:hover:not(.on) {
+  color: var(--text);
+}
+.tabs button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.tabs button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
 }
 .kpis div {
   display: flex;
@@ -592,6 +879,104 @@ dd {
 }
 .p-failed a {
   color: var(--bad);
+}
+.detail-actions,
+.detail-rules {
+  grid-column: 1 / -1;
+}
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -1rem;
+}
+
+.similar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.input[aria-invalid='true'] {
+  border-color: var(--bad);
+}
+.hits ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 0.4rem;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+.hits li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.hits li + li {
+  border-top: 1px solid var(--border-soft);
+}
+.hits li .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.similar .submit {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Above the pop-ups, since most actions start in one */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  translate: -50% 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+  background: var(--text);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+.toast button {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius);
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 @media (max-width: 1100px) {

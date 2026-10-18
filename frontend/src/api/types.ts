@@ -118,6 +118,53 @@ export interface Source {
   discovered: CrawledPage[] // a sample of the crawl tree, for the graph
 }
 
+// --- Resources: the crawled pages, ranked by what they give the search (FRONTEND_API.md "Resources") ---
+
+export type PageKind = 'team' | 'lab' | 'project' | 'infrastructure' | 'other'
+
+export interface ResourcePage {
+  id: number
+  source_id: string
+  url: string
+  title: string
+  kind: PageKind
+  status: PageStatus
+  // 0-100: yield 40 %, judge precision 30 %, quote-verification survival 20 %, feedback 10 %
+  score: number
+  score_breakdown: ScoreItem[] // the four parts, same order
+  entities: number
+  verified_claims: number
+  judge_supported: number | null // share of judged claims marked "supported", 0-1; null: none judged
+  drop_rate: number | null // share of extracted claims dropped by quote verification, 0-1
+  feedback_up: number
+  feedback_down: number
+  crawled_at: string | null
+  blocked_by: string | null // exclude pattern that matches the URL: hidden from results at once
+  prioritised_by: string | null // priority pattern that matches the URL: crawled first next time
+}
+
+export interface PageFact {
+  claim_id: number
+  entity_id: number
+  entity_name: string
+  entity_type: EntityType
+  field: string
+  value: string
+  quote: string
+  judge_verdict: 'supported' | 'partial' | null
+}
+
+export interface PageDetail extends ResourcePage {
+  facts: PageFact[] // the verified facts extracted from this page
+}
+
+export type RuleKind = 'allow_hosts' | 'include_patterns' | 'exclude_patterns' | 'priority_patterns'
+
+// The crawl rules of one source, as in config/sources.yaml. Patterns are regular expressions on the URL.
+export type CrawlRules = Record<RuleKind, string[]> & {
+  changed_at: string | null // newer than the source's last_crawled_at: a re-crawl applies them fully
+}
+
 export interface NewSource {
   url: string
   name?: string

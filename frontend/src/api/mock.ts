@@ -6,13 +6,21 @@ import type {
   ChatRequest,
   ChatResponse,
   CrawledPage,
+  CrawlRules,
   EntityType,
   FeedbackRequest,
   NewSource,
+  PageDetail,
+  PageFact,
+  PageKind,
+  PageStatus,
   Pitch,
+  ResourcePage,
   Result,
+  RuleKind,
   Source,
 } from './types'
+import { isValidPattern, matches } from '@/utils/patterns'
 
 const ANALYSIS_MS = 3500
 const CRAWL_MS = 9000
@@ -303,6 +311,297 @@ seedSource('unibe', 'University of Bern web ecosystem', 25, 61, 214)
 seedSource('artorg', 'ARTORG Center for Biomedical Engineering Research', 45, 132, 488)
 seedSource('dcb', 'Diabetes Center Berne', 30, 74, 259)
 
+// --- resources: crawl rules and pages ---
+
+// The rules from config/sources.yaml, so the demo blocks and prioritises with real patterns
+const rules = new Map<string, CrawlRules>([
+  [
+    'artorg',
+    {
+      allow_hosts: ['www.artorg.unibe.ch'],
+      include_patterns: ['index_eng\\.html$'],
+      exclude_patterns: ['/news_and_events/', '/jobs/', '/publications/', '/teaching/'],
+      priority_patterns: [
+        '^https://www\\.artorg\\.unibe\\.ch/research/[a-z0-9_]+/index_eng\\.html$',
+        '^https://www\\.artorg\\.unibe\\.ch/research/[a-z0-9_]+/group_members/index_eng\\.html$',
+      ],
+      changed_at: null,
+    },
+  ],
+  [
+    'dcb',
+    {
+      allow_hosts: ['www.dcberne.com'],
+      include_patterns: ['^https://www\\.dcberne\\.com/en/'],
+      exclude_patterns: ['/wp-json/', '/career/', '/legal-notice/', '/news/'],
+      priority_patterns: ['/en/project/', '/innovation/$'],
+      changed_at: null,
+    },
+  ],
+  [
+    'unibe',
+    {
+      allow_hosts: ['www.dbmr.unibe.ch', 'www.cvrc.unibe.ch', 'www.sitem.unibe.ch'],
+      include_patterns: ['index_eng\\.html$'],
+      exclude_patterns: ['/news', '/jobs/', '/events/'],
+      priority_patterns: ['/research_programs/[a-z0-9_]+/index_eng\\.html$'],
+      changed_at: null,
+    },
+  ],
+])
+
+// [path, title, kind] per source; the hosts come from the allow list
+const PAGE_SEEDS: Record<string, Array<[string, string, PageKind]>> = {
+  artorg: [
+    ...[
+      'surgical_robotics',
+      'hearing_research',
+      'cardiovascular',
+      'medical_imaging',
+      'ai_health',
+      'gait_lab',
+    ].flatMap((lab): Array<[string, string, PageKind]> => {
+      const name = lab.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      return [
+        [`https://www.artorg.unibe.ch/research/${lab}/index_eng.html`, `${name} Lab`, 'lab'],
+        [
+          `https://www.artorg.unibe.ch/research/${lab}/group_members/index_eng.html`,
+          `${name} Lab: group members`,
+          'team',
+        ],
+      ]
+    }),
+    [
+      'https://www.artorg.unibe.ch/services/prototyping/index_eng.html',
+      'Prototyping workshop',
+      'infrastructure',
+    ],
+    [
+      'https://www.artorg.unibe.ch/services/biomech_testing/index_eng.html',
+      'Biomechanics testing',
+      'infrastructure',
+    ],
+    ['https://www.artorg.unibe.ch/research/index_eng.html', 'Research overview', 'other'],
+    ['https://www.artorg.unibe.ch/about_us/index_eng.html', 'About us', 'other'],
+    ['https://www.artorg.unibe.ch/news_and_events/index_eng.html', 'News and events', 'other'],
+  ],
+  dcb: [
+    ['https://www.dcberne.com/en/team/', 'Team', 'team'],
+    [
+      'https://www.dcberne.com/en/project/smart-insulin-patch/',
+      'Project: Smart insulin patch',
+      'project',
+    ],
+    [
+      'https://www.dcberne.com/en/project/closed-loop-control/',
+      'Project: Closed-loop glucose control',
+      'project',
+    ],
+    [
+      'https://www.dcberne.com/en/project/ai-nutrition-coach/',
+      'Project: AI nutrition coach',
+      'project',
+    ],
+    [
+      'https://www.dcberne.com/en/project/sensor-validation/',
+      'Project: Sensor validation',
+      'project',
+    ],
+    ['https://www.dcberne.com/en/focus-areas/', 'Focus areas', 'lab'],
+    ['https://www.dcberne.com/en/offering/', 'Offering for start-ups', 'infrastructure'],
+    ['https://www.dcberne.com/en/innovation/', 'Innovation', 'other'],
+    ['https://www.dcberne.com/en/partners-network/', 'Partners network', 'other'],
+    ['https://www.dcberne.com/en/contact/', 'Contact', 'other'],
+  ],
+  unibe: [
+    ...['muster_lab', 'imaging_lab', 'metabolism_lab', 'cardio_lab'].flatMap(
+      (lab): Array<[string, string, PageKind]> => {
+        const name = lab.replace(/_lab$/, '').replace(/\b\w/g, (c) => c.toUpperCase())
+        return [
+          [
+            `https://www.dbmr.unibe.ch/research/research_programs/${lab}/index_eng.html`,
+            `${name} Lab`,
+            'lab',
+          ],
+          [
+            `https://www.dbmr.unibe.ch/research/research_programs/${lab}/team/index_eng.html`,
+            `${name} Lab: team`,
+            'team',
+          ],
+        ]
+      },
+    ),
+    ['https://www.cvrc.unibe.ch/index_eng.html', 'Cardiovascular Research Cluster', 'lab'],
+    ['https://www.sitem.unibe.ch/index_eng.html', 'sitem-insel', 'infrastructure'],
+    [
+      'https://www.sitem.unibe.ch/translational_imaging/index_eng.html',
+      'Translational imaging center',
+      'infrastructure',
+    ],
+    [
+      'https://www.dbmr.unibe.ch/research/research_programs/index_eng.html',
+      'Research programmes',
+      'other',
+    ],
+  ],
+}
+
+// Facts and entities a page of this kind typically yields: [min facts, max facts]
+const YIELD: Record<PageKind, [number, number]> = {
+  team: [22, 46],
+  lab: [10, 26],
+  project: [6, 16],
+  infrastructure: [4, 11],
+  other: [0, 4],
+}
+
+interface StoredPage {
+  id: number
+  source_id: string
+  url: string
+  title: string
+  kind: PageKind
+  status: PageStatus
+  verified_claims: number
+  entities: number
+  judge_supported: number | null
+  drop_rate: number | null
+  feedback_up: number
+  feedback_down: number
+}
+
+const pages: StoredPage[] = Object.entries(PAGE_SEEDS)
+  .flatMap(([sourceId, seeds]) =>
+    seeds.map(([url, title, kind]) => {
+      const rand = rng(hash(url))
+      const [lo, hi] = YIELD[kind]
+      const claims = Math.round(lo + rand() * (hi - lo))
+      return {
+        id: 0,
+        source_id: sourceId,
+        url,
+        title,
+        kind,
+        status: (rand() < 0.06 ? 'failed' : 'crawled') as PageStatus,
+        verified_claims: claims,
+        entities: Math.max(claims ? 1 : 0, Math.round(claims / (kind === 'team' ? 2.6 : 4))),
+        judge_supported: claims ? 0.62 + rand() * 0.38 : null,
+        drop_rate: claims ? rand() * 0.32 : null,
+        feedback_up: Math.floor(rand() * (claims / 6)),
+        feedback_down: Math.floor(rand() * 2.4),
+      }
+    }),
+  )
+  .map((p, i) => ({ ...p, id: i + 1 }))
+
+const pct = (share: number) => `${Math.round(share * 100)} %`
+
+function toResourcePage(p: StoredPage): ResourcePage {
+  const r = rules.get(p.source_id)
+  const failed = p.status === 'failed'
+  const claims = failed ? 0 : p.verified_claims
+  const yieldScore = Math.min(100, Math.round((claims / 40) * 100))
+  const precision = !failed && p.judge_supported !== null ? Math.round(p.judge_supported * 100) : 0
+  const survival = !failed && p.drop_rate !== null ? Math.round((1 - p.drop_rate) * 100) : 0
+  const votes = p.feedback_up + p.feedback_down
+  const feedback = Math.round(((p.feedback_up + 1) / (votes + 2)) * 100)
+  return {
+    id: p.id,
+    source_id: p.source_id,
+    url: p.url,
+    title: p.title,
+    kind: p.kind,
+    status: p.status,
+    score: Math.round(0.4 * yieldScore + 0.3 * precision + 0.2 * survival + 0.1 * feedback),
+    score_breakdown: [
+      {
+        criterion: 'Yield',
+        score: yieldScore,
+        rationale: failed
+          ? 'The page could not be fetched.'
+          : `${claims} verified facts about ${p.entities} people, units or projects.`,
+      },
+      {
+        criterion: 'Precision',
+        score: precision,
+        rationale:
+          p.judge_supported === null || failed
+            ? 'No facts to judge.'
+            : `The judge found ${pct(p.judge_supported)} of the facts fully supported by their quote.`,
+      },
+      {
+        criterion: 'Verification',
+        score: survival,
+        rationale:
+          p.drop_rate === null || failed
+            ? 'Nothing was extracted.'
+            : `${pct(p.drop_rate)} of the extracted facts were dropped: their quote was not on the page.`,
+      },
+      {
+        criterion: 'Feedback',
+        score: feedback,
+        rationale: votes
+          ? `${p.feedback_up} up and ${p.feedback_down} down on results that cite this page.`
+          : 'No feedback yet.',
+      },
+    ],
+    entities: failed ? 0 : p.entities,
+    verified_claims: claims,
+    judge_supported: failed ? null : p.judge_supported,
+    drop_rate: failed ? null : p.drop_rate,
+    feedback_up: p.feedback_up,
+    feedback_down: p.feedback_down,
+    crawled_at: sources.get(p.source_id)?.data.last_crawled_at ?? null,
+    blocked_by: r?.exclude_patterns.find((x) => matches(x, p.url)) ?? null,
+    prioritised_by: r?.priority_patterns.find((x) => matches(x, p.url)) ?? null,
+  }
+}
+
+const FACT_FIELDS: Record<EntityType, string[]> = {
+  person: ['role', 'expertise', 'member_of', 'contact'],
+  unit: ['expertise', 'part_of', 'project'],
+  project: ['expertise', 'partner', 'funding'],
+  infrastructure: ['service', 'part_of'],
+}
+
+function pageFacts(p: StoredPage): PageFact[] {
+  if (p.status === 'failed' || !p.verified_claims) return []
+  const rand = rng(hash(p.url) ^ 0x5bd1e995)
+  const pool = REFERENCE_POOL.map((e, i) => ({ e, i })).filter(({ e }) => e[3] === p.source_id)
+  const topics = EXPERTISE[p.source_id]!
+  const facts: PageFact[] = []
+  for (let n = 0; n < Math.min(p.verified_claims, 14); n++) {
+    const { e, i } = pool[Math.floor(rand() * Math.min(pool.length, p.entities || 1))]!
+    const [type, name, affiliation] = e
+    const field = FACT_FIELDS[type][Math.floor(rand() * FACT_FIELDS[type].length)]!
+    const topic = topics[Math.floor(rand() * topics.length)]!
+    const value =
+      field === 'role'
+        ? 'Group leader'
+        : field === 'member_of' || field === 'part_of'
+          ? affiliation
+          : field === 'contact'
+            ? `${name.split(' ').pop()!.toLowerCase()}@example.unibe.ch`
+            : topic
+    facts.push({
+      claim_id: p.id * 100 + n,
+      entity_id: i + 1,
+      entity_name: name,
+      entity_type: type,
+      field,
+      value,
+      quote:
+        field === 'role'
+          ? `${name}, ${value}`
+          : field === 'contact'
+            ? `${name} · ${value}`
+            : `${name} … ${value === topic ? `works on ${topic}` : `is part of the ${value}`}.`,
+      judge_verdict: rand() < 0.82 ? 'supported' : 'partial',
+    })
+  }
+  return facts
+}
+
 function readSource(id: string): Source {
   const stored = sources.get(id)
   if (!stored) throw new Error('404 Not Found')
@@ -443,5 +742,50 @@ export const mockBackend = {
       maxDepth: input.max_depth,
     })
     return clone(readSource(id))
+  },
+  async recrawlSource(id: string): Promise<Source> {
+    await wait(300)
+    const stored = sources.get(id)
+    if (!stored) throw new Error('404 Not Found')
+    stored.data.status = 'crawling'
+    stored.startedAt = Date.now()
+    return clone(readSource(id))
+  },
+  async getRules(id: string): Promise<CrawlRules> {
+    await wait(150)
+    const r = rules.get(id)
+    if (!r)
+      return {
+        allow_hosts: [],
+        include_patterns: [],
+        exclude_patterns: [],
+        priority_patterns: [],
+        changed_at: null,
+      }
+    return clone(r)
+  },
+  async setRules(id: string, next: Record<RuleKind, string[]>): Promise<CrawlRules> {
+    await wait(250)
+    for (const pattern of [
+      ...next.include_patterns,
+      ...next.exclude_patterns,
+      ...next.priority_patterns,
+    ]) {
+      if (!isValidPattern(pattern)) throw new Error(`422 Invalid pattern: ${pattern}`)
+    }
+    const saved: CrawlRules = { ...clone(next), changed_at: new Date().toISOString() }
+    rules.set(id, saved)
+    return clone(saved)
+  },
+
+  async listPages(): Promise<ResourcePage[]> {
+    await wait(300)
+    return pages.map(toResourcePage)
+  },
+  async getPage(id: number): Promise<PageDetail> {
+    await wait(200)
+    const p = pages.find((x) => x.id === id)
+    if (!p) throw new Error('404 Not Found')
+    return { ...toResourcePage(p), facts: pageFacts(p) }
   },
 }

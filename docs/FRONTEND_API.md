@@ -108,3 +108,49 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 - Served since #51 (read-only): `status` is always `"ready"`; `validated` means the source is in
   `config/sources.yaml`, and `root_url` is its first seed. `discovered` is up to 60 stored pages with
   `parent: null`, `depth: 0`, `status: "crawled"`: the crawler does not record the tree yet (#55).
+
+## Resources: ranked pages and crawl rules
+
+The Sources page has a "Ranked pages" tab: every crawled page, ranked by what it gives the search,
+with actions to block or prioritise pages. Not served yet; the mock answers.
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/pages` | – | `ResourcePage[]` (all sources, any order; the UI sorts) |
+| GET | `/api/pages/{id}` | – | `PageDetail` = `ResourcePage` + `facts: PageFact[]` |
+| GET | `/api/sources/{id}/rules` | – | `CrawlRules` |
+| PUT | `/api/sources/{id}/rules` | `{allow_hosts, include_patterns, exclude_patterns, priority_patterns}` | `CrawlRules` |
+| POST | `/api/sources/{id}/crawl` | – | `Source` with `status: "crawling"` (re-crawl + embed) |
+
+**Page score (0–100)**, from data that already exists. `score_breakdown` holds the four parts as
+`ScoreItem`s (criterion, 0–100, one-sentence rationale), in this order:
+
+| Part | Weight | Value |
+|---|---|---|
+| Yield | 40 % | shown claims from the page, `min(100, claims / 40 × 100)` |
+| Precision | 30 % | share of the page's judged claims with `judge_verdict = 'supported'` |
+| Verification | 20 % | `1 − drop rate`: share of `raw_claim`s from the page that passed quote verification |
+| Feedback | 10 % | `(up + 1) / (up + down + 2)` over feedback on results that cite the page |
+
+A failed fetch scores 0 on the first three parts. The same numbers come back as plain fields
+(`verified_claims`, `entities`, `judge_supported`, `drop_rate`, `feedback_up`, `feedback_down`),
+plus `kind` (`team` | `lab` | `project` | `infrastructure` | `other`, a guess from the URL or the
+entity types on the page is fine).
+
+**Rules** are the per-source blocks of `config/sources.yaml`; patterns are regular expressions
+matched with `re.search` on the URL (the UI only uses syntax JavaScript shares). The UI writes:
+
+- *Block* → `^<escaped url>$` added to `exclude_patterns`. *Block similar…* → a pattern the user
+  edits, prefilled with the page's folder (`^https://host/path/`).
+- *Prioritise* → `^<escaped url>$` added to `priority_patterns`.
+- *Unblock* / *Remove priority* → removes the matching rule (the UI warns when it covers more pages).
+
+Expected behaviour:
+
+- **A block applies at once:** search, chat and case references drop claims whose only sources
+  match an exclude pattern, without a re-crawl. Each `ResourcePage` returns the matching
+  pattern in `blocked_by` (and `prioritised_by`), or `null`.
+- Rules are stored server-side (DB table or a rules file next to `sources.yaml`), not lost on
+  restart. `changed_at` is set on every PUT; when it is newer than the source's `last_crawled_at`,
+  the UI offers a re-crawl, which must also re-embed the source.
+- Invalid patterns → `422` with the pattern in the message.

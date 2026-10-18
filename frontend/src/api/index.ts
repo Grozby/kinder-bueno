@@ -8,10 +8,14 @@ import type {
   CaseStatus,
   ChatRequest,
   ChatResponse,
+  CrawlRules,
   FeedbackRequest,
   NewSource,
+  PageDetail,
   Pitch,
+  ResourcePage,
   Result,
+  RuleKind,
   Source,
 } from './types'
 
@@ -50,6 +54,13 @@ const realBackend = {
   getSource: (id: string) => api<Source>(`/sources/${id}`),
   addSource: (source: NewSource) =>
     api<Source>('/sources', { method: 'POST', body: JSON.stringify(source) }),
+  recrawlSource: (id: string) => api<Source>(`/sources/${id}/crawl`, { method: 'POST' }),
+  getRules: (id: string) => api<CrawlRules>(`/sources/${id}/rules`),
+  setRules: (id: string, rules: Record<RuleKind, string[]>) =>
+    api<CrawlRules>(`/sources/${id}/rules`, { method: 'PUT', body: JSON.stringify(rules) }),
+
+  listPages: () => api<ResourcePage[]>('/pages'),
+  getPage: (id: number) => api<PageDetail>(`/pages/${id}`),
 }
 
 export type Backend = typeof realBackend
