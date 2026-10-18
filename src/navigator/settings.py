@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://gateway.keera.ch/api/v1"
     llm_model: str = "apertus-v1-5-70b"
     extract_model: str | None = None  # model for extraction only; defaults to llm_model
+    explain_model: str | None = None  # model for "why it matches" (plan 8.6); defaults to llm_model
     llm_concurrency: int = 8
     judge_enabled: bool = True
     embed_model: str = "BAAI/bge-m3"

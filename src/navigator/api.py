@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 
 from navigator import chunks_db
+from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
 from navigator.llm import LLM
@@ -22,6 +23,7 @@ from navigator.models import (
     FeedbackCounts,
     FeedbackRequest,
     FeedbackResponse,
+    Result,
     SearchResponse,
     SourceStats,
     StatsResponse,
@@ -40,7 +42,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from navigator.embed import get_model
 
     get_model()
-    app.state.llm = LLM(get_settings())
+    settings = get_settings()
+    app.state.llm = LLM(settings)
+    app.state.explain_llm = LLM(settings, settings.explain_model)  # its own model: 8B while the gateway is slow
     yield
 
 
@@ -76,9 +80,16 @@ def get_expand(request: Request) -> Callable[[str], TermExpansion]:
     return lambda q: anyio.from_thread.run(expand_query, llm, q)
 
 
+def get_explain(request: Request) -> Callable[[str, list[Result]], dict[int, str]]:
+    """'Why it matches' sentences (plan 8.6), run on the main loop like get_expand."""
+    llm = request.app.state.explain_llm
+    return lambda q, results: anyio.from_thread.run(explain_results, llm, q, results)
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
 Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
+Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_explain)]
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -98,6 +109,7 @@ def search(
     conn: Conn,
     embed: Embed,
     expand: Expand,
+    explain: Explain,
     q: Annotated[str, Query(min_length=1)],
     source: Annotated[list[str], Query()] = [],
     type: Annotated[list[EntityType], Query()] = [],
@@ -107,6 +119,7 @@ def search(
     terms = expand(q)
     ranking = rank_entities(conn, q, sources=source, types=type, extra_terms=terms.terms, embed=embed)
     results = build_results(conn, ranking.ranked)
+    results = apply_why(results, explain(q, results)) if results else results
     expansion = Expansion(en=terms.en, de=terms.de) if terms.terms else None
     return SearchResponse(results=results, expansion=expansion, no_result=not results)
 

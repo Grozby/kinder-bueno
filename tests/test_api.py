@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import onehot
-from navigator.api import app, get_conn, get_embed, get_expand
+from navigator.api import app, get_conn, get_embed, get_expand, get_explain
 from navigator.expand import Expansion
 
 
@@ -22,6 +22,7 @@ def client(test_conn, graph):
     app.dependency_overrides[get_conn] = lambda: test_conn
     app.dependency_overrides[get_embed] = lambda: fake_embed
     app.dependency_overrides[get_expand] = lambda: lambda q: Expansion()  # expansion failed / disabled
+    app.dependency_overrides[get_explain] = lambda: lambda q, results: {}  # explanations failed: template
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -96,3 +97,27 @@ def test_search_uses_and_returns_expansion(client, graph):
     assert body["expansion"] == {"en": ["insulin"], "de": ["Insulinpumpe"]}
     assert body["no_result"] is False
     assert "Diabetes Lab" in {r["name"] for r in body["results"]}
+
+
+def test_search_uses_checked_explanations_and_keeps_the_template_otherwise(client, graph):
+    seen = {}
+
+    def fake_explain(q, results):
+        seen["q"], seen["n"] = q, len(results)
+        first = results[0]
+        return {first.entity_id: f"Works on glucose [{first.evidence[0].claim_id}]."}
+
+    app.dependency_overrides[get_explain] = lambda: fake_explain
+    body = client.get("/api/search", params={"q": "glucose"}).json()
+    assert seen == {"q": "glucose", "n": len(body["results"])}
+    first, rest = body["results"][0], body["results"][1:]
+    assert first["why"] == f"Works on glucose [{first['evidence'][0]['claim_id']}]."
+    assert all(r["why"].startswith("Matches on: ") for r in rest)
+
+
+def test_search_without_results_does_not_call_explain(client):
+    def fail(q, results):
+        raise AssertionError("explain called without results")
+
+    app.dependency_overrides[get_explain] = lambda: fail
+    assert client.get("/api/search", params={"q": "nothing here"}).json()["no_result"] is True
