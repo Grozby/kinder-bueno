@@ -10,6 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError, field_validator
 
 from navigator.llm import LLM, LLMError
+from navigator.resolve import norm_name
 from navigator.verify import PageText, verify_claim, verify_relation
 
 log = logging.getLogger(__name__)
@@ -234,16 +235,56 @@ def parse_items(data: dict) -> tuple[list[Claim], list[Relation], int]:
     return claims, relations, dropped
 
 
+# Words that label a list on member pages; the 8B model sometimes turns them into "people".
+LABEL_WORDS = {"alumni", "phone", "phone2", "mail", "e-mail", "funktion", "name", "titel", "staff", "students",
+               "student", "senior", "members", "member", "group", "team", "head", "chair", "administration",
+               "candidates", "thesis", "master", "bachelor", "postdocs", "contact"}
+
+
+def is_person_name(name: str) -> bool:
+    """A real person's name: at least two words after titles, no digits, not only list labels.
+    Rejects "Alumni", "Phone2", "PhD Students" and lone surnames that cannot be told apart."""
+    words = norm_name(name).replace("/", " ").split()
+    return len(words) >= 2 and not any(ch.isdigit() for ch in name) and not set(words) <= LABEL_WORDS
+
+
 def check_items(page: PageText, claims: list[Claim], relations: list[Relation]) -> tuple[list[Checked], list[Checked]]:
     checked_claims = []
     for c in claims:
+        if c.entity_type == "person" and not is_person_name(c.entity_name):
+            checked_claims.append(Checked(c, False, c.quote, "not a person name"))
+            continue
         m = verify_claim(page, c.entity_name, c.field, c.value, c.quote)
         checked_claims.append(Checked(c, m.ok, m.quote, m.reason))
     checked_relations = []
     for r in relations:
+        names = [n for t, n in ((r.from_type, r.from_name), (r.to_type, r.to_name)) if t == "person"]
+        if not all(is_person_name(n) for n in names):
+            checked_relations.append(Checked(r, False, r.quote, "not a person name"))
+            continue
         m = verify_relation(page, r.from_name, r.to_name, r.quote)
         checked_relations.append(Checked(r, m.ok, m.quote, m.reason))
     return checked_claims, checked_relations
+
+
+def reverify(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]:
+    """Re-run the checks on stored raw rows, without LLM calls (after a rule change).
+
+    rows: (kind, id, title, text, *item fields) with kind "claim" or "relation".
+    Returns (claim updates, relation updates) as (verified, quote, fail_reason, id)."""
+    pages: dict[tuple[str, str], PageText] = {}
+    claim_updates, relation_updates = [], []
+    for kind, row_id, title, text, *fields in rows:
+        page = pages.setdefault((title, text), PageText(f"{title}\n{text}"))
+        if kind == "claim":
+            item = Claim.model_construct(**dict(zip(CLAIM_KEYS, fields)))
+            (checked,), _ = check_items(page, [item], [])
+            claim_updates.append((checked.verified, checked.quote, checked.fail_reason, row_id))
+        else:
+            item = Relation.model_construct(**dict(zip(RELATION_KEYS, fields)))
+            _, (checked,) = check_items(page, [], [item])
+            relation_updates.append((checked.verified, checked.quote, checked.fail_reason, row_id))
+    return claim_updates, relation_updates
 
 
 async def extract_page(llm: LLM, page_id: int, url: str, title: str, text: str) -> PageResult:

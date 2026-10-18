@@ -1,6 +1,6 @@
 import pytest
 
-from navigator.extract import check_items, parse_items, salvage_rows, split_text
+from navigator.extract import check_items, is_person_name, parse_items, reverify, salvage_rows, split_text
 from navigator.llm import LLMError, parse_json_object
 from navigator.verify import PageText
 
@@ -101,3 +101,43 @@ def test_relation_row_inside_claims_is_routed():
         "claims": [["person", "Katja Odening", "member_of", "unit", "Odening Lab", "Katja Odening"]],
     })
     assert (len(claims), len(relations), dropped) == (0, 1, 0)
+
+
+@pytest.mark.parametrize("name, ok", [
+    ("Prof. Dr. Stavroula Mougiakakou", True),
+    ("Dr. Martina Rothenbühler", True),
+    ("Gaëlle Nivlet", True),
+    ("Alumni", False),
+    ("Phone2", False),
+    ("Karkampouna", False),          # lone surname: cannot be told apart
+    ("PhD Students", False),         # "phd" is a title, "students" a label
+    ("Senior Scientific Staff", True),  # 3 words, not all labels: kept (no false negatives on rare names)
+    ("Group Head", False),
+    ("Room 3.14 Team", False),
+])
+def test_is_person_name(name, ok):
+    assert is_person_name(name) is ok
+
+
+def test_label_people_are_rejected_in_claims_and_relations():
+    page = PageText("Group Members\nAlumni\nPhone2\n+41 31 684 14 00\nDr. Lucas Patty\nResearch Associate")
+    claims, relations, _ = parse_items({
+        "claims": [["person", "Alumni", "role", "Alumni", "Alumni"],
+                   ["person", "Dr. Lucas Patty", "role", "Research Associate", "Dr. Lucas Patty\nResearch Associate"]],
+        "relations": [["person", "Phone2", "member_of", "unit", "Group Members", "Phone2"]],
+    })
+    checked_claims, checked_relations = check_items(page, claims, relations)
+    assert [(c.verified, c.fail_reason) for c in checked_claims] == [(False, "not a person name"), (True, None)]
+    assert checked_relations[0].fail_reason == "not a person name"
+
+
+def test_reverify_rechecks_stored_rows_without_llm():
+    text = "Alumni\nCEO\nDerek Brandt"
+    rows = [
+        ("claim", 1, "Team", text, "person", "Alumni", "role", "Alumni", "Alumni"),
+        ("claim", 2, "Team", text, "person", "Derek Brandt", "role", "CEO", "Derek Brandt\nCEO"),  # rebuilt
+        ("relation", 7, "Team", text, "person", "Derek Brandt", "member_of", "unit", "Team", "Derek Brandt"),
+    ]
+    claim_updates, relation_updates = reverify(rows)
+    assert claim_updates == [(False, "Alumni", "not a person name", 1), (True, "CEO\nDerek Brandt", None, 2)]
+    assert relation_updates == [(True, "Derek Brandt", None, 7)]

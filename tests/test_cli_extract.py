@@ -28,6 +28,7 @@ def fakes(monkeypatch):
     monkeypatch.setattr(cli.db, "pages_for_extraction", lambda *a: [(1, "https://t.test/", "T", "text")])
     monkeypatch.setattr(cli.db, "replace_raw_extractions", lambda conn, results: calls.append("store"))
     monkeypatch.setattr(cli, "extract_pages", extract_pages)
+    monkeypatch.setattr(cli, "LLM", lambda *a, **k: "llm")  # no API key needed (CI, worktrees without .env)
     monkeypatch.setattr(cli, "run_resolve", lambda conn: calls.append("resolve") or Counter(claims=3))
     return calls
 
