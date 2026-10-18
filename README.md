@@ -113,6 +113,7 @@ With `--expand` it first prints the English and German search terms from Apertus
 ```bash
 uv run navigator eval             # 9 gold queries (eval/gold.yaml) through the /api/search pipeline
 uv run navigator eval --no-expand --no-judge  # no gateway needed
+uv run navigator case-eval        # case analysis on 4 example PDFs (eval/cases.yaml), read-only
 ```
 
 Prints the plan 10.2 metrics (recall@10, phrasing overlap, traceability, field fill, coverage, drop rate,

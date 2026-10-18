@@ -310,5 +310,31 @@ def llm_speed(
             typer.echo(f"{m:<28} failed: {str(e)[:120]}")
 
 
+@app.command("case-eval")
+def case_eval(
+    gold: str = typer.Option("eval/cases.yaml", help="Example business models with expected matches (#73)."),
+    out: str = typer.Option("eval/case_report.md", help="Where to save the Markdown report."),
+) -> None:
+    """Run the case analysis read-only on the example PDFs and compare with the expected matches (#73)."""
+    from pathlib import Path
+
+    from navigator import chunks_db
+    from navigator.analysis import read_case
+    from navigator.case_eval import evaluate_case, load_cases, report
+    from navigator.embed import embed_documents, embed_query
+
+    settings = get_settings()
+    with chunks_db.connect(settings.database_url) as conn:
+        outcomes = [  # one LLM client per asyncio.run: the client is bound to its event loop
+            evaluate_case(conn, case, lambda text: asyncio.run(read_case(LLM(settings), text)), embed_query,
+                          embed_documents)
+            for case in load_cases(Path(gold))
+        ]
+    text = report(outcomes)
+    Path(out).write_text(text)
+    typer.echo(text)
+    typer.echo(f"Saved to {out}")
+
+
 if __name__ == "__main__":
     app()
