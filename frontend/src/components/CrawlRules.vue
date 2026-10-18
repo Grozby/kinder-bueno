@@ -51,10 +51,12 @@ const draft = reactive<Record<RuleKind, string>>({
 
 const rules = computed(() => store.rules[props.source.id])
 const sourcePages = computed(() => store.pages.filter((p) => p.source_id === props.source.id))
+// Compared as dates: the two timestamps are not always formatted alike (fractional seconds)
 const stale = computed(
   () =>
     !!rules.value?.changed_at &&
-    (!props.source.last_crawled_at || rules.value.changed_at > props.source.last_crawled_at),
+    (!props.source.last_crawled_at ||
+      Date.parse(rules.value.changed_at) > Date.parse(props.source.last_crawled_at)),
 )
 
 function matchCount(kind: RuleKind, pattern: string) {

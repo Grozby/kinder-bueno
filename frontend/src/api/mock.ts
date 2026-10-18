@@ -362,6 +362,24 @@ interface StoredSource {
   startedAt: number
   maxPages: number
   maxDepth: number
+  recrawl?: boolean // keeps its previous counts until the new crawl is done, as the backend does (#80)
+}
+
+// The ingest stages the backend reports while crawling (#55), at the share of the run they start at
+const STAGES: Array<[number, string]> = [
+  [0, 'crawl'],
+  [0.35, 'embed'],
+  [0.5, 'extract'],
+  [0.8, 'resolve'],
+  [0.85, 'judge'],
+]
+
+// One ingest at a time, as the backend: 409 while another source is crawling
+function assertIdle() {
+  for (const id of sources.keys()) {
+    if (readSource(id).status === 'crawling')
+      throw new Error('409 Another source is being ingested; try again when it is ready')
+  }
 }
 const sources = new Map<string, StoredSource>()
 
@@ -707,13 +725,18 @@ function readSource(id: string): Source {
     const progress = Math.min(1, (Date.now() - stored.startedAt) / CRAWL_MS)
     const shown = Math.max(1, Math.round(progress * Math.min(stored.maxPages, 60)))
     s.discovered = crawlTree(s.root_url, shown, stored.maxDepth, hash(s.id))
-    s.pages = s.discovered.filter((p) => p.status === 'crawled').length
-    s.entities = Math.round(s.pages * 2.4)
-    s.verified_claims = Math.round(s.pages * 7.8)
+    s.stage = STAGES.filter(([from]) => progress >= from).at(-1)![1]
+    if (!stored.recrawl || progress >= 1) {
+      s.pages = s.discovered.filter((p) => p.status === 'crawled').length
+      s.entities = Math.round(s.pages * 2.4)
+      s.verified_claims = Math.round(s.pages * 7.8)
+    }
     if (progress >= 1) {
       s.status = 'ready'
+      s.stage = null
       s.validated = true
       s.last_crawled_at = new Date().toISOString()
+      stored.recrawl = false
     }
   }
   return s
@@ -963,6 +986,7 @@ export const mockBackend = {
   },
   async addSource(input: NewSource): Promise<Source> {
     await wait(400)
+    assertIdle()
     const url = new URL(input.url)
     const id = url.hostname.replace(/^www\./, '').replace(/[^a-z0-9]+/g, '_')
     const data: Source = {
@@ -988,17 +1012,22 @@ export const mockBackend = {
   async recrawlSource(id: string): Promise<Source> {
     await wait(300)
     const stored = sources.get(id)
-    if (!stored) throw new Error('404 Not Found')
+    if (!stored) throw new Error('404 Source not found')
+    assertIdle()
     stored.data.status = 'crawling'
+    stored.data.error = null
     stored.startedAt = Date.now()
+    stored.recrawl = true
     return clone(readSource(id))
   },
   async getRules(id: string): Promise<CrawlRules> {
     await wait(150)
+    if (!sources.has(id)) throw new Error('404 Source not found')
     const r = rules.get(id)
     if (!r)
+      // A source added from the UI: its start host, as the backend stores in its config
       return {
-        allow_hosts: [],
+        allow_hosts: [new URL(sources.get(id)!.data.root_url).hostname],
         include_patterns: [],
         exclude_patterns: [],
         priority_patterns: [],
@@ -1008,14 +1037,17 @@ export const mockBackend = {
   },
   async setRules(id: string, next: Record<RuleKind, string[]>): Promise<CrawlRules> {
     await wait(250)
-    for (const pattern of [
-      ...next.include_patterns,
-      ...next.exclude_patterns,
-      ...next.priority_patterns,
-    ]) {
-      if (!isValidPattern(pattern)) throw new Error(`422 Invalid pattern: ${pattern}`)
+    // The backend's checks and messages (src/navigator/rules.py): patterns must compile, a host must be left
+    const kinds = ['include_patterns', 'exclude_patterns', 'priority_patterns'] as const
+    for (const kind of kinds) {
+      const bad = next[kind].find((p) => !isValidPattern(p))
+      if (bad !== undefined) throw new Error(`422 ${kind}: invalid regex '${bad}'`)
     }
-    const saved: CrawlRules = { ...clone(next), changed_at: new Date().toISOString() }
+    if (!next.allow_hosts.length) throw new Error('422 allow_hosts: at least one host is needed')
+    const trimmed = Object.fromEntries(
+      Object.entries(next).map(([k, v]) => [k, v.map((p) => p.trim()).filter(Boolean)]),
+    ) as Record<RuleKind, string[]>
+    const saved: CrawlRules = { ...trimmed, changed_at: new Date().toISOString() }
     rules.set(id, saved)
     return clone(saved)
   },
