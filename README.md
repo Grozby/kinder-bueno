@@ -203,6 +203,9 @@ Keep `priority_patterns` narrow and anchored to the site root: they decide what 
 - Every result card links to its source pages, so each fact can be checked at the source.
 - Uploaded business model PDFs are company data: only their text is stored (table `"case"`), never the file,
   and it is only sent to the Apertus gateway for the case analysis.
+- The partner report and slides of an accepted case (#96) include the company's summary and needs from that
+  text. They are made to be sent to research partners, so the reviewer checks them before sending. Internal notes
+  are never in them.
 - Designed for the Swiss nDSG and the GDPR where it applies. No user accounts: feedback is stored with an
   anonymous session id. Its optional free-text comment is stored as typed, so it should not ask for personal data.
 

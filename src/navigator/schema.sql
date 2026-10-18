@@ -137,6 +137,15 @@ CREATE INDEX IF NOT EXISTS case_uploaded_idx ON "case"(uploaded_at DESC);
 ALTER TABLE "case" ADD COLUMN IF NOT EXISTS pitch jsonb;
 ALTER TABLE "case" ADD COLUMN IF NOT EXISTS selection jsonb;
 ALTER TABLE "case" ADD COLUMN IF NOT EXISTS added_refs jsonb NOT NULL DEFAULT '[]';
+-- Partner report (.docx) and slides (.pptx) of an accepted case (#96): the job state here, the files below.
+-- {status: pending|done|failed, entity_ids, started_at, generated_at, error}
+ALTER TABLE "case" ADD COLUMN IF NOT EXISTS documents jsonb;
+CREATE TABLE IF NOT EXISTS case_document (
+  case_id     text NOT NULL REFERENCES "case"(id) ON DELETE CASCADE,
+  kind        text NOT NULL CHECK (kind IN ('report','slides')),
+  content     bytea NOT NULL,           -- the file as generated: what was sent stays what was checked
+  PRIMARY KEY (case_id, kind)
+);
 
 -- Chat turns of the case drawer (session "case-<id>", #81), so the history survives a reload. The results are
 -- stored as ids, scores and "why" sentences, and rebuilt from the current claims when read.

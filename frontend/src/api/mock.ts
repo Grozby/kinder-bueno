@@ -3,6 +3,7 @@
 import type {
   Case,
   CaseChatTurn,
+  CaseDocuments,
   CaseFeedback,
   CaseNote,
   CaseStatus,
@@ -10,6 +11,7 @@ import type {
   ChatResponse,
   CrawledPage,
   CrawlRules,
+  DocumentKind,
   EntityType,
   FeedbackRequest,
   NewSource,
@@ -721,6 +723,7 @@ function readSource(id: string): Source {
 const selections = new Map<string, number[]>()
 const addedRefs = new Map<string, Result[]>()
 const chatTurns = new Map<string, CaseChatTurn[]>()
+const mockDocuments = new Map<string, CaseDocuments>()
 const caseFeedback = new Map<string, CaseFeedback>()
 const caseOf = (sessionId: string) => (sessionId.startsWith('case-') ? sessionId.slice(5) : null)
 
@@ -856,6 +859,39 @@ export const mockBackend = {
   async getCaseFeedback(id: string): Promise<CaseFeedback> {
     await wait(100)
     return clone(caseFeedback.get(id) ?? { ratings: {}, flagged: [] })
+  },
+  // Report and slides (#96): the mock "generates" for 3 s, then serves a text file in place of the .docx/.pptx
+  async generateDocuments(id: string): Promise<CaseDocuments> {
+    await wait(200)
+    const job: CaseDocuments = {
+      status: 'pending',
+      entity_ids: [],
+      started_at: new Date().toISOString(),
+      generated_at: null,
+      error: null,
+    }
+    mockDocuments.set(id, job)
+    setTimeout(
+      () =>
+        mockDocuments.set(id, { ...job, status: 'done', generated_at: new Date().toISOString() }),
+      3000,
+    )
+    return clone(job)
+  },
+  async getDocuments(id: string): Promise<CaseDocuments> {
+    await wait(100)
+    const none: CaseDocuments = {
+      status: 'none',
+      entity_ids: [],
+      started_at: null,
+      generated_at: null,
+      error: null,
+    }
+    return clone(mockDocuments.get(id) ?? none)
+  },
+  documentUrl(id: string, kind: DocumentKind): string {
+    const text = `Mock ${kind} for ${readCase(id).company_name}: the real backend makes a .${kind === 'report' ? 'docx' : 'pptx'}.`
+    return URL.createObjectURL(new Blob([text], { type: 'text/plain' }))
   },
   // The store keeps the pitches the mock generates, so there is nothing stored to reload
   async getPitch(_id: string): Promise<Pitch | null> {

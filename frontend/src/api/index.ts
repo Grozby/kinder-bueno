@@ -1,17 +1,19 @@
 // Typed backend endpoints. VITE_USE_MOCK=true swaps in an in-memory mock, e.g. for UI work on routes
 // the backend does not serve yet.
 // /chat and /feedback follow docs/PLAN.md section 8.9; the rest is in docs/FRONTEND_API.md.
-import { api } from './client'
+import { api, apiUrl } from './client'
 import { mockBackend } from './mock'
 import type {
   Case,
   CaseChatTurn,
+  CaseDocuments,
   CaseFeedback,
   CaseNote,
   CaseStatus,
   ChatRequest,
   ChatResponse,
   CrawlRules,
+  DocumentKind,
   FeedbackRequest,
   NewSource,
   PageDetail,
@@ -51,6 +53,11 @@ const realBackend = {
       if (e.message.startsWith('404')) return null
       throw e
     }),
+  // Partner report and slides (#96): start the job, poll it, then download the files
+  generateDocuments: (id: string) =>
+    api<CaseDocuments>(`/cases/${id}/documents`, { method: 'POST' }),
+  getDocuments: (id: string) => api<CaseDocuments>(`/cases/${id}/documents`),
+  documentUrl: (id: string, kind: DocumentKind) => apiUrl(`/cases/${id}/documents/${kind}`),
   getSelection: (id: string) => api<Selection>(`/cases/${id}/selection`),
   setSelection: (id: string, entityIds: number[]) =>
     api<Selection>(`/cases/${id}/selection`, {

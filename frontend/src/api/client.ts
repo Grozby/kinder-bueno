@@ -2,6 +2,11 @@
 // In production, set VITE_API_BASE_URL if the backend runs on a different origin.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
+// A URL for the browser itself (download links): same base as the fetch calls
+export function apiUrl(path: string): string {
+  return `${BASE_URL}/api${path}`
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // FormData bodies (file uploads) need the browser to set the multipart boundary itself
   const isForm = init?.body instanceof FormData

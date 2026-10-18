@@ -15,7 +15,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import analysis, case_state, cases, chunks_db, ingest, pages, pitch, rules
+from navigator import analysis, case_state, cases, chunks_db, documents, ingest, pages, pitch, rules
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -24,8 +24,10 @@ from navigator.models import (
     AddReference,
     Case,
     CaseChatTurn,
+    CaseDocuments,
     CaseFeedback,
     CaseStatusUpdate,
+    DocumentKind,
     ChatFilters,
     ChatRequest,
     ChatResponse,
@@ -186,6 +188,19 @@ def get_write_pitch(request: Request) -> Callable[[tuple, list[Result]], str]:
     return lambda context, results: anyio.from_thread.run(pitch.write_pitch, llm, *context, results)
 
 
+def get_make_documents(request: Request) -> Callable[[str], None]:
+    """The partner report and slides (#96), made after the response on their own connection, like the analysis.
+    The texts are written on the explain LLM, like the pitch."""
+    llm = request.app.state.explain_llm
+
+    def run(case_id: str) -> None:
+        with chunks_db.connect(get_settings().database_url) as conn:
+            conn.autocommit = True  # minutes of LLM calls: no transaction may stay open
+            documents.generate(conn, case_id, write=lambda ctx: anyio.from_thread.run(documents.write_texts, llm, ctx))
+
+    return run
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 Seeds = Annotated[dict[str, str], Depends(get_seeds)]
 PageRules = Annotated[dict[str, pages.SourceRules], Depends(get_page_rules)]
@@ -195,6 +210,7 @@ Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_e
 Analyze = Annotated[Callable[[str], None], Depends(get_analyze)]
 Sessions = Annotated[ChatSessions, Depends(get_sessions)]
 WritePitch = Annotated[Callable[[tuple, list[Result]], str], Depends(get_write_pitch)]
+MakeDocuments = Annotated[Callable[[str], None], Depends(get_make_documents)]
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -596,3 +612,45 @@ def get_pitch(conn: Conn, case_id: str) -> Pitch:
     if stored is None:
         raise HTTPException(status_code=404, detail="No pitch yet")
     return stored
+
+
+@app.post("/api/cases/{case_id}/documents")
+def generate_documents(conn: Conn, make: MakeDocuments, background: BackgroundTasks, case_id: str) -> CaseDocuments:
+    """Start the partner report (.docx) and slides (.pptx) from the case's selected references, in the background.
+    Only for accepted cases. While a job runs, returns it instead of starting another; poll GET .../documents."""
+    case = cases.get_case(conn, case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if case.status != "accepted":
+        raise HTTPException(status_code=409, detail="Accept the case first")
+    current = documents.status(conn, case_id)
+    if current and current.status == "pending":
+        return current
+    selection = case_state.get_selection(conn, case_id) or []
+    if not selection:
+        raise HTTPException(status_code=422, detail="Select at least one reference")
+    job = documents.start(conn, case_id, selection)
+    conn.commit()  # the background job reads it on another connection
+    background.add_task(make, case_id)
+    return job
+
+
+@app.get("/api/cases/{case_id}/documents")
+def documents_status(conn: Conn, case_id: str) -> CaseDocuments:
+    """The state of the documents job: none, pending, done or failed."""
+    found = documents.status(conn, case_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return found
+
+
+@app.get("/api/cases/{case_id}/documents/{kind}", response_class=Response,
+         responses={200: {"content": {t: {} for t in documents.MEDIA_TYPES.values()}}})
+def download_document(conn: Conn, case_id: str, kind: DocumentKind) -> Response:
+    """The stored report (.docx) or slides (.pptx), as generated; 404 if not generated yet."""
+    found = documents.load(conn, case_id, kind)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Not generated yet")
+    content, name = found
+    return Response(content, media_type=documents.MEDIA_TYPES[kind],
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
