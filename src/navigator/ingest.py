@@ -145,6 +145,7 @@ def run_ingest(database_url: str, source_id: str) -> None:
     from navigator.judge import run_judge
     from navigator.llm import LLM
     from navigator.resolve import resolve
+    from navigator.rules import apply_blocks, with_stored
     from navigator.settings import get_settings
 
     settings = get_settings()
@@ -154,7 +155,7 @@ def run_ingest(database_url: str, source_id: str) -> None:
             stage = "crawl"
             try:
                 cfg = conn.execute("SELECT config FROM source WHERE id = %s", (source_id,)).fetchone()[0]
-                source = SourceConfig(**cfg["source"])
+                source = with_stored(conn, SourceConfig(**cfg["source"]))  # rules edited in the UI (#79)
                 conn.execute("DELETE FROM crawl_url WHERE source_id = %s", (source_id,))
                 pages = asyncio.run(crawl_source(source, CrawlDefaults(max_depth=cfg["max_depth"]),
                                                  on_url=record_url(conn, source_id)))
@@ -164,6 +165,7 @@ def run_ingest(database_url: str, source_id: str) -> None:
                 if not pages:
                     raise SourceError("No page with enough text: the site may need JavaScript, block us in robots.txt, or not be HTML")
                 db.replace_pages(conn, source_id, pages)
+                apply_blocks(conn, source_id, source.exclude_patterns)
 
                 stage = "embed"
                 _set(conn, source_id, stage=stage)

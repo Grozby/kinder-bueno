@@ -39,7 +39,10 @@ def crawl(
     source: str | None = typer.Option(None, help="Source id. Default: all sources."),
     max_pages: int | None = typer.Option(None, help="Override max_pages from config."),
 ) -> None:
-    """Crawl and clean pages, then replace the stored pages of each crawled source."""
+    """Crawl and clean pages, then replace the stored pages of each crawled source.
+    Rules edited in the UI (#79) replace a source's patterns in config/sources.yaml."""
+    from navigator.rules import apply_blocks, with_stored
+
     settings = get_settings()
     sources = load_sources(settings.sources_file)
     selected = [sources.get(source)] if source else sources.sources
@@ -48,11 +51,14 @@ def crawl(
         # Sources live on different hosts, so they can be crawled in parallel.
         return await asyncio.gather(*(crawl_source(s, sources.defaults, max_pages) for s in selected))
 
-    results = asyncio.run(run())
     with db.connect(settings.database_url) as conn:
         db.init_db(conn, sources)
+        conn.commit()
+        selected = [with_stored(conn, s) for s in selected]
+        results = asyncio.run(run())
         for src, pages in zip(selected, results):
             db.replace_pages(conn, src.id, pages)
+            apply_blocks(conn, src.id, src.exclude_patterns)  # src has the stored rules
             typer.echo(f"{src.id}: stored {len(pages)} pages")
 
 

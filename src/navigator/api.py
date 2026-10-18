@@ -15,7 +15,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import analysis, case_state, cases, chunks_db, ingest, pages, pitch
+from navigator import analysis, case_state, cases, chunks_db, ingest, pages, pitch, rules
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -30,6 +30,8 @@ from navigator.models import (
     ChatRequest,
     ChatResponse,
     CrawledPage,
+    CrawlRules,
+    CrawlRulesUpdate,
     EntityType,
     Expansion,
     FeedbackCounts,
@@ -116,12 +118,9 @@ def get_seeds() -> dict[str, str]:
     return {s.id: s.seeds[0] for s in load_sources(get_settings().sources_file).sources}
 
 
-def get_page_rules() -> dict[str, pages.SourceRules]:
-    """Exclude and priority patterns per source in config/sources.yaml (stored rules: #79)."""
-    return {
-        s.id: pages.SourceRules(s.exclude_patterns, s.priority_patterns)
-        for s in load_sources(get_settings().sources_file).sources
-    }
+def get_page_rules(conn: Annotated[psycopg.Connection, Depends(get_conn)]) -> dict[str, pages.SourceRules]:
+    """Exclude and priority patterns per source: the stored rules (#79), else config/sources.yaml."""
+    return rules.page_rules(conn, load_sources(get_settings().sources_file))
 
 
 def get_analyze(request: Request) -> Callable[[str], None]:
@@ -411,6 +410,28 @@ def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewS
     conn.commit()  # the background ingest reads the source on another connection
     background.add_task(run, source_id)
     return _sources(conn, seeds, source_id)[0]
+
+
+@app.get("/api/sources/{source_id}/rules")
+def get_source_rules(conn: Conn, source_id: str) -> CrawlRules:
+    """The source's crawl rules: the stored ones, else its block in config/sources.yaml."""
+    found = rules.get_rules(conn, load_sources(get_settings().sources_file), source_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return found
+
+
+@app.put("/api/sources/{source_id}/rules")
+def put_source_rules(conn: Conn, source_id: str, body: CrawlRulesUpdate) -> CrawlRules:
+    """Store the rules. Exclude patterns apply at once: claims from matching pages are hidden everywhere.
+    The other rules apply on the next crawl."""
+    try:
+        stored = rules.save_rules(conn, load_sources(get_settings().sources_file), source_id, body)
+    except rules.RulesError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return stored
 
 
 @app.get("/api/pages")

@@ -109,6 +109,7 @@ def _fake_pipeline(monkeypatch, pages, fail_at=None):
             return result
         return run
 
+    monkeypatch.setattr("navigator.llm.LLM", lambda *args, **kwargs: object())  # no gateway key needed (CI)
     monkeypatch.setattr("navigator.crawl.crawl_source", crawl)
     monkeypatch.setattr("navigator.embed.embed_documents", lambda texts: [np.zeros(1024) for _ in texts])
     monkeypatch.setattr("navigator.extract.extract_pages", extract)
