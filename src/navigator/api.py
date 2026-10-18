@@ -159,13 +159,20 @@ def feedback(conn: Conn, body: FeedbackRequest) -> FeedbackResponse:
         raise HTTPException(status_code=404, detail="Entity not found")
     claim_text = None
     if body.claim_id is not None:
+        # The entity's own claim, or a unit topic on its card (the via_unit rows of results._unit_topics, #44)
         claim = conn.execute(
-            "SELECT field, value, quote FROM claim WHERE id = %s AND entity_id = %s",
-            (body.claim_id, body.entity_id),
+            f"""
+            SELECT c.field, c.value, c.quote, c.entity_id, u.name FROM claim c JOIN entity u ON u.id = c.entity_id
+            WHERE c.id = %s AND (c.entity_id = %s OR (c.field = 'expertise' AND {shown("c")} AND EXISTS (
+                SELECT 1 FROM relation r WHERE r.from_id = %s AND r.to_id = c.entity_id
+                  AND r.rel IN ('member_of', 'listed_in') AND {shown("r")})))
+            """,
+            (body.claim_id, body.entity_id, body.entity_id),
         ).fetchone()
         if claim is None:
             raise HTTPException(status_code=404, detail="Claim not found for this entity")
-        claim_text = f"{claim[0]}: {claim[1]} — {claim[2]}"
+        via = "" if claim[3] == body.entity_id else f" (via {claim[4]})"
+        claim_text = f"{claim[0]}: {claim[1]} — {claim[2]}{via}"
     conn.execute(
         "INSERT INTO feedback (session_id, query, entity_id, claim_id, entity_name, claim_text, rating, comment) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",

@@ -84,6 +84,29 @@ def test_feedback_insert_with_snapshot(client, test_conn, graph):
     assert client.get("/api/stats").json()["feedback"]["wrong_fact"] == 1
 
 
+def test_feedback_on_a_unit_claim_of_a_member(client, test_conn, graph):
+    # Alice is a shown member_of the lab, so a "via Diabetes Lab" row on her card can be flagged.
+    response = client.post("/api/feedback", json={
+        "session_id": "s1", "entity_id": graph["alice"], "claim_id": graph["lab_expertise"], "rating": "wrong_fact",
+    })
+    assert response.json() == {"ok": True}
+    row = test_conn.execute("SELECT entity_name, claim_text FROM feedback").fetchone()
+    assert row == ("Alice Muster", "expertise: insulin pumps — quote for insulin pumps (via Diabetes Lab)")
+
+
+@pytest.mark.parametrize("person, claim", [
+    ("bob", "lab_expertise"),     # bob's member_of the lab is judged unsupported: not shown
+    ("alice", "center_name"),     # alice's member_of the center is not verified (and a name is not a topic)
+    ("alice", "bob_glucose"),     # another person's claim
+])
+def test_feedback_claim_of_another_entity_is_404(client, graph, person, claim):
+    response = client.post("/api/feedback", json={
+        "session_id": "s1", "entity_id": graph[person], "claim_id": graph[claim], "rating": "wrong_fact",
+    })
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Claim not found for this entity"}
+
+
 def test_feedback_unknown_entity_is_404(client):
     response = client.post("/api/feedback", json={"session_id": "s1", "entity_id": 999999, "rating": "up"})
     assert response.status_code == 404
