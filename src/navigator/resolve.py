@@ -22,6 +22,7 @@ Mention = tuple[str, str, int]  # (entity_type, raw name, page_id)
 MEMBER_PAGE = re.compile(r"^(.*/)(?:group_members|team)/(index_eng\.html)?$")
 FIXED_UNITS = {"https://www.dcberne.com/en/team/": "Diabetes Center Berne"}  # its parent page starts with a slogan
 MEMBER_REL = ("member_of", "listed_in")  # both give a person's unit
+LAB_TOPIC_FIELDS = ("expertise", "description")  # moved from the umbrella to the lab on the lab's own pages (#70)
 
 
 def norm_name(name: str) -> str:
@@ -164,6 +165,40 @@ def member_page_rows(conn: psycopg.Connection, claims: list) -> tuple[list, list
     return extra_claims, extra_relations, counts
 
 
+def site_name(title: str) -> str:
+    """"Research: Adaptive Diabetes Management - ARTORG Center for ..." -> "ARTORG Center for ..."; "" if none."""
+    return title.rsplit(" - ", 1)[1].strip() if " - " in title else ""
+
+
+def move_umbrella_topics(conn: psycopg.Connection, claims: list, listed_relations: list) -> tuple[list, int]:
+    """Give a lab the topic claims the extractor credited to the umbrella unit on the lab's own pages (#70).
+
+    A lab's pages (".../research/aihn/...", the folder of its member page) often do not name the lab; only the
+    page title names the site ("... - ARTORG Center ..."), so the extractor credits the site. A unit claim whose
+    name is part of the page title's site name, on a page under a lab's folder, moves to that lab (the deepest
+    folder wins). The quote is unchanged: it is still exact page text. Returns the claims and the number moved.
+    """
+    pages = {pid: (url, title or "") for pid, url, title in conn.execute("SELECT id, url, title FROM page")}
+    homes: dict[str, str] = {}  # lab folder -> lab name, from the member pages
+    for _, _, _, _, lab, page_id, _, _ in listed_relations:
+        m = MEMBER_PAGE.match(pages[page_id][0])
+        if m:
+            homes[m.group(1)] = lab
+    moved, out = 0, []
+    for row in claims:
+        etype, name, page_id, source, fld, value, quote = row
+        url, title = pages[page_id]
+        site = norm_unit(site_name(title))
+        if etype == "unit" and fld in LAB_TOPIC_FIELDS and site and norm_unit(name) in site:
+            owners = [folder for folder in homes if url.startswith(folder)]
+            if owners:
+                lab = homes[max(owners, key=len)]
+                if norm_unit(lab) != norm_unit(name):
+                    row, moved = (etype, lab, page_id, source, fld, value, quote), moved + 1
+        out.append(row)
+    return out, moved
+
+
 def _load(conn: psycopg.Connection) -> tuple[list, list]:
     claims = conn.execute(
         "SELECT r.entity_type, r.entity_name, r.page_id, p.source_id, r.field, r.value, r.quote "
@@ -229,6 +264,7 @@ def resolve(conn: psycopg.Connection) -> Counter:
     """Rebuild entity, claim and relation from the raw tables. Returns counts for the report."""
     claims, relations = _load(conn)
     listed_claims, listed_relations, counts = member_page_rows(conn, claims)
+    claims, counts["lab topics moved from the umbrella"] = move_umbrella_topics(conn, claims, listed_relations)
     claims, relations = claims + listed_claims, relations + listed_relations
     keys = mention_keys(claims, relations)
     names: dict[tuple[str, str], Counter] = defaultdict(Counter)
