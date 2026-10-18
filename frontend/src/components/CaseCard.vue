@@ -54,9 +54,10 @@ function onDragStart(e: DragEvent) {
     <ul v-else class="criteria">
       <li v-for="b in item.score_breakdown.slice(0, 3)" :key="b.criterion">
         <span>{{ b.criterion }}</span>
-        <span class="meter"
-          ><span :class="`fill-${scoreBand(b.score)}`" :style="{ width: `${b.score}%` }"
-        /></span>
+        <span class="meter">
+          <span :class="`fill-${scoreBand(b.score)}`" :style="{ width: `${b.score}%` }" />
+        </span>
+        <span class="num">{{ b.score }}</span>
       </li>
     </ul>
 
@@ -159,15 +160,22 @@ h3 {
 }
 .criteria li {
   display: grid;
-  grid-template-columns: 1fr 80px;
+  grid-template-columns: 1fr 80px 2ch;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 .meter {
-  height: 4px;
+  height: 6px;
   background: var(--surface-alt);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
+}
+.num {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .meter span {
   display: block;

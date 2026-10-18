@@ -341,12 +341,12 @@ h1 {
     background-color 0.15s,
     box-shadow 0.15s;
 }
-/* Stages progress grey → black → blue; blue means "accept" as in the score scale */
+/* Stages progress light grey → grey → black */
 .col-new {
-  --col-color: var(--text-muted);
+  --col-color: var(--border-strong);
 }
 .col-in_review {
-  --col-color: var(--text);
+  --col-color: var(--text-muted);
 }
 .col-accepted {
   --col-color: var(--score-strong);
@@ -382,14 +382,17 @@ h1 {
   color: var(--text-muted);
 }
 .count {
-  min-width: 30px;
-  padding: 0.1rem 0.6rem;
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 0.6rem;
   border-radius: 999px;
-  background: var(--col-color);
+  background: var(--text);
   color: #fff;
-  text-align: center;
   font-size: 15px;
   font-weight: 700;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .column-body {

@@ -16,12 +16,12 @@
   --text-faint: #8c8c8c;
   --focus: #1d1d1d;
 
-  /* Fit scores: diverging Bern red ↔ neutral grey ↔ blue. Red/blue stays apart for every
-     colour-vision deficiency (dataviz checks: CVD ΔE 22); all three clear 3:1 on #fff and #f6f6f6.
-     Same meaning as the actions: red = reject, blue = accept. */
-  --score-weak: var(--bern-red);
-  --score-partial: #8c8c8c;
-  --score-strong: #1c5cab;
+  /* Fit scores from the Okabe-Ito palette: vermillion, orange, bluish green. Built for
+     colour-vision deficiencies (dataviz checks, all pairs: worst CVD ΔE 11, deutan). Orange is
+     only 2.25:1 on white, so the number is always shown next to the colour. */
+  --score-weak: #d55e00;
+  --score-partial: #e69f00;
+  --score-strong: #009e73;
 
   /* Status only (validated, crawling, failed, errors); always shown with an icon or label */
   --good: #1e7b3c;

@@ -8,8 +8,37 @@ const visible = ref(false)
 const open = ref(false)
 const chomping = ref(false)
 const satisfied = ref(false)
+const flipped = ref(false)
+const place = ref<Record<string, string>>({})
 const layer = useTemplateRef<HTMLDivElement>('layer')
 const bear = useTemplateRef<HTMLDivElement>('bear')
+
+const GAP = 24
+const EDGE = 8
+
+// Put the bear beside the card, mouth level with its centre, so it never covers the card.
+// Right of the card by default (the bear faces left); mirrored on the left when there is no
+// room; along the bottom edge when neither side fits (narrow screens).
+function placeBear(rect: DOMRect) {
+  const w = Math.min(150, window.innerWidth * 0.3)
+  const h = (w * 210) / 120
+  const top = Math.min(
+    Math.max(rect.top + rect.height / 2 - h * BEAR_MOUTH.y, EDGE),
+    window.innerHeight - h - EDGE,
+  )
+  flipped.value = false
+  if (rect.right + GAP + w <= window.innerWidth - EDGE) {
+    place.value = { left: `${rect.right + GAP}px`, top: `${top}px` }
+  } else if (rect.left - GAP - w >= EDGE) {
+    flipped.value = true
+    place.value = { left: `${rect.left - GAP - w}px`, top: `${top}px` }
+  } else {
+    place.value = {
+      left: `${(window.innerWidth - w) / 2}px`,
+      top: `${window.innerHeight - h - EDGE}px`,
+    }
+  }
+}
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const CRUMB_COLORS = ['#ffd100', '#e30613', '#1d1d1d', '#b8b8b8']
@@ -57,6 +86,7 @@ async function eat(el: HTMLElement) {
   layer.value.appendChild(ghost)
   el.style.visibility = 'hidden'
 
+  placeBear(rect)
   visible.value = true
   await nextTick()
   await wait(320)
@@ -64,7 +94,7 @@ async function eat(el: HTMLElement) {
   await wait(120)
 
   const bearRect = bear.value!.getBoundingClientRect()
-  const mouthX = bearRect.left + bearRect.width * BEAR_MOUTH.x
+  const mouthX = bearRect.left + bearRect.width * (flipped.value ? 1 - BEAR_MOUTH.x : BEAR_MOUTH.x)
   const mouthY = bearRect.top + bearRect.height * BEAR_MOUTH.y
   const dx = mouthX - (rect.left + rect.width / 2)
   const dy = mouthY - (rect.top + rect.height / 2)
@@ -102,8 +132,16 @@ onBeforeUnmount(() => registerBernEater(null))
 <template>
   <div ref="layer" class="eater-layer" aria-hidden="true">
     <Transition name="bear">
-      <div v-if="visible" ref="bear" class="eater-bear" :class="{ chomping }">
-        <BernBear :open="open" :chomping="chomping" />
+      <div
+        v-if="visible"
+        ref="bear"
+        class="eater-bear"
+        :class="{ chomping, flipped }"
+        :style="place"
+      >
+        <div class="figure">
+          <BernBear :open="open" :chomping="chomping" />
+        </div>
         <Transition name="bubble">
           <div v-if="satisfied" class="bubble">Merci vöu mau!</div>
         </Transition>
@@ -122,12 +160,12 @@ onBeforeUnmount(() => registerBernEater(null))
 
 .eater-bear {
   position: fixed;
-  left: 50%;
-  bottom: 6vh;
   width: min(150px, 30vw);
-  translate: -50% 0;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.2));
   z-index: 1;
+}
+.flipped .figure {
+  transform: scaleX(-1);
 }
 .eater-bear.chomping {
   animation: shake 0.12s linear 4;
@@ -147,6 +185,10 @@ onBeforeUnmount(() => registerBernEater(null))
   white-space: nowrap;
   box-shadow: var(--shadow-lg);
 }
+.flipped .bubble {
+  right: auto;
+  left: 90%;
+}
 
 .bear-enter-active {
   transition:
@@ -160,7 +202,7 @@ onBeforeUnmount(() => registerBernEater(null))
 }
 .bear-enter-from,
 .bear-leave-to {
-  transform: translateY(140%) scale(0.6);
+  transform: translateY(24px) scale(0.6);
   opacity: 0;
 }
 

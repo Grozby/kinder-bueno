@@ -52,7 +52,13 @@ const SHIELD = 'M14 72 H106 V150 C106 178 86 196 60 204 C34 196 14 178 14 150 Z'
         <ellipse cx="-16" cy="-6" rx="14" ry="13" />
         <circle cx="-30" cy="-14" r="10" />
         <circle cx="-26" cy="-24" r="4.5" />
-        <path d="M-36 -21 L-51 -16 L-49 -11 L-36 -11 Z" />
+        <!-- upper snout, rounded towards the nose; the fangs sit behind the closed jaw -->
+        <path d="M-35 -22 C-41 -22.5 -47 -21 -50.5 -17.5 Q-53 -14 -50 -11.8 L-35 -11 Z" />
+        <circle cx="-50.5" cy="-17" r="2" />
+        <path
+          d="M-48.5 -12 L-47.6 -8.6 L-46.4 -12 Z M-42 -11.6 L-41.2 -9 L-40.2 -11.5 Z"
+          fill="#fff"
+        />
         <circle cx="32" cy="-6" r="4" />
         <g stroke="currentColor" stroke-width="8" stroke-linecap="round" fill="none">
           <path d="M-20 4 L-35 9" />
@@ -69,7 +75,9 @@ const SHIELD = 'M14 72 H106 V150 C106 178 86 196 60 204 C34 196 14 178 14 150 Z'
         <circle cx="-33" cy="-17" r="1.7" fill="#fff" />
         <g transform="translate(-36 -8)">
           <g class="jaw">
-            <path d="M0 -1 L-14 2 L-13 6 L0 5 Z" />
+            <path d="M2 -3 C-4 -3.2 -10 -2.4 -13 -0.6 Q-15.5 1.6 -13 3.4 C-9 5.2 -3 5.6 2 4.2 Z" />
+            <path d="M0 -2 Q-6 -3.6 -11 -1.2 Q-7 0.6 0 0 Z" fill="var(--bern-red)" />
+            <path class="fang" d="M-11 -1.4 L-10.2 -4.4 L-9.2 -1.6 Z" fill="#fff" />
           </g>
         </g>
       </g>
@@ -86,17 +94,26 @@ const SHIELD = 'M14 72 H106 V150 C106 178 86 196 60 204 C34 196 14 178 14 150 Z'
 }
 .jaw {
   transform-origin: 0 0;
-  transition: transform 0.18s ease-out;
+  transition: transform 0.22s cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 .open .jaw {
-  transform: rotate(-40deg);
+  transform: rotate(-38deg);
+}
+/* The lower fang would poke over the upper snout while the mouth is shut */
+.fang {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.open .fang,
+.chomping .fang {
+  opacity: 1;
 }
 .chomping .jaw {
-  animation: chomp 0.16s ease-in-out 3;
+  animation: chomp 0.18s cubic-bezier(0.4, 0, 0.6, 1) 3;
 }
 @keyframes chomp {
   50% {
-    transform: rotate(-25deg);
+    transform: rotate(-22deg);
   }
 }
 </style>
