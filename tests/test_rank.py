@@ -5,6 +5,8 @@ import pytest
 from conftest import onehot
 
 from navigator.rank import (
+    _is_real_model,
+    _topic_vec_of,
     _units,
     entity_scores,
     fairness_cap,
@@ -77,6 +79,28 @@ def test_topic_score_is_the_best_matching_topic():
     claims = [(1, "robotics"), (1, "nutrition"), (2, "imaging")]
     sims = topic_scores(claims, [np.array([1.0, 0.0])], vecs.__getitem__)
     assert sims == {1: pytest.approx(1.0), 2: pytest.approx(0.6)}
+
+
+def test_topic_vectors_are_cached_per_embedding_function():
+    calls = []
+
+    def fake(text):
+        calls.append(text)
+        return np.array([1.0, 0.0])
+
+    vec_of = _topic_vec_of(fake, ["a", "b", "a"])
+    assert vec_of("a").tolist() == [1.0, 0.0] and calls == ["a", "b"]
+    _topic_vec_of(fake, ["a", "b", "c"])
+    assert calls == ["a", "b", "c"]  # only the new value is embedded
+    other = _topic_vec_of(lambda text: np.array([0.0, 1.0]), ["a"])
+    assert other("a").tolist() == [0.0, 1.0]  # another function never sees fake's vectors
+
+
+def test_the_api_embed_function_counts_as_the_real_model():
+    from navigator import embed
+
+    assert _is_real_model(None) and _is_real_model(embed.embed_query)
+    assert not _is_real_model(lambda text: text)
 
 
 def test_fairness_cap_allows_three_per_unit():

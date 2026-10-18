@@ -160,7 +160,9 @@ def _embed_query(text: str) -> np.ndarray:
     return embed_query(text)
 
 
-_topic_vecs: dict[str, np.ndarray] = {}  # claim value -> bge-m3 embedding, per process
+# Per process: embedding function (None = the real bge-m3 model) -> claim value -> vector. Keyed by function so
+# test fakes never see the real model's vectors or each other's.
+_topic_vecs: dict[Callable | None, dict[str, np.ndarray]] = {}
 
 
 def topic_scores(
@@ -190,17 +192,37 @@ def _topic_claims(conn: psycopg.Connection, types: list[str], sources: list[str]
     ).fetchall()
 
 
-def _topic_vec_of(embed: Callable[[str], np.ndarray] | None, values: list[str]) -> Callable[[str], np.ndarray]:
-    """Embeddings of topic values. With the default model, the missing ones are embedded in one batch and
-    cached per process (~500 short values: a few seconds on the first search); a given `embed` is called directly."""
-    if embed is not None:
-        return embed
-    missing = [v for v in dict.fromkeys(values) if v not in _topic_vecs]
-    if missing:
-        from navigator.embed import embed_documents  # imported lazily: loads torch
+def _is_real_model(embed: Callable[[str], np.ndarray] | None) -> bool:
+    """None or navigator.embed.embed_query (the API passes it explicitly), without importing torch here."""
+    return embed is None or (getattr(embed, "__module__", ""), getattr(embed, "__name__", "")) == (
+        "navigator.embed", "embed_query")
 
-        _topic_vecs.update(zip(missing, embed_documents(missing)))
-    return _topic_vecs.__getitem__
+
+def _topic_vec_of(embed: Callable[[str], np.ndarray] | None, values: list[str]) -> Callable[[str], np.ndarray]:
+    """Embeddings of topic values, cached per process and per embedding function. With the real model the missing
+    ones are embedded in one batch; ~500 values take seconds, so `warm_topic_vectors` fills the cache at server
+    start and searches do not embed while their transaction is open."""
+    real = _is_real_model(embed)
+    cache = _topic_vecs.setdefault(None if real else embed, {})
+    missing = [v for v in dict.fromkeys(values) if v not in cache]
+    if missing:
+        if real:
+            from navigator.embed import embed_documents  # imported lazily: loads torch
+
+            cache.update(zip(missing, embed_documents(missing)))
+        else:
+            cache.update((v, embed(v)) for v in missing)
+    return cache.__getitem__
+
+
+def warm_topic_vectors(conn: psycopg.Connection) -> int:
+    """Embed every topic value with the real model now (server start). Returns how many were new.
+    Ends the read transaction before embedding, so no transaction stays open meanwhile."""
+    values = [v for _, v in _topic_claims(conn, ["person", "unit", "project", "infrastructure"], [])]
+    conn.rollback()
+    before = len(_topic_vecs.get(None, {}))
+    _topic_vec_of(None, values)
+    return len(_topic_vecs[None]) - before
 
 
 def _homes(conn: psycopg.Connection, sources: list[str]) -> list[tuple[int, str]]:
