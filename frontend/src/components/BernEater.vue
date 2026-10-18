@@ -68,8 +68,32 @@ function spawnCrumbs(x: number, y: number) {
   }
 }
 
+// A new meal cuts the current one short: its card is already in the trash, so its ghost just
+// disappears and the bear starts over for the new card. `run` tells a stale meal to stop.
+let run = 0
+let current: { el: HTMLElement; ghost: HTMLElement; flight?: Animation } | null = null
+
+function clearCurrent() {
+  if (!current) return
+  current.flight?.cancel()
+  current.ghost.remove()
+  current.el.style.visibility = ''
+  current = null
+}
+
 async function eat(el: HTMLElement) {
   if (!layer.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+  const id = ++run
+  const stale = () => id !== run
+  clearCurrent()
+  open.value = false
+  chomping.value = false
+  satisfied.value = false
+  if (visible.value) {
+    visible.value = false
+    await nextTick()
+  }
 
   const rect = el.getBoundingClientRect()
   const ghost = el.cloneNode(true) as HTMLElement
@@ -85,13 +109,16 @@ async function eat(el: HTMLElement) {
   })
   layer.value.appendChild(ghost)
   el.style.visibility = 'hidden'
+  current = { el, ghost }
 
   placeBear(rect)
   visible.value = true
   await nextTick()
   await wait(320)
+  if (stale()) return
   open.value = true
   await wait(120)
+  if (stale()) return
 
   const bearRect = bear.value!.getBoundingClientRect()
   const mouthX = bearRect.left + bearRect.width * (flipped.value ? 1 - BEAR_MOUTH.x : BEAR_MOUTH.x)
@@ -99,7 +126,7 @@ async function eat(el: HTMLElement) {
   const dx = mouthX - (rect.left + rect.width / 2)
   const dy = mouthY - (rect.top + rect.height / 2)
 
-  await ghost.animate(
+  const flight = ghost.animate(
     [
       { transform: 'translate(0, 0) rotate(0deg) scale(1)' },
       {
@@ -109,20 +136,31 @@ async function eat(el: HTMLElement) {
       { transform: `translate(${dx}px, ${dy}px) rotate(10deg) scale(0.04)` },
     ],
     { duration: 750, easing: 'cubic-bezier(.55,0,.8,.4)', fill: 'forwards' },
-  ).finished
+  )
+  current.flight = flight
+  try {
+    await flight.finished
+  } catch {
+    return // cancelled by the next meal
+  }
+  if (stale()) return
   ghost.remove()
 
   open.value = false
   chomping.value = true
   spawnCrumbs(mouthX, mouthY)
   await wait(500)
+  if (stale()) return
   chomping.value = false
   satisfied.value = true
   await wait(900)
+  if (stale()) return
   satisfied.value = false
   visible.value = false
   await wait(300)
+  if (stale()) return
   el.style.visibility = ''
+  current = null
 }
 
 onMounted(() => registerBernEater(eat))
