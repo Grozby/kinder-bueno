@@ -15,7 +15,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import cases, chunks_db, pitch
+from navigator import analysis, cases, chunks_db, pitch
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -104,13 +104,23 @@ def get_seeds() -> dict[str, str]:
     return {s.id: s.seeds[0] for s in load_sources(get_settings().sources_file).sources}
 
 
-def get_analyze() -> Callable[[str], None]:
-    """The case analysis, run after the upload response on its own connection (the request's is closed by then)."""
+def get_analyze(request: Request) -> Callable[[str], None]:
+    """The case analysis (#53), run after the upload response on its own connection (the request's is closed
+    by then). Background tasks of sync routes run in a worker thread, so the LLM calls run on the main loop."""
+    from navigator.embed import embed_documents, embed_query
+
+    llm, explain_llm = request.app.state.llm, request.app.state.explain_llm
 
     def run(case_id: str) -> None:
         try:
             with chunks_db.connect(get_settings().database_url) as conn:
-                cases.analyze(conn, case_id)
+                analysis.analyze(
+                    conn, case_id,
+                    read=lambda text: anyio.from_thread.run(analysis.read_case, llm, text),
+                    embed=embed_query,
+                    embed_many=embed_documents,
+                    explain=lambda q, results: anyio.from_thread.run(explain_results, explain_llm, q, results),
+                )
         except Exception:
             log.exception("case analysis failed: %s", case_id)
 
@@ -368,6 +378,15 @@ def get_case(conn: Conn, case_id: str) -> Case:
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
+
+
+@app.get("/api/cases/{case_id}/references")
+def case_references(conn: Conn, case_id: str, limit: Annotated[int, Query(ge=1, le=50)] = 25) -> list[Result]:
+    """The case's references, best first; empty until the analysis is done."""
+    found = analysis.references(conn, case_id, limit)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return found
 
 
 @app.patch("/api/cases/{case_id}")
