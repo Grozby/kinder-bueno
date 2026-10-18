@@ -21,7 +21,10 @@ sources:
       - '^https://www\.artorg\.unibe\.ch/research/[a-z0-9_]+/index_eng\.html$'                # lab overview
       - '^https://www\.artorg\.unibe\.ch/research/[a-z0-9_]+/group_members/index_eng\.html$'  # names, roles, emails
       - '^https://www\.artorg\.unibe\.ch/services/[a-z0-9_]+/index_eng\.html$'                # infrastructure
-    max_pages: 45
+      # Senior people's profiles (#75): their CV text names their research topics, the member list does not.
+      # 52 of 144 profiles (2026-10-18); the others are crawled with what is left of the budget.
+      - '^https://www\.artorg\.unibe\.ch/research/[a-z0-9_]+/group_members/(persons/)?(prof|dr|pd)_[a-z0-9_]+/index_eng\.html$'
+    max_pages: 110
 
   - id: dcb
     name: "Diabetes Center Berne"
@@ -50,4 +53,6 @@ sources:
       - '/research_programs/[a-z0-9_]+/index_eng\.html$'        # lab overview
       - '/research_programs/[a-z0-9_]+/team/index_eng\.html$'   # names, roles
       - '^https://www\.(cvrc|sitem)\.unibe\.ch/[a-z0-9_]+/index_eng\.html$'
-    max_pages: 25
+    # #75: 200 pages reach ~100 lab overviews and ~100 team pages (25 reached 19 labs). The DBMR person
+    # profiles are contact cards without research text, and 4 links deep, so they are not crawled.
+    max_pages: 200

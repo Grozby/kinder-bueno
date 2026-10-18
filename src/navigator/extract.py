@@ -67,6 +67,11 @@ YOUR TASK: extract ONLY people (entity_type "person") and their relations. Ignor
 - For each person: a role claim (quote = the lines from the name to the role, or from the role to
   the name), and an email and a phone claim when shown. Add a name claim only if no role is shown.
 - expertise or bio claims only when a sentence on the page says what this person works on.
+- On a person's own profile page (one person, with a CV or "research interests"): add AT MOST 6 expertise
+  claims for that person: specific research topics of 2-5 words, like "computer vision", "dietary
+  assessment", "cardiac electrophysiology", taken from the page. Never single generic words ("research", "health",
+  "technology", "systems", "medical", "engineering"), and never the name of a group or lab.
+  The quote is the sentence that names the topic.
 - Add a member_of relation from each person to the unit the list belongs to (often named in the page
   title). Its quote is the person's name line. Add works_on when the page says the person works on a project.
 
@@ -75,6 +80,13 @@ Example, member list page "Group Members - Medical Sensing Laboratory" with the 
 {"claims": [["person", "Dr. Lucas Patty", "role", "Research Associate", "Dr. Lucas Patty\nFunktion\nResearch Associate"],
             ["person", "Dr. Lucas Patty", "email", "lucas.patty@unibe.ch", "Dr. Lucas Patty\nFunktion\nResearch Associate\nMail\nlucas.patty@unibe.ch"]],
  "relations": [["person", "Dr. Lucas Patty", "member_of", "unit", "Medical Sensing Laboratory", "Dr. Lucas Patty"]]}
+
+Example, profile page "Prof. Dr. Xyla Qorvant" with the text
+"Prof. Dr. Xyla Qorvant\nGroup Head\nHer research interests include glacier acoustics and lichen genomics.":
+{"claims": [["person", "Prof. Dr. Xyla Qorvant", "role", "Group Head", "Prof. Dr. Xyla Qorvant\nGroup Head"],
+            ["person", "Prof. Dr. Xyla Qorvant", "expertise", "glacier acoustics", "Her research interests include glacier acoustics and lichen genomics."],
+            ["person", "Prof. Dr. Xyla Qorvant", "expertise", "lichen genomics", "Her research interests include glacier acoustics and lichen genomics."]],
+ "relations": []}
 """
 
 TOPICS_PROMPT = _COMMON + """
