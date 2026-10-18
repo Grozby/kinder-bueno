@@ -166,5 +166,17 @@ def serve(
     uvicorn.run("navigator.api:app", host=host, port=port, workers=1)
 
 
+@app.command()
+def resolve() -> None:
+    """Merge verified raw extractions into entities, claims and relations (re-runnable)."""
+    from navigator.resolve import resolve as run_resolve
+
+    settings = get_settings()
+    with db.connect(settings.database_url) as conn:
+        counts = run_resolve(conn)
+    for name, n in sorted(counts.items()):
+        typer.echo(f"{name:<26}{n:>6}")
+
+
 if __name__ == "__main__":
     app()
