@@ -19,7 +19,8 @@ from navigator.results import build_results, shown
 
 LAY_PHRASINGS = (1, 2)  # per use case: (a) site wording, (b) lay term, (c) synonym
 MIN_JUDGE_AGREEMENT = 0.8  # below this the eval judge is not reliable (plan 10.2)
-PERSON_FIELDS = ("role", "affiliations", "expertise", "sources")
+# "unit_topics" is reported on its own: the topics of a person's unit are not personal expertise (#44).
+PERSON_FIELDS = ("role", "affiliations", "expertise", "unit_topics", "sources")
 
 
 @dataclass(frozen=True)

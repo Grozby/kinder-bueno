@@ -106,6 +106,7 @@ function toResult(i: number, why: string, score: number): Result {
     why,
     score,
     sources: [ROOT_URLS[sourceId]!],
+    unit_topics: [],
     evidence: [],
   }
 }

@@ -62,7 +62,7 @@ def test_field_fill_counts_person_results_only():
         _result("B", role=["PhD"]),
         _result("X Lab", type="unit", expertise=["x"]),
     ]
-    assert field_fill(results) == {"role": 1.0, "affiliations": 0.5, "expertise": 0.0, "sources": 0.5}
+    assert field_fill(results) == {"role": 1.0, "affiliations": 0.5, "expertise": 0.0, "unit_topics": 0.0, "sources": 0.5}
     assert field_fill([_result("X Lab", type="unit")])["role"] is None
 
 

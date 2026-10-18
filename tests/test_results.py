@@ -44,7 +44,7 @@ def test_role_and_contact(test_conn, graph):
 
 def test_evidence_carries_claim_id_url_and_verdict(test_conn, graph):
     alice = build_results(test_conn, [(graph["alice"], 1.0)])[0]
-    evidence = {e.claim_id: e for e in alice.evidence}
+    evidence = {e.claim_id: e for e in alice.evidence if e.via_unit is None}
     assert len(evidence) == 5
     partial = evidence[graph["alice_diabetes"]]
     assert (partial.field, partial.url) == ("expertise", "https://artorg.example/lab")
@@ -57,3 +57,53 @@ def test_why_default_and_override(test_conn, graph):
     alice, bob = build_results(test_conn, [(graph["alice"], 2.0), (graph["bob"], 1.0)], why={graph["bob"]: "Custom."})
     assert alice.why == "Matches on: continuous glucose monitoring, diabetes technology"
     assert bob.why == "Custom."
+
+
+def test_person_gets_unit_topics_labelled_as_the_units(test_conn, graph):
+    alice, bob, lab = build_results(test_conn, [(graph["alice"], 3), (graph["bob"], 2), (graph["lab"], 1)])
+    assert alice.unit_topics == ["insulin pumps"]
+    assert "insulin pumps" not in alice.expertise  # never copied into personal expertise
+    row = next(e for e in alice.evidence if e.via_unit)
+    assert (row.claim_id, row.field, row.via_unit) == (graph["lab_expertise"], "unit_expertise", "Diabetes Lab")
+    assert row.url == "https://artorg.example/lab"
+    assert bob.unit_topics == []  # his link to the lab is judged unsupported; the center has no topics
+    assert lab.unit_topics == []  # only persons get unit topics
+
+
+def test_why_falls_back_to_unit_topics(test_conn, graph):
+    dana = test_conn.execute(
+        "INSERT INTO entity (type, name, norm_key) VALUES ('person', 'Dana Probe', 'dana') RETURNING id"
+    ).fetchone()[0]
+    test_conn.execute(
+        "INSERT INTO claim (entity_id, field, value, quote, page_id, verified) VALUES (%s, 'role', 'PhD Student', 'q', %s, true)",
+        (dana, graph["p2"]),
+    )
+    test_conn.execute(
+        "INSERT INTO relation (from_id, rel, to_id, quote, page_id, verified) VALUES (%s, 'listed_in', %s, 'Dana Probe', %s, true)",
+        (dana, graph["lab"], graph["p2"]),
+    )
+    (result,) = build_results(test_conn, [(dana, 1.0)])
+    assert result.expertise == []
+    assert result.unit_topics == ["insulin pumps"]
+    assert result.why == "In Diabetes Lab, which works on: insulin pumps"
+
+
+def test_unit_topics_are_capped_deduplicated_and_prefer_the_listed_lab(test_conn, graph):
+    def add(sql, *args):
+        return test_conn.execute(sql + " RETURNING id", args).fetchone()[0]
+
+    erin = add("INSERT INTO entity (type, name, norm_key) VALUES ('person', 'Erin Test', 'erin')")
+    add("INSERT INTO claim (entity_id, field, value, quote, page_id, verified) VALUES (%s, 'role', 'Postdoc', 'q', %s, true)",
+        erin, graph["p2"])
+    for i in range(8):  # the umbrella center has many topics, one of them twice
+        value = "topic 1" if i == 7 else f"topic {i}"
+        add("INSERT INTO claim (entity_id, field, value, quote, page_id, verified) VALUES (%s, 'expertise', %s, 'q', %s, true)",
+            graph["center"], value, graph["p2"])
+    for rel, unit in (("member_of", "center"), ("listed_in", "lab")):
+        add("INSERT INTO relation (from_id, rel, to_id, quote, page_id, verified) VALUES (%s, %s, %s, 'q', %s, true)",
+            erin, rel, graph[unit], graph["p2"])
+    (result,) = build_results(test_conn, [(erin, 1.0)])
+    via = [e.via_unit for e in result.evidence if e.via_unit]
+    assert via[0] == "Diabetes Lab"  # the listed lab first, though member_of was added first
+    assert via.count("ARTORG Center") == 5  # capped, duplicates removed
+    assert result.unit_topics[:2] == ["insulin pumps", "topic 0"]

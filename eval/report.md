@@ -4,14 +4,14 @@
 
 | use case | query | results | expected found | recall@10 | judged relevant | expansion terms |
 |---|---|---|---|---|---|---|
-| glucose | continuous glucose monitoring | 10 | Diabetes Center Berne, Lilian Witthauer | 40% | 5/10 | 8 |
-| glucose | glucose sensors | 10 | Diabetes Center Berne, Lilian Witthauer | 40% | 6/10 | 15 |
-| glucose | biosensing for diabetes | 10 | Lilian Witthauer, Thomas Züger, Christoph Stettler | 60% | 7/10 | 11 |
-| surgery | computer-assisted surgery | 10 | Chair for Image-guided Therapy | 17% | 6/9 | 10 |
+| glucose | continuous glucose monitoring | 10 | Diabetes Center Berne, Lilian Witthauer | 40% | 6/10 | 8 |
+| glucose | glucose sensors | 10 | Diabetes Center Berne, Lilian Witthauer | 40% | 10/10 | 11 |
+| glucose | biosensing for diabetes | 10 | Lilian Witthauer, Thomas Züger, Christoph Stettler | 60% | 9/10 | 11 |
+| surgery | computer-assisted surgery | 10 | Chair for Image-guided Therapy | 17% | 6/10 | 10 |
 | surgery | surgical robots | 10 | Chair for Image-guided Therapy, Manuela Eugster, Philipp Aebischer | 50% | 2/9 | 12 |
-| surgery | image-guided intervention | 10 | Chair for Image-guided Therapy, Manuela Eugster | 33% | 3/10 | 12 |
-| cardio | cardiovascular engineering | 10 | Dominik Obrist, Cardiovascular Research Cluster Bern, Odening Lab | 75% | 6/10 | 14 |
-| cardio | heart valve research | 10 | Dominik Obrist, Cardiovascular Research Cluster Bern, Odening Lab, Longnus Lab | 100% | 6/10 | 16 |
+| surgery | image-guided intervention | 10 | Chair for Image-guided Therapy, Manuela Eugster | 33% | 2/10 | 12 |
+| cardio | cardiovascular engineering | 10 | Dominik Obrist, Cardiovascular Research Cluster Bern, Odening Lab | 75% | 6/10 | 15 |
+| cardio | heart valve research | 10 | Dominik Obrist, Cardiovascular Research Cluster Bern, Odening Lab, Longnus Lab | 100% | 10/10 | 16 |
 | cardio | implant materials | 10 | – | 0% | 2/9 | 16 |
 
 ## Metrics (plan 10.2)
@@ -27,9 +27,10 @@
 | field fill, person results: role | 98% | report |
 | field fill, person results: affiliations | 100% | report |
 | field fill, person results: expertise | 0% | report |
+| field fill, person results: unit_topics | 79% | report |
 | field fill, person results: sources | 100% | report |
-| judged precision@10 [PoC] (mean of 9 judged queries) | 49% | report |
-| judge gold agreement [PoC] (gold hits judged relevant) | 60% (12 / 20) | judge not reliable |
+| judged precision@10 [PoC] (mean of 9 judged queries) | 59% | report |
+| judge gold agreement [PoC] (gold hits judged relevant) | 80% (16 / 20) | report; < 80% = judge not reliable |
 | extraction drop rate (unverified raw claims) | 13% (221 / 1705) | report |
 
 ## Source coverage
