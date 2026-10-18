@@ -97,7 +97,7 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
 - *Why is recall 64% and not 80%?* Every gold expert is in the database; the misses are people ranked 11th to
   40th behind their own lab, and one head whose member page is not crawled. A cross-encoder reranker adds 1 to
   3 experts but takes 7–11 s per search on a CPU, so it is off. A deeper crawl with profile pages (#75, 340
-  pages) reaches 58% today: the resolver keeps a few duplicates there, which are the next fix.
+  pages) reaches 62%, after merging the duplicates the resolver kept there; it is used once it is at least level.
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
   We report it as a signal, not as proof (judge agreement with the gold set: 76%).

@@ -32,7 +32,7 @@ cases:
       - {name: "Stavroula Mougiakakou", type: person}
       - {name: "Intelligent Nutrition", type: project}
       - {name: "enhance-d", type: project}
-      - {name: "SPN-005", type: project}
+      - {name: "SPN-005 – Pilot study on painless glucose monitoring", type: project}  # one entity since #127
       - {name: "GoCARB", type: project}
       - {name: "goFOOD", type: project}
       - {name: "Adaptive Diabetes Management", type: project}

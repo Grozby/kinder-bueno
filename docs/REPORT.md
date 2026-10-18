@@ -129,12 +129,12 @@ three phrasings (site wording, lay term, synonym) and 5–7 expected entities. 9
 
 | Case | Score | Expected range | Expected matches found | False matches |
 |---|---|---|---|---|
-| Glucora (wearable glucose sensor) | 77 | 55–90 | 7 of 11 | 0 |
+| Glucora (wearable glucose sensor) | 77 | 55–90 | 8 of 11 | 0 |
 | Repolar | 64 | 55–90 | 3 of 9 | 1 |
 | Precisa | 67 | 55–90 | 7 of 11 | 2 |
 | Vinora (no research fit) | 0 | 0–30 | – | 0 |
 
-All four scores are in range; 17 of 31 expected matches are found (19 of 31 among the references), with 3 false
+All four scores are in range; 18 of 31 expected matches are found (20 of 31 among the references), with 3 false
 matches. A live upload reads the PDF afresh, and the Glucora score varied between 55 and 80 across rehearsals,
 because the needs Apertus reads change.
 
@@ -149,12 +149,13 @@ with person profile pages (#75) was run:
 | chunks | 377 | 773 |
 | entities | 537 | 1,339 |
 | claims | 1,567 | 5,336 |
-| recall@10 / lay-term | 64% / 67% | 58% / 61% |
+| recall@10 / lay-term | 64% / 67% | 62% / 66% |
 | people with their own expertise | 0% | 26% |
 
-The deeper crawl is not used for the demo yet. More labs compete for the top 10, and the resolver keeps a few
-duplicates there (the same person with and without title, "Neuro Robotic(s) Group"). Those are the next fixes,
-measured with the same gold set before any swap.
+The deeper crawl is not used for the demo yet: more labs compete for the top 10, and it is still a few points
+behind. Fixing the resolver duplicates it showed (the same person with and without "Ass. Prof.", "Neuro
+Robotic(s) Group") raised it from 58% / 61% to 62% / 66%, with the demo database unchanged. It is swapped in only
+once it is at least level, measured with the same gold set.
 
 **Measured times per step** (100 pages, about 3,200 characters of text per page):
 
@@ -211,7 +212,7 @@ Bern (suppliers, manufacturers, advisors), with a different extraction prompt an
 ## 7. Limits and roadmap
 
 - **Recall is 64%, short of the 80% target.** The lever left is data: profile and facility pages (#75), with
-  the resolver duplicates fixed first. Ranking constants were swept and are near their best on this gold set (#99).
+  which is now close to the demo database (62% against 64%). Ranking constants were swept and are near their best on this gold set (#99).
 - **The gold set is small:** 9 queries in 3 use cases. A difference of ±2 points is noise.
 - **The LLM judge is a proof of concept:** 76% agreement with the gold set, and the same model family as the
   extractor. A human-labelled precision set would replace it.
