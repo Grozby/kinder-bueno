@@ -945,10 +945,12 @@ Topic match with person profiles, #75 (2026-10-18). The deeper crawl (340 pages,
 
 The gold set only gives recall. The eval judge gives a precision number without more human labels.
 
-- One call per query, with all top-10 results.
+- One call per result (10 per query, in parallel). One call per query with all ten made the verdicts depend on the
+  other results and their order: on identical input the judge is deterministic (0 of 87 verdicts changed over three
+  runs), but reversing the order of the same results changed 14 of 86 (#116).
 - The judge sees only the query and each result's shown evidence (`field: value — "quote"`). No URLs, no scores.
 - Binary verdict per result. Temperature 0. Same model as everything else, so it is biased (section 3). This is a PoC metric, not ground truth.
-- If the call fails → mark that query "not judged" and leave it out of the mean.
+- If a call fails → that result is not judged; a query with no judged result is left out of the mean.
 
 **Prompt (draft):**
 
@@ -968,8 +970,9 @@ Results:
 
 Save every verdict with its reason to `eval/judge_log.jsonl`, so a human can spot-check it later (section 16).
 
-As built (`eval_judge.py`, not `judge.py`, so it does not collide with the claim judge in 7.8): the prompt above plus one line asking for the bare id as the key (Apertus sometimes copies "4 ARTORG Center" as the key; the parser also accepts a leading id). Max 8 evidence rows per result (a big unit has 120+), quotes cut to 200 characters, 90 s timeout per query, calls in parallel. `navigator eval --no-judge` skips it.
+As built (`eval_judge.py`, not `judge.py`, so it does not collide with the claim judge in 7.8): the prompt above plus one line asking for the bare id as the key (Apertus sometimes copies "4 ARTORG Center" as the key; the parser also accepts a leading id). Max 8 evidence rows per result (a big unit has 120+), quotes cut to 200 characters, 90 s timeout per call, calls in parallel. `navigator eval --no-judge` skips it.
 With lab topics (#42): the judge sees `lab topic (via <unit>)` rows first (the 8-row cap used to cut them off), and the prompt says a person is relevant if their unit's topics match. Judge gold agreement 85% → 95–100% (3 runs), judged precision@10 63% → 65%. It still rejects people whose lab doesn't match (e.g. Daniel Ahmed, micro/nanorobotics, for "surgical robots").
+One call per result (2026-10-18, #116): **judged precision@10 73% and 74%** in two runs on the same ranking (one call for all ten gave 49–60%), gold agreement 73% and 76%, 1 of 90 verdicts different between the runs, ~1 min for the whole eval.
 First run (2026-10-18): **judged precision@10 47%** over 9 queries, judge gold agreement 100% (6 / 6). Results vary between runs because the expansion terms vary, and the result lists change with them.
 
 ### 10.4 Case eval (`case_eval.py`, `navigator case-eval`) — added during the hackathon

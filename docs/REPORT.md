@@ -109,8 +109,8 @@ three phrasings (site wording, lay term, synonym) and 5–7 expected entities. 9
 | phrasing overlap (Jaccard of top-10 sets): glucose, surgery, cardio | 60%, 41%, 48% | report |
 | field fill, people: role, affiliation, lab topics | 100%, 100%, 98% | report |
 | field fill, people: personal expertise | 0% | report |
-| judged precision@10 [PoC] | 49% | report |
-| eval judge agreement with the gold hits [PoC] | 61% (19 of 31) | report |
+| judged precision@10 [PoC] | 74% | report |
+| eval judge agreement with the gold hits [PoC] | 76% (25 of 33) | report |
 | extraction drop rate (quote not found) | 13% (221 of 1,705) | report |
 
 - **Recall rose from 14% to 64%** through ranking work: IDF on claims, owner of a page section, topic match,
@@ -118,14 +118,12 @@ three phrasings (site wording, lay term, synonym) and 5–7 expected entities. 9
   surgery (29–43%): the head of the image-guided therapy chair appears in the 100 pages only as a lecturer.
 - **Personal expertise is 0%** because the crawled pages state topics for labs, not for people. People show
   their lab's topics, labelled as the lab's.
-- **Judged precision fell from 60% to 49%** with the last ranking change (#130), which raised recall from 60%
-  to 64%. 77 of the 88 judged results were the same as in the run before; on those, the judge changed 9
-  verdicts, 7 of them to "not relevant" (for example "Chair for Image-guided Therapy" for "surgical robots").
-  Of the 11 new results, it judged 2 relevant, against 5 of the 9 that left. The judge rates all 10 results of a
-  query in one call at temperature 0: on identical input it is deterministic (0 of 87 verdicts differ over three
-  runs), but the same results in reverse order change 14 of 86 verdicts. A ranking change therefore also changes
-  verdicts on results that stayed. The judge uses the extractor's model family and agrees with the human gold set
-  on only 61% of gold hits, so it is a signal, not a measurement.
+- **Judged precision is 74%** with the judge rating each result in its own call. It used to rate all 10 results
+  of a query in one call, and its verdicts then depended on the other results and their order: at temperature 0
+  identical input gave identical verdicts (0 of 87 changed), but reversing the order of the same results changed
+  14 of 86. With one call per result, two runs differ in 1 verdict of 90; the old setup gave 49–60% on the same
+  ranking. The judge uses the extractor's model family and agrees with the human gold set on 76% of gold hits,
+  so it is a signal, not a measurement.
 
 **Case eval** (4 fictional business models in `docs/examples`, expected matches in `eval/cases.yaml`):
 
@@ -216,9 +214,8 @@ Bern (suppliers, manufacturers, advisors), with a different extraction prompt an
 - **Recall is 64%, short of the 80% target.** The lever left is data: profile and facility pages (#75), with
   which is now close to the demo database (62% against 64%). Ranking constants were swept and are near their best on this gold set (#99).
 - **The gold set is small:** 9 queries in 3 use cases. A difference of ±2 points is noise.
-- **The LLM judge is a proof of concept:** 61–73% agreement with the gold set, and its verdicts depend on the
-  order of the results it is shown (16% change when the order is reversed). Judging each result on its own would
-  remove that, at 10 times the calls.
+- **The LLM judge is a proof of concept:** 76% agreement with the gold set, and the same model family as the
+  extractor. A human-labelled precision set would replace it.
 - **Personal expertise** needs profile pages (#75).
 - **Open:** deleting a case and its data (#134), documentation updates (#100, #104), published Docker images
   (#101).
