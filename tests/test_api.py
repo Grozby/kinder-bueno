@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import onehot
-from navigator.api import app, get_conn, get_embed, get_expand, get_explain
+from navigator.api import app, get_conn, get_embed, get_expand, get_explain, get_seeds
 from navigator.expand import Expansion
 
 
@@ -23,6 +23,7 @@ def client(test_conn, graph):
     app.dependency_overrides[get_embed] = lambda: fake_embed
     app.dependency_overrides[get_expand] = lambda: lambda q: Expansion()  # expansion failed / disabled
     app.dependency_overrides[get_explain] = lambda: lambda q, results: {}  # explanations failed: template
+    app.dependency_overrides[get_seeds] = lambda: {"artorg": "https://artorg.example/"}  # dcb is not validated
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -144,3 +145,32 @@ def test_search_without_results_does_not_call_explain(client):
 
     app.dependency_overrides[get_explain] = lambda: fail
     assert client.get("/api/search", params={"q": "nothing here"}).json()["no_result"] is True
+
+
+def test_sources_list(client, test_conn, graph):
+    body = client.get("/api/sources").json()
+    assert [s["id"] for s in body] == ["artorg", "dcb"]
+    artorg, dcb = body
+    stats = {s["source"]: s for s in client.get("/api/stats").json()["sources"]}
+    assert (artorg["pages"], artorg["entities"], artorg["verified_claims"]) == (
+        stats["artorg"]["pages"], stats["artorg"]["entities"], stats["artorg"]["shown_claims"],
+    )
+    assert artorg["root_url"] == "https://artorg.example/" and artorg["validated"] is True
+    assert artorg["status"] == "ready" and artorg["last_crawled_at"] is not None
+    assert {d["url"] for d in artorg["discovered"]} == {"https://artorg.example/alice", "https://artorg.example/lab"}
+    assert artorg["discovered"][0] == {"url": "https://artorg.example/alice", "parent": None, "depth": 0, "status": "crawled"}
+    # Not in sources.yaml: not validated, root_url falls back to its first page
+    assert dcb["validated"] is False and dcb["root_url"] == "https://dcb.example/bob"
+
+
+def test_source_get_and_unknown(client, graph):
+    assert client.get("/api/sources/dcb").json()["pages"] == 1
+    response = client.get("/api/sources/nope")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Source not found"}
+
+
+def test_seeds_from_sources_yaml():
+    seeds = get_seeds()
+    assert {"artorg", "dcb", "unibe"} <= seeds.keys()
+    assert seeds["artorg"] == "https://www.artorg.unibe.ch/research/index_eng.html"

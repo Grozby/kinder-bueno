@@ -73,3 +73,6 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 - While `status` is `crawling`, the frontend polls `GET /api/sources/{id}` every second and draws
   `discovered` (`{url, parent, depth, status}`) as a live graph. A sample of up to ~60 pages is enough.
 - `pages`, `entities`, `verified_claims` map to the counts from `navigator stats` / `GET /api/stats`.
+- Served since #51 (read-only): `status` is always `"ready"`; `validated` means the source is in
+  `config/sources.yaml`, and `root_url` is its first seed. `discovered` is up to 60 stored pages with
+  `parent: null`, `depth: 0`, `status: "crawled"`: the crawler does not record the tree yet (#55).
