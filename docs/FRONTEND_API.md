@@ -11,7 +11,7 @@ The Vue frontend (`frontend/`) calls JSON endpoints under `/api`. Types are in
 
 The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory mock
 (`frontend/src/api/mock.ts`) for UI work on routes the backend does not serve yet;
-`VITE_SHOW_UNFINISHED=true` shows controls whose backend is not there yet (the chat examples: served since #97, still hidden by default). In dev, Vite proxies
+`VITE_SHOW_UNFINISHED=true` shows controls whose backend is not there yet (none at the moment: the chat examples are shown since #97). In dev, Vite proxies
 `/api` to `BACKEND_URL` (default `http://localhost:8000`); in the Docker image, nginx does
 (`frontend/deploy/default.conf.template`) and adds `API_TOKEN`.
 

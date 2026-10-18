@@ -4,7 +4,6 @@
 import { Check, LoaderCircle, Plus, Send } from '@lucide/vue'
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 
-import { SHOW_UNFINISHED } from '@/api'
 import { useCasesStore } from '@/stores/cases'
 import { evidenceIndex } from '@/utils/citations'
 import { hostOf } from '@/utils/format'
@@ -23,6 +22,7 @@ const referenceIds = computed(
   () => new Set((store.references[props.caseId] ?? []).map((r) => r.entity_id)),
 )
 
+// Each one is a tool of the chat agent (#97): set_filters, more_like, related
 const EXAMPLES = ['Only people at DCB', 'More like #1', 'Who works with #2?']
 
 async function send(message = draft.value.trim()) {
@@ -88,7 +88,7 @@ async function send(message = draft.value.trim()) {
       </div>
     </div>
 
-    <div v-if="SHOW_UNFINISHED" class="examples">
+    <div class="examples">
       <button v-for="ex in EXAMPLES" :key="ex" type="button" :disabled="busy" @click="send(ex)">
         {{ ex }}
       </button>
