@@ -380,7 +380,7 @@ CREATE INDEX IF NOT EXISTS claim_page_idx ON claim(page_id);
 CREATE TABLE IF NOT EXISTS relation (
   id          serial PRIMARY KEY,
   from_id     int NOT NULL REFERENCES entity(id) ON DELETE CASCADE,
-  rel         text NOT NULL CHECK (rel IN ('member_of','works_on','part_of','provides')),
+  rel         text NOT NULL CHECK (rel IN ('member_of','works_on','part_of','provides','listed_in')),
   to_id       int NOT NULL REFERENCES entity(id) ON DELETE CASCADE,
   quote       text NOT NULL,
   page_id     int NOT NULL REFERENCES page(id) ON DELETE CASCADE,
@@ -474,6 +474,8 @@ Allowed fields per entity type:
 | infrastructure | `name`, `description` (equipment, facility, platform, service) |
 
 Allowed relations: `member_of` (person → unit), `part_of` (unit → unit), `works_on` (person or unit → project), `provides` (unit → infrastructure).
+
+`listed_in` (person → unit) is **not extracted**: `resolve` creates it (#23). It means "this person is listed on this unit's member page". Its quote is the person's name on that page, which supports "listed on", not "is a member of". That is why it is a separate relation and not a `member_of` with a weak quote. The unit's name comes from the first line of the parent page (the member page URL without `group_members/` or `team/`), because member page titles do not name the lab. `schema.sql` re-creates `relation_rel_check`, so existing databases accept it after `navigator init-db`.
 
 **System prompt (use as is, tune only if eval fails):**
 
