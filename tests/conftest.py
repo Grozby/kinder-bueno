@@ -5,7 +5,9 @@ import pytest
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from navigator import db
+import numpy as np
+
+from navigator import chunks_db, db
 from navigator.settings import PROJECT_ROOT, get_settings
 from navigator.sources import load_sources
 
@@ -30,8 +32,8 @@ def test_database_url() -> str:
 
 @pytest.fixture
 def test_conn(test_database_url):
-    """Connection to the test database, with every table emptied first."""
-    with db.connect(test_database_url) as conn:
+    """Connection to the test database (pgvector registered), with every table emptied first."""
+    with chunks_db.connect(test_database_url) as conn:
         tables = [r[0] for r in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")]
         conn.execute(
             sql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(sql.SQL(", ").join(map(sql.Identifier, tables)))
@@ -106,4 +108,20 @@ def graph(test_conn) -> dict[str, int]:
     relation("alice", "works_on", "pancreas", "p1")
     relation("bob", "member_of", "center", "p3")
     relation("bob", "member_of", "lab", "p3", verdict="unsupported")
+
+    # One chunk per page made of its quotes; page n gets the one-hot vector on dimension n (see onehot()).
+    for n, pg in enumerate(["p1", "p2", "p3"], start=1):
+        text = c.execute("SELECT string_agg(quote, '. ' ORDER BY id) FROM claim WHERE page_id = %s", (ids[pg],))
+        c.execute(
+            "INSERT INTO chunk (page_id, ord, text, embedding) VALUES (%s, 0, %s, %s)",
+            (ids[pg], text.fetchone()[0], onehot({n: 1.0})),
+        )
     return ids
+
+
+def onehot(weights: dict[int, float]) -> np.ndarray:
+    """A unit vector with the given weights on the given dimensions (bge-m3 size)."""
+    v = np.zeros(1024, dtype=np.float32)
+    for dim, w in weights.items():
+        v[dim] = w
+    return v / np.linalg.norm(v)
