@@ -6,6 +6,7 @@ import zlib
 import numpy as np
 import pytest
 from conftest import onehot
+from psycopg.types.json import Jsonb
 from test_api import fake_embed
 
 from navigator import analysis, cases
@@ -195,6 +196,20 @@ def test_references_keep_checked_sentences_and_drop_missing_entities(test_conn, 
     names = [r.name for r in analysis.references(test_conn, case_id, 25)]
     assert "Bob Beispiel" not in names and "Alice Muster" in names
     assert len(analysis.references(test_conn, case_id, 1)) == 1
+
+
+def test_references_list_the_matching_ones_first(test_conn, graph):
+    case_id = new_case(test_conn)
+    stored = [  # the search's order: two only found for the need, then the matching ones
+        {"entity_id": graph["center"], "score": 0.9, "need": "glucose", "needs": [], "why": None},
+        {"entity_id": graph["lab"], "score": 0.8, "need": "glucose", "needs": [], "why": None},
+        {"entity_id": graph["bob"], "score": 0.7, "need": "glucose", "needs": ["glucose"], "why": None},
+        {"entity_id": graph["alice"], "score": 0.6, "need": "glucose", "needs": ["glucose"], "why": None},
+    ]
+    test_conn.execute('UPDATE "case" SET refs = %s WHERE id = %s', (Jsonb(stored), case_id))
+    names = [r.name for r in analysis.references(test_conn, case_id, 25)]
+    assert names == ["Bob Beispiel", "Alice Muster", "ARTORG Center", "Diabetes Lab"]
+    assert [r.name for r in analysis.references(test_conn, case_id, 2)] == ["Bob Beispiel", "Alice Muster"]
 
 
 def test_references_unknown_case(test_conn):
