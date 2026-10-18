@@ -867,6 +867,13 @@ As built (`evaluate.py`, `navigator eval`, `eval/run_eval.py`): the PoC rows (ju
 
 Baseline (2026-10-18, 8B extraction, expansion on): **recall@10 14%** (target 80%), traceability 100%, drop rate 13%. Main causes (see the ranking issue): umbrella units ("ARTORG Center", in two spellings) have claims on nearly every page and take top slots; the expected labs and their heads are pushed out (surgery 0%).
 
+Ranking, #59 (2026-10-18): **recall@10 46% → 59%**, lay-term 47% → 54%, unit_topics fill 78% → 92%, traceability 100%. 14 of 15 gold entities are in the DB, so the misses were ranking, not coverage. Two new signals in `rank.py`:
+- **Topic match** (`TOPIC_WEIGHT`): an entity's own `expertise` / `description` claims are embedded (bge-m3, cached per process, first search +1 s) and compared with the query; the best match above `TOPIC_MIN` adds to the score (times IDF). Only the first `TOPICS_PER_PAGE` topics per page count: 8B sometimes loops into 30 generic topics ("medical research").
+- **Section owner** (`SECTION_WEIGHT`): a lab with a member page owns the pages under its folder (`/research/aihn/…`), as if it were named in them. The extractor often credits a lab page's topics to the umbrella ("ARTORG Center…"), so the lab, and its head through inheritance, never scored. The deepest folder wins.
+- `SENIOR_BOOST` 0.1 → 0.3. A bigger inherited share for heads (tried) lowered recall.
+
+Judged precision fell 63% → 48%, but judge gold agreement fell too (90% → 60%, "not reliable"): the judge rejects new gold hits (Odening Lab and CVRC for "heart valve research", Mougiakakou for CGM). Real noise remains: Motor Learning lab and Acoustic Robotics for surgery queries, and umbrella topics shown as a person's lab topics. Still missed: Stefan Weber (not in the DB), Hearing Research Laboratory, Züger and Stettler for 2 of 3 glucose phrasings.
+
 ### 10.3 Eval judge (`judge.py`) — [PoC]
 
 The gold set only gives recall. The eval judge gives a precision number without more human labels.

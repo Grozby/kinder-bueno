@@ -1,9 +1,20 @@
 """Entity ranking: linking and cap as unit tests, the full ranker on the fixture graph (tests/conftest.py)."""
 
+import numpy as np
 import pytest
-
 from conftest import onehot
-from navigator.rank import _units, entity_scores, fairness_cap, idf, inherit, rank_entities
+
+from navigator.rank import (
+    _units,
+    entity_scores,
+    fairness_cap,
+    home_folder,
+    idf,
+    inherit,
+    rank_entities,
+    section_scores,
+    topic_scores,
+)
 from navigator.search import ChunkHit
 
 
@@ -43,6 +54,29 @@ def test_members_inherit_their_best_units_score():
     scores = {10: 1.0, 11: 0.4, 1: 0.1}  # units 10, 11; person 1 has its own score
     out = inherit(scores, [(1, 10), (1, 11), (2, 11), (3, 99)], share=0.5)
     assert out == {10: 1.0, 11: 0.4, 1: pytest.approx(0.6), 2: pytest.approx(0.2)}  # 3: unit 99 did not match
+
+
+def test_home_folder_is_the_folder_above_the_member_page():
+    assert home_folder("https://a.ch/research/aihn/group_members/index_eng.html") == "https://a.ch/research/aihn/"
+    assert home_folder("https://www.dcberne.com/en/team/") == "https://www.dcberne.com/en/"
+
+
+def test_section_scores_credit_the_deepest_owner():
+    def hit(url: str, score: float) -> ChunkHit:
+        return ChunkHit(1, 1, url, "text", score, None)
+
+    homes = [(1, "https://a.ch/research/aihn/"), (2, "https://a.ch/"), (3, "https://a.ch/research/nrg/")]
+    hits = [hit("https://a.ch/research/aihn/diabetes/index.html", 0.4), hit("https://a.ch/research/aihn/x", 0.1),
+            hit("https://a.ch/about.html", 0.2)]
+    # the lab, not the whole site, owns its pages; the site owns the rest; nrg has no hit
+    assert section_scores(hits, homes, weight=0.5) == {1: pytest.approx(0.2), 2: pytest.approx(0.1)}
+
+
+def test_topic_score_is_the_best_matching_topic():
+    vecs = {"robotics": np.array([1.0, 0.0]), "nutrition": np.array([0.0, 1.0]), "imaging": np.array([0.6, 0.8])}
+    claims = [(1, "robotics"), (1, "nutrition"), (2, "imaging")]
+    sims = topic_scores(claims, [np.array([1.0, 0.0])], vecs.__getitem__)
+    assert sims == {1: pytest.approx(1.0), 2: pytest.approx(0.6)}
 
 
 def test_fairness_cap_allows_three_per_unit():
@@ -94,3 +128,24 @@ def test_unit_from_member_of_first_then_listed_in(test_conn, graph):
     test_conn.execute("DELETE FROM relation WHERE from_id = %s", (graph["bob"],))
     listed_in("bob", "lab")  # Bob has only listed_in
     assert _units(test_conn, [graph["alice"], graph["bob"]]) == {graph["alice"]: graph["lab"], graph["bob"]: graph["lab"]}
+
+
+def test_unit_found_through_its_own_topics(test_conn, graph, monkeypatch):
+    # The query matches Bob's page (p3), where the lab has no claim; the lab's expertise claim matches the query.
+    test_conn.execute(
+        "INSERT INTO claim (entity_id, field, value, quote, page_id, verified) "
+        "VALUES (%s, 'expertise', 'zebrafish genetics', 'q', %s, true)",
+        (graph["lab"], graph["p2"]),
+    )
+
+    def embed(text: str):
+        if text == "zebrafish genetics":
+            return onehot({3: 0.6, 7: 0.8})  # the query
+        return onehot({7: 1.0}) if "zebrafish" in text else onehot({1: 1.0})  # topic values
+
+    def ranked() -> list[int]:
+        return [e for e, _ in rank_entities(test_conn, "zebrafish genetics", embed=embed).ranked]
+
+    assert ranked()[0] == graph["lab"]
+    monkeypatch.setattr("navigator.rank.TOPIC_WEIGHT", 0.0)
+    assert ranked()[-1] == graph["lab"]  # without topics it only has a weak page link
