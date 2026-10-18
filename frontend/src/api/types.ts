@@ -111,6 +111,8 @@ export interface Source {
   root_url: string
   validated: boolean
   status: SourceStatus
+  stage?: string | null // while crawling: crawl, embed, extract, resolve or judge (#55)
+  error?: string | null // why the ingest failed
   pages: number
   entities: number
   verified_claims: number

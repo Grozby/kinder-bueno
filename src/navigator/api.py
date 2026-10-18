@@ -15,7 +15,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import analysis, cases, chunks_db, pitch
+from navigator import analysis, cases, chunks_db, ingest, pitch
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -36,6 +36,7 @@ from navigator.models import (
     PitchRequest,
     Result,
     SearchResponse,
+    NewSource,
     Source,
     SourceStats,
     StatsResponse,
@@ -305,7 +306,7 @@ def _sources(conn: psycopg.Connection, seeds: dict[str, str], source_id: str | N
     """Sources with the /api/stats counts; all of them, or the one with `source_id`."""
     rows = conn.execute(
         f"""
-        SELECT s.id, s.name,
+        SELECT s.id, s.name, s.status, s.stage, s.error, s.root_url,
                count(DISTINCT p.id),
                count(DISTINCT cl.entity_id) FILTER (WHERE {shown("cl")}),
                count(DISTINCT cl.id) FILTER (WHERE {shown("cl")}),
@@ -320,25 +321,34 @@ def _sources(conn: psycopg.Connection, seeds: dict[str, str], source_id: str | N
         {"id": source_id},
     ).fetchall()
     discovered: dict[str, list[CrawledPage]] = {r[0]: [] for r in rows}
-    for sid, url in conn.execute(
-        "SELECT source_id, url FROM (SELECT source_id, url, row_number() OVER (PARTITION BY source_id ORDER BY id) n "
-        "FROM page WHERE source_id = ANY(%s)) p WHERE n <= %s ORDER BY source_id, n",
-        (list(discovered), DISCOVERED_SAMPLE),
+    # The crawl tree where the crawler recorded it (#55); otherwise the stored pages, as flat seeds
+    for sid, url, parent, depth, status in conn.execute(
+        """
+        SELECT source_id, url, parent, depth, status FROM (
+            SELECT source_id, url, parent, depth, status, row_number() OVER (PARTITION BY source_id ORDER BY id) n
+            FROM crawl_url WHERE source_id = ANY(%(ids)s)
+            UNION ALL
+            SELECT source_id, url, NULL, 0, 'crawled', row_number() OVER (PARTITION BY source_id ORDER BY id)
+            FROM page WHERE source_id = ANY(%(ids)s)
+              AND NOT EXISTS (SELECT 1 FROM crawl_url c WHERE c.source_id = page.source_id)
+        ) u WHERE n <= %(n)s ORDER BY source_id, n
+        """,
+        {"ids": list(discovered), "n": DISCOVERED_SAMPLE},
     ):
-        discovered[sid].append(CrawledPage(url=url, parent=None, depth=0, status="crawled"))
+        discovered[sid].append(CrawledPage(url=url, parent=parent, depth=depth, status=status))
     return [
         Source(
-            id=sid, name=name, root_url=seeds.get(sid) or next((d.url for d in discovered[sid]), ""),
-            validated=sid in seeds, status="ready", pages=pages, entities=entities, verified_claims=claims,
-            last_crawled_at=crawled, discovered=discovered[sid],
+            id=sid, name=name, root_url=seeds.get(sid) or root or next((d.url for d in discovered[sid]), ""),
+            validated=sid in seeds, status=status, stage=stage, error=error, pages=pages, entities=entities,
+            verified_claims=claims, last_crawled_at=crawled, discovered=discovered[sid],
         )
-        for sid, name, pages, entities, claims, crawled in rows
+        for sid, name, status, stage, error, root, pages, entities, claims, crawled in rows
     ]
 
 
 @app.get("/api/sources")
 def list_sources(conn: Conn, seeds: Seeds) -> list[Source]:
-    """All crawled sources with their counts (status is always "ready" until POST /api/sources, #55)."""
+    """All sources with their counts; sources added from the UI carry their ingest status (#55)."""
     return _sources(conn, seeds)
 
 
@@ -348,6 +358,31 @@ def get_source(conn: Conn, seeds: Seeds, source_id: str) -> Source:
     if not found:
         raise HTTPException(status_code=404, detail="Source not found")
     return found[0]
+
+
+def get_ingest() -> Callable[[str], None]:
+    """The background ingest of a source added from the UI, on its own connection."""
+    return lambda source_id: ingest.run_ingest(get_settings().database_url, source_id)
+
+
+@app.post("/api/sources")
+def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewSource,
+               run: Annotated[Callable[[str], None], Depends(get_ingest)]) -> Source:
+    """Add a website and ingest it in the background (crawl, embed, extract, resolve, judge). Returns at once
+    with status "crawling"; poll GET /api/sources/{id}. One ingest at a time: 409 while one runs."""
+    if not ingest.try_start():
+        raise HTTPException(status_code=409, detail="Another source is being ingested; try again when it is ready")
+    try:
+        source_id = ingest.add_source(conn, body.url, body.name, body.max_depth, body.max_pages, body.follow_outbound)
+    except ingest.SourceError as exc:
+        ingest.finish()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        ingest.finish()
+        raise
+    conn.commit()  # the background ingest reads the source on another connection
+    background.add_task(run, source_id)
+    return _sources(conn, seeds, source_id)[0]
 
 
 @app.post("/api/cases")

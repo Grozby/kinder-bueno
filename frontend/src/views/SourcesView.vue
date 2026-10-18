@@ -160,6 +160,14 @@ const submitting = ref(false)
 const formError = ref<string | null>(null)
 const form = reactive({ url: '', name: '', max_depth: 2, max_pages: 50, follow_outbound: false })
 const DEPTHS = [1, 2, 3, 4]
+// The backend ingests a new source in steps after the crawl (#55)
+const STAGE_LABEL: Record<string, string> = {
+  crawl: 'Crawling',
+  embed: 'Embedding',
+  extract: 'Extracting facts',
+  resolve: 'Linking entities',
+  judge: 'Checking facts',
+}
 
 const openId = ref<string | null>(null)
 const openSource = computed(() => store.sources.find((s) => s.id === openId.value) ?? null)
@@ -377,9 +385,9 @@ onMounted(() => {
         </div>
         <div class="info">
           <span v-if="s.status === 'crawling'" class="tag tag-mid">
-            <LoaderCircle class="spin" :size="12" /> Crawling
+            <LoaderCircle class="spin" :size="12" /> {{ STAGE_LABEL[s.stage ?? 'crawl'] ?? 'Crawling' }}
           </span>
-          <span v-else-if="s.status === 'failed'" class="tag tag-bad">Failed</span>
+          <span v-else-if="s.status === 'failed'" class="tag tag-bad" :title="s.error ?? undefined">Failed</span>
           <span v-else-if="s.validated" class="tag tag-good"
             ><BadgeCheck :size="13" /> Validated</span
           >
