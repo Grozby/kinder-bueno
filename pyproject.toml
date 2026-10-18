@@ -20,6 +20,7 @@ dependencies = [
     "typer>=0.27.3",
     "unidecode>=1.4.0",
     "uvicorn==0.54.0",
+    "torch>=2.5",
 ]
 
 [dependency-groups]
@@ -39,3 +40,12 @@ packages = ["src/navigator"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Linux (Docker) gets the CPU-only torch wheel: the default one pulls ~4 GB of CUDA libraries.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

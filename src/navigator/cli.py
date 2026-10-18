@@ -233,5 +233,18 @@ def evaluate(
         typer.echo(f"Saved {len(verdicts)} judge verdicts to {judge_log}")
 
 
+@app.command()
+def ingest(
+    source: str | None = typer.Option(None, help="Source id. Default: all sources."),
+    max_pages: int | None = typer.Option(None, help="Override max_pages from config (crawl)."),
+) -> None:
+    """Whole pipeline: init-db → crawl → embed → extract → resolve (plan 11)."""
+    init_db()
+    crawl(source=source, max_pages=max_pages)
+    embed(source=source)
+    extract(source=source, limit=None, url_like=None, resolve_after=True)
+    stats()
+
+
 if __name__ == "__main__":
     app()

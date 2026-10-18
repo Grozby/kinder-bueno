@@ -230,75 +230,20 @@ Frontend: `npm ci` in `frontend/` (versions in `frontend/package.json`).
 
 ## 6. Infrastructure
 
-### 6.1 `docker-compose.yml`
+### 6.1 `docker-compose.yml` (live file, #31)
 
-```yaml
-services:
-  db:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_USER: navigator
-      POSTGRES_PASSWORD: navigator
-      POSTGRES_DB: navigator
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U navigator"]
-      interval: 5s
-      retries: 10
+Services: `db` (pgvector/pgvector:pg16), `app` (`navigator serve` on port 8000, healthcheck on `/api/stats`, bge-m3 cache in the `hf_cache` volume, `EXTRACT_MODEL` defaults to `apertus-v1-5-8b`) and `frontend` (node:24-slim, Vite dev server on 5173, `BACKEND_URL=http://app:8000`, starts when `app` is healthy). Host ports come from `DB_PORT`, `API_PORT` and `UI_PORT`, so a second stack with its own volumes can run under another project name (`docker compose -p navclean ...`).
 
-  app:
-    build: .
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://navigator:navigator@db:5432/navigator
-      HF_HOME: /cache/hf
-    depends_on:
-      db: { condition: service_healthy }
-    ports: ["8000:8000"]
-    volumes:
-      - hf_cache:/cache/hf          # keeps the bge-m3 download (~2.3 GB) between runs
-      - ./config:/app/config
-      - ./eval:/app/eval
-    command: uv run navigator serve --host 0.0.0.0 --port 8000
+### 6.2 `Dockerfile` (live file, #31)
 
-  frontend:                         # pending teammate review
-    image: node:24-slim
-    working_dir: /frontend
-    environment:
-      BACKEND_URL: http://app:8000  # read by vite.config.ts
-    depends_on: [app]
-    ports: ["5173:5173"]
-    volumes:
-      - ./frontend:/frontend
-      - /frontend/node_modules      # keep container node_modules separate from the host
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
-
-volumes:
-  pgdata:
-  hf_cache:
-```
-
-### 6.2 `Dockerfile`
-
-```dockerfile
-FROM python:3.12-slim
-COPY --from=ghcr.io/astral-sh/uv:0.4.30 /uv /usr/local/bin/uv
-WORKDIR /app
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
-COPY . .
-RUN uv sync --frozen --no-dev
-```
-
-Note: torch (pulled in by sentence-transformers) is large. To keep the image small, install the CPU-only torch wheel (`--index-url https://download.pytorch.org/whl/cpu`) via a `[tool.uv.sources]` entry. If this costs more than 15 minutes, skip it and accept the big image.
+`python:3.12-slim` + uv. Dependencies are installed in their own layer, and the uv download cache is a BuildKit cache mount, so it stays out of the image. `torch` comes from the CPU-only index on Linux (`[tool.uv.sources]` in `pyproject.toml`): the default wheel pulls ~4 GB of CUDA libraries. Image: ~2 GB.
 
 ### 6.3 Commands
 
 ```bash
 docker compose up -d db
 docker compose run --rm app uv run navigator init-db
-docker compose run --rm app uv run navigator ingest            # crawl + clean + chunk + embed + extract + verify + resolve, all sources
+docker compose run --rm app uv run navigator ingest            # init-db + crawl + embed + extract + verify + resolve, all sources
 docker compose run --rm app uv run navigator ingest --source dcb
 docker compose run --rm app uv run navigator eval
 docker compose up app frontend                                 # UI at http://localhost:5173, API at http://localhost:8000/api

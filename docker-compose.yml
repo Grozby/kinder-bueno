@@ -1,3 +1,6 @@
+# Run everything:   docker compose up -d db && docker compose run --rm app uv run navigator ingest
+#                   docker compose up app frontend   →  UI http://localhost:5173, API http://localhost:8000/docs
+# Host ports can be changed (DB_PORT, API_PORT, UI_PORT), e.g. to run a second stack next to the first.
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -5,7 +8,7 @@ services:
       POSTGRES_USER: navigator
       POSTGRES_PASSWORD: navigator
       POSTGRES_DB: navigator
-    ports: ["5432:5432"]
+    ports: ["${DB_PORT:-5432}:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U navigator"]
@@ -18,15 +21,36 @@ services:
     environment:
       DATABASE_URL: postgresql://navigator:navigator@db:5432/navigator
       HF_HOME: /cache/hf
+      EXTRACT_MODEL: ${EXTRACT_MODEL:-apertus-v1-5-8b}  # 70B is too slow on the shared gateway (plan 3)
     depends_on:
       db: { condition: service_healthy }
-    ports: ["8501:8501"]
+    ports: ["${API_PORT:-8000}:8000"]
     volumes:
       - hf_cache:/cache/hf          # keeps the bge-m3 download (~2.3 GB) between runs
       - ./config:/app/config
       - ./eval:/app/eval
-    command: uv run streamlit run app/streamlit_app.py --server.address 0.0.0.0
+    command: uv run navigator serve --host 0.0.0.0 --port 8000
+    healthcheck:                    # the API is ready once the embedding model is loaded
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/stats')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  frontend:
+    image: node:24-slim
+    working_dir: /frontend
+    environment:
+      BACKEND_URL: http://app:8000  # read by vite.config.ts
+    depends_on:
+      app: { condition: service_healthy }
+    ports: ["${UI_PORT:-5173}:5173"]
+    volumes:
+      - ./frontend:/frontend
+      - frontend_node_modules:/frontend/node_modules  # container's own node_modules, not the host's
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
 
 volumes:
   pgdata:
   hf_cache:
+  frontend_node_modules:
