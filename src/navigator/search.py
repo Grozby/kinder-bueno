@@ -29,9 +29,27 @@ def _unique_terms(terms: list[str]) -> list[str]:
     return list(seen.values())
 
 
-def keyword_search(conn: psycopg.Connection, terms: list[str], limit: int = TOP_N) -> list[int]:
-    """Chunk ids ranked by ts_rank_cd for an OR of all terms (multi-word terms as phrases)."""
-    terms = _unique_terms(terms)
+def query_words(conn: psycopg.Connection, query: str) -> list[str]:
+    """The query's words, tokenised like `chunk.tsv`, without English/German stopwords (unless that leaves none)."""
+    rows = conn.execute(
+        "SELECT lexeme, ts_lexize('english_stem', lexeme) = '{}' OR ts_lexize('german_stem', lexeme) = '{}' "
+        "FROM unnest(to_tsvector('simple', %s))",
+        (query,),
+    ).fetchall()
+    content = [w for w, is_stopword in rows if not is_stopword]
+    return content or [w for w, _ in rows]
+
+
+def keyword_search(
+    conn: psycopg.Connection, query: str, extra_terms: list[str] = [], limit: int = TOP_N
+) -> list[int]:
+    """Chunk ids ranked by ts_rank_cd for an OR of the query's words and the extra terms.
+
+    The query is split into words: the 'simple' config does not stem, so requiring the whole
+    query ("heart valve research") misses pages that say "valves". ts_rank_cd still ranks chunks
+    with more of the words, closer together, first. Multi-word extra terms stay phrases.
+    """
+    terms = _unique_terms([*query_words(conn, query), *extra_terms])
     if not terms:
         return []
     parts = [
@@ -74,7 +92,7 @@ def search_chunks(
         from navigator.embed import embed_query  # imported lazily: loads torch
 
         embed = embed_query
-    lists = [keyword_search(conn, [query, *extra_terms])]
+    lists = [keyword_search(conn, query, extra_terms)]
     queries = [query] + ([f"{query}, {', '.join(extra_terms[:4])}"] if extra_terms else [])
     similarity: dict[int, float] = {}
     for q in queries:
