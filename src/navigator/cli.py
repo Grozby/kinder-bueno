@@ -126,14 +126,22 @@ def embed(source: str | None = typer.Option(None, help="Source id. Default: all 
 
 
 @app.command("search-chunks")
-def search_chunks(query: str, k: int = typer.Option(10, help="Number of chunks to show.")) -> None:
+def search_chunks(
+    query: str,
+    k: int = typer.Option(10, help="Number of chunks to show."),
+    expand: bool = typer.Option(False, help="Add Apertus search terms (plan 8.1)."),
+) -> None:
     """Debug: show the top chunks for a query with page URL and score."""
     from navigator import chunks_db
+    from navigator.expand import Expansion, expand_query
     from navigator.search import search_chunks as run_search
 
     settings = get_settings()
+    expansion = asyncio.run(expand_query(LLM(settings), query)) if expand else Expansion()
+    if expand:
+        typer.echo(f"en: {', '.join(expansion.en) or '-'}\nde: {', '.join(expansion.de) or '-'}\n")
     with chunks_db.connect(settings.database_url) as conn:
-        hits = run_search(conn, query)[:k]
+        hits = run_search(conn, query, expansion.terms)[:k]
     for i, hit in enumerate(hits, start=1):
         sim = f"{hit.similarity:.3f}" if hit.similarity is not None else "  -  "
         snippet = " ".join(hit.text.split())[:120]

@@ -35,9 +35,11 @@ uv run navigator embed --source dcb
 
 ```bash
 uv run navigator search-chunks "continuous glucose monitoring" --k 10
+uv run navigator search-chunks "Herzklappen" --expand   # add Apertus search terms (needs KEERA_API_KEY)
 ```
 
 Prints the top chunks (keyword + semantic search, fused with RRF) with page URL and score.
+With `--expand` it first prints the English and German search terms from Apertus.
 
 ## Tests
 
