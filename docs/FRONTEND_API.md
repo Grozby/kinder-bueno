@@ -54,7 +54,8 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
   - Running projects (10%): 50 per project.
 
   Each criterion is capped at 100. It measures fit within our sources, not all of Canton Bern.
-- References: `why` starts with the need the reference matched (`Matches 'continuous glucose monitoring': …`),
+- References: `why` starts with the need: `Matches 'continuous glucose monitoring': …` when a claim matched it
+  (it counts in the score), `Found for '…'` when the search found the reference but no claim matched,
   then a sentence whose claim citations are checked again on every request. `[]` before the analysis
   is done.
 - Pitch (#54): plain text, paragraphs separated by a blank line. Every sentence about a reference cites
