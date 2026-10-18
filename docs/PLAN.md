@@ -909,6 +909,14 @@ Search tuning, #99 (2026-10-18), on the 9 gold queries (recall@10 60% before):
 - Fairness cap by the lab member page (`listed_in`) instead of the first `member_of`: no change.
 - Remaining misses are people whose lab ranks but who sit at places 11–40 (Züger, Stettler, Mougiakakou, Eugster, Aebischer), and Stefan Weber, who appears only as "Dozent" on the Neuro Robotics page because his own chair's member page is not crawled (#75). The lever left is data (person profile pages, #75), not ranking constants.
 
+Topic match with person profiles, #75 (2026-10-18). The deeper crawl (340 pages, 48 ARTORG profiles, 103 unibe labs) gives people topics of their own, and recall@10 fell 60% → 48% (lay-term 61% → 49%). Causes: people with profile topics outranked the labs and people the gold set expects, and single generic topic claims ("disease progression monitoring" for a cancer lab) matched "continuous glucose monitoring" with no chunk evidence. Changes, measured on a copy of each DB (shared / deeper crawl):
+- `PERSON_TOPIC` 0.25: a person's own topics get a quarter of the topic bonus, so they don't beat lab evidence.
+- `TOPIC_TOPK` 2: an entity's topic similarity is the mean of its best two topics, not the single best.
+- `TOPIC_ALONE` 0.5: an entity with no chunk evidence gets half the topic bonus.
+- `TOPIC_WEIGHT` 0.3 → 0.4.
+- Recall@10 60% / 48% → **64% / 58%**; lay-term 61% / 49% → **67% / 61%**. Case eval: shared 17 → 18 of 31 matches and 6 → 3 false matches; deeper crawl unchanged (15 of 31, 2 false). Swept: `TOPIC_MIN` 0.5–0.65, `TOPIC_WEIGHT` 0.15–0.4, person share 0–1, top-k 1–3; with 9 queries a ±2-point difference is noise.
+- Left on the deeper crawl, outside ranking: duplicates the resolver keeps ("Marco Osterwalder" and "Ass. Prof. Dr. Marco Osterwalder"; "Neuro Robotic(s) Group"; three "Acoustic Robotic(s) Systems Lab"), which take top-10 places, and a profile's expertise stored on the lab (Dr. Debeire's causal-discovery topics on "AI in Health and Nutrition").
+
 ### 10.3 Eval judge (`judge.py`) — [PoC]
 
 The gold set only gives recall. The eval judge gives a precision number without more human labels.
