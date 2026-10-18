@@ -3,10 +3,11 @@
 1. Apertus reads the PDF text: company name, industry, a short summary and 3-6 needs (search queries).
 2. Each need goes through the search (rank_entities, all four entity types).
 3. The rankings are merged with reciprocal rank fusion and the fairness cap: the top 25 are the references.
-4. A reference *matches* a need when one of its shown topic claims is close to it (bge-m3 cosine). Each claim
-   counts only for its closest need: on Glucora, "non-invasive glucose monitoring" was also 0.60 from "AI for
-   carbohydrate estimation". People have no topic claims of their own (only roles), so a person matches
-   through their lab's topics.
+4. A reference *matches* a need when a cross-encoder (bge-reranker-v2-m3) scores one of its shown topic claims
+   against the need at RERANK_MIN or more (#74). bge-m3 cosine only pre-filters the pairs: it cannot tell
+   "bioinformatics" (0.67) from "continuous glucose monitoring" (0.63) for a wearable-sensor need, the
+   reranker can (case eval, eval/case_report.md). People have no topic claims of their own (only roles),
+   so a person matches through their lab's topics.
 5. The score counts matches only (plan 1: no invented facts). Each row names the matches behind it.
    Market access or an industry network would need data about companies and markets, which we do not have.
 
@@ -20,6 +21,7 @@ import re
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 
 import numpy as np
 import psycopg
@@ -29,7 +31,7 @@ from navigator.explain import recheck
 from navigator.llm import LLM
 from navigator.models import Result, ScoreItem
 from navigator.rank import MAX_PER_UNIT, _units, fairness_cap, rank_entities
-from navigator.results import build_results, shown
+from navigator.results import build_results
 
 log = logging.getLogger(__name__)
 
@@ -40,13 +42,17 @@ MAX_NEED_LEN = 80
 MAX_REFERENCES = 25
 ALL_TYPES = ["person", "unit", "project", "infrastructure"]
 RRF_K = 10            # small: each need's ranking has at most 10 entries
-MATCH_SIM = 0.62      # bge-m3 cosine between a need and a claim value. On Glucora the right matches were 0.63+
-                      # (CGM, insulin delivery); below were robotics or image segmentation for the wrong need
+RERANK_MODEL = "BAAI/bge-reranker-v2-m3"  # same family as bge-m3, multilingual, runs locally (~2 GB)
+PRE_SIM = 0.45        # bge-m3 cosine below which a (need, claim) pair is not sent to the reranker
+# Tuned on the case eval (#73): loose matches ("clinical studies" for "cochlear implantation clinical trials")
+# score up to 0.24, most expected ones 0.13-1.0. 0.10 kept 16 of 20 expected matches and let 6 loose ones in;
+# 0.25 lets none in but drops the Neuro Robotics Group and the Hearing Research Laboratory.
+RERANK_MIN = 0.10
+# The reranker misses domain synonyms: "automated insulin delivery systems" scores 0.08 for "artificial pancreas
+# systems" (cosine 0.74). A pair this close by cosine matches without it; the loose matches were at most 0.71.
+COSINE_ALONE = 0.72
 TOPIC_FIELDS = {"expertise", "description", "unit_expertise"}
 NAME_TYPES = {"project", "infrastructure"}  # their names say what they are ("Cleanroom")
-# A unit with this many shown topic claims is an umbrella ("ARTORG Center": 62-86) that covers almost any need;
-# the specific labs have at most ~30. Umbrellas and their members stay references but do not count as matches.
-UMBRELLA_TOPICS = 50
 
 # criterion, weight, points per match (score = min(100, matches * points)); research fit is a share of needs
 CRITERIA = [
@@ -128,45 +134,48 @@ class Match:
     need: str
     value: str     # the claim value that matched
     via: str | None  # the person's unit, when the value is the unit's topic
-    sim: float
+    sim: float     # bge-m3 cosine (pre-filter)
+    score: float   # reranker score, 0-1
 
 
-def umbrella_units(conn: psycopg.Connection) -> set[str]:
-    """Names of the umbrella units (see UMBRELLA_TOPICS)."""
-    rows = conn.execute(
-        f"""SELECT e.name FROM entity e JOIN claim c ON c.entity_id = e.id
-            WHERE e.type = 'unit' AND c.field IN ('expertise', 'description') AND {shown("c")}
-            GROUP BY e.id HAVING count(*) >= %s""",
-        (UMBRELLA_TOPICS,),
-    )
-    return {r[0] for r in rows}
+@lru_cache
+def _reranker():
+    from sentence_transformers import CrossEncoder
+
+    return CrossEncoder(RERANK_MODEL, max_length=128)
+
+
+def rerank(pairs: list[tuple[str, str]]) -> np.ndarray:
+    """Reranker scores (0-1) for (need, claim value) pairs. The model loads on the first call (~10 s)."""
+    return np.asarray(_reranker().predict(pairs, batch_size=32))
 
 
 def match_needs(
     results: list[Result], needs: list[str], embed_many: Callable[[list[str]], np.ndarray],
-    umbrellas: set[str] = frozenset(),
+    rerank: Callable[[list[tuple[str, str]]], np.ndarray],
 ) -> dict[int, list[Match]]:
-    """Per entity, the needs it matches, best claim per need. Umbrella units and their topics do not count."""
+    """Per entity, the needs it matches, best claim per need."""
     candidates = [
         (r.entity_id, e.value, e.via_unit) for r in results for e in r.evidence
-        if (e.field in TOPIC_FIELDS or (e.field == "name" and r.type in NAME_TYPES))
-        and not (r.type == "unit" and r.name in umbrellas) and e.via_unit not in umbrellas
+        if e.field in TOPIC_FIELDS or (e.field == "name" and r.type in NAME_TYPES)
     ]
     if not candidates:
         return {}
     values = list(dict.fromkeys(v for _, v, _ in candidates))
     sims = np.asarray(embed_many(values)) @ np.asarray(embed_many(needs)).T
     row = {v: i for i, v in enumerate(values)}
+    pairs = [(need, v) for v in values for j, need in enumerate(needs) if sims[row[v], j] >= PRE_SIM]
+    scores = dict(zip(pairs, rerank(pairs).tolist())) if pairs else {}
     best: dict[tuple[int, str], Match] = {}
     for entity_id, value, via in candidates:
-        j = int(sims[row[value]].argmax())  # the claim's closest need only
-        sim, key = float(sims[row[value], j]), (entity_id, needs[j])
-        if sim >= MATCH_SIM and (key not in best or sim > best[key].sim):
-            best[key] = Match(needs[j], value, via, sim)
+        for j, need in enumerate(needs):
+            score, sim, key = scores.get((need, value), 0.0), float(sims[row[value], j]), (entity_id, need)
+            if (score >= RERANK_MIN or sim >= COSINE_ALONE) and (key not in best or score > best[key].score):
+                best[key] = Match(need, value, via, sim, score)
     matches: dict[int, list[Match]] = defaultdict(list)
     for (entity_id, _), m in best.items():
         matches[entity_id].append(m)
-    return {e: sorted(ms, key=lambda m: -m.sim) for e, ms in matches.items()}
+    return {e: sorted(ms, key=lambda m: -m.score) for e, ms in matches.items()}
 
 
 def _names(names: list[str], limit: int = 3) -> str:
@@ -245,12 +254,13 @@ class Scored:
 
 def score_needs(
     conn: psycopg.Connection, needs: list[str], embed: Callable[[str], np.ndarray],
-    embed_many: Callable[[list[str]], np.ndarray],
+    embed_many: Callable[[list[str]], np.ndarray], rerank: Callable[[list[tuple[str, str]]], np.ndarray],
 ) -> Scored:
     """References, matches and score for a list of needs; no LLM call (also used by `navigator case-eval`)."""
     refs = find_references(conn, needs, embed)
     results = build_results(conn, [(e, s) for e, s, _ in refs])
-    matches = match_needs(results, needs, embed_many, umbrella_units(conn))
+    conn.commit()  # the reranker takes seconds: end the read transaction first
+    matches = match_needs(results, needs, embed_many, rerank)
     score, rows = score_case(needs, results, matches)
     return Scored(refs, results, matches, score, rows)
 
@@ -261,16 +271,19 @@ def analyze(
     read: Callable[[str], CaseInfo],
     embed: Callable[[str], np.ndarray],
     embed_many: Callable[[list[str]], np.ndarray],
+    rerank: Callable[[list[tuple[str, str]]], np.ndarray],
     explain: Callable[[str, list[Result]], dict[int, str]],
 ) -> None:
     """Run the analysis of a pending case and store it; on any error the case is marked failed."""
     row = conn.execute("""SELECT pdf_text FROM "case" WHERE id = %s AND analysis_status = 'pending'""", (case_id,))
     found = row.fetchone()
+    conn.commit()  # never keep a transaction open across the slow steps: it blocks schema changes (init_db)
     if found is None:
         return
     try:
         info = read(found[0])
-        scored = score_needs(conn, info.needs, embed, embed_many)
+        scored = score_needs(conn, info.needs, embed, embed_many, rerank)
+        conn.commit()
         refs, results, matches, score, rows = scored.refs, scored.results, scored.matches, scored.score, scored.rows
         # The need each reference is explained with: its best match, else the first need it was found for
         found_for = {e: n for e, _, n in refs}

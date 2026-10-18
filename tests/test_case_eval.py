@@ -29,7 +29,8 @@ def outcome() -> Outcome:
     )
     results = [result(1, "unit", "Diabetes Lab"), result(2, "person", "Prof. Alice Muster"),
                result(3, "unit", "Rubin Lab"), result(4, "person", "Bob")]
-    matches = {1: [Match("glucose", "insulin pumps", None, 0.7)], 3: [Match("glucose", "bioinformatics", None, 0.64)]}
+    matches = {1: [Match("glucose", "insulin pumps", None, 0.7, 0.9)],
+               3: [Match("glucose", "bioinformatics", None, 0.64, 0.2)]}
     rows = [ScoreItem(criterion="Research fit", score=50, rationale="1 of 2 needs covered")]
     return Outcome(case, case.needs, Scored([], results, matches, 40, rows))
 
@@ -49,4 +50,4 @@ def test_report():
     assert "Alice Muster (in references, no matching claim)" in text
     assert "Gone Lab (not in references)" in text
     assert "False matches: Rubin Lab" in text
-    assert "| Rubin Lab | unit | glucose | bioinformatics | 0.64 |" in text
+    assert "| Rubin Lab | unit | glucose | bioinformatics | 0.20 | 0.64 |" in text

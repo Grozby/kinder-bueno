@@ -24,6 +24,11 @@ def fake_embed_many(texts: list[str]) -> np.ndarray:
     return np.array([one(t) for t in texts])
 
 
+def fake_rerank(pairs: list[tuple[str, str]]) -> np.ndarray:
+    """1.0 when need and claim share a word, else 0.0."""
+    return np.array([float(bool(set(need.lower().split()) & set(value.lower().split()))) for need, value in pairs])
+
+
 def fake_read(text: str) -> CaseInfo:
     return CaseInfo(company_name="Glucora Health", industry="Medical devices", summary="Glucose patches.", needs=NEEDS)
 
@@ -33,7 +38,8 @@ def no_explain(query: str, results: list[Result]) -> dict[int, str]:
 
 
 def run(conn, case_id: str, read=fake_read, explain=no_explain) -> None:
-    analysis.analyze(conn, case_id, read=read, embed=fake_embed, embed_many=fake_embed_many, explain=explain)
+    analysis.analyze(conn, case_id, read=read, embed=fake_embed, embed_many=fake_embed_many, rerank=fake_rerank,
+                     explain=explain)
 
 
 def test_parse_case_info():
@@ -74,9 +80,9 @@ def test_score_rows_name_their_matches():
         result(3, "project", "Artificial Pancreas"), result(4, "person", "Bob"),
     ]
     matches = {
-        1: [Match("glucose monitoring", "insulin pumps", "Diabetes Lab", 0.9)],
-        2: [Match("insulin delivery", "insulin pumps", None, 0.9)],
-        3: [Match("insulin delivery", "artificial pancreas", None, 0.8)],
+        1: [Match("glucose monitoring", "insulin pumps", "Diabetes Lab", 0.9, 0.9)],
+        2: [Match("insulin delivery", "insulin pumps", None, 0.9, 0.9)],
+        3: [Match("insulin delivery", "artificial pancreas", None, 0.8, 0.8)],
     }
     score, rows = analysis.score_case(NEEDS, results, matches)
     by = {r.criterion: r for r in rows}
@@ -100,15 +106,42 @@ def test_score_without_matches():
     assert rows[1].rationale == "No matching experts in our sources"
 
 
-def test_claim_counts_for_its_closest_need_only():
+def evidence(claim_id: int, field: str, value: str, via: str | None = None) -> dict:
+    return {"claim_id": claim_id, "field": field, "value": value, "quote": "q", "url": "u",
+            "judge_verdict": None, "judge_reason": None, "via_unit": via}
+
+
+def test_reranker_decides_the_match():
     alice = result(1, "person", "Alice", evidence=[
-        {"claim_id": 1, "field": "expertise", "value": "glucose sensors", "quote": "q", "url": "u",
-         "judge_verdict": None, "judge_reason": None},
-        {"claim_id": 2, "field": "role", "value": "glucose professor", "quote": "q", "url": "u",
-         "judge_verdict": None, "judge_reason": None},  # roles are not topics
+        evidence(1, "expertise", "glucose sensors"),
+        evidence(2, "role", "glucose professor"),  # roles are not topics
+        evidence(3, "unit_expertise", "insulin monitoring", via="Diabetes Lab"),
     ])
-    matches = analysis.match_needs([alice], ["glucose monitoring", "glucose insulin"], fake_embed_many)
-    assert [(m.need, m.value) for m in matches[1]] == [("glucose monitoring", "glucose sensors")]
+    sent = []
+
+    def rerank(pairs):
+        sent.extend(pairs)
+        return np.array([0.9 if value == "glucose sensors" else analysis.RERANK_MIN / 2 for _, value in pairs])
+
+    matches = analysis.match_needs([alice], ["glucose monitoring", "zebrafish genetics"], fake_embed_many, rerank)
+    assert [(m.need, m.value, m.score) for m in matches[1]] == [("glucose monitoring", "glucose sensors", 0.9)]
+    # "insulin monitoring" is far from both needs (cosine): never sent to the reranker
+    assert sent == [("glucose monitoring", "glucose sensors")]
+
+
+def test_very_close_pair_matches_without_the_reranker():
+    """Synonyms the reranker misses ("automated insulin delivery" for "artificial pancreas") match on cosine."""
+    lab = result(1, "unit", "Diabetes Lab", evidence=[evidence(1, "expertise", "glucose sensors")])
+    zero = lambda pairs: np.zeros(len(pairs))
+    assert analysis.match_needs([lab], ["glucose monitoring"], fake_embed_many, zero)[1][0].score == 0.0
+
+
+def test_no_pairs_no_rerank_call():
+    def rerank(pairs):
+        raise AssertionError("not called")
+
+    alice = result(1, "person", "Alice", evidence=[evidence(1, "expertise", "zebrafish")])
+    assert analysis.match_needs([alice], ["glucose monitoring"], fake_embed_many, rerank) == {}
 
 
 def new_case(conn) -> str:
@@ -168,20 +201,28 @@ def test_references_unknown_case(test_conn):
     assert analysis.references(test_conn, "nope", 25) is None
 
 
-def test_umbrella_units_do_not_count(test_conn, graph):
-    lab = result(1, "unit", "Diabetes Lab", evidence=[
-        {"claim_id": 1, "field": "expertise", "value": "insulin pumps", "quote": "q", "url": "u",
-         "judge_verdict": None, "judge_reason": None}])
-    alice = result(2, "person", "Alice", evidence=[
-        {"claim_id": 2, "field": "unit_expertise", "value": "insulin pumps", "quote": "q", "url": "u",
-         "judge_verdict": None, "judge_reason": None, "via_unit": "Diabetes Lab"}])
-    assert set(analysis.match_needs([lab, alice], ["insulin delivery"], fake_embed_many)) == {1, 2}
-    assert analysis.match_needs([lab, alice], ["insulin delivery"], fake_embed_many, {"Diabetes Lab"}) == {}
 
-    assert analysis.umbrella_units(test_conn) == set()
-    for n in range(analysis.UMBRELLA_TOPICS):
-        test_conn.execute(
-            "INSERT INTO claim (entity_id, field, value, quote, page_id, verified) VALUES (%s, 'expertise', %s, 'q', %s, true)",
-            (graph["center"], f"topic {n}", graph["p2"]),
-        )
-    assert analysis.umbrella_units(test_conn) == {"ARTORG Center"}
+def test_no_transaction_open_during_slow_steps(test_conn, graph):
+    """An open transaction across minutes of LLM calls blocked init_db's ALTER TABLE on the shared DB."""
+    from psycopg.pq import TransactionStatus
+
+    case_id = new_case(test_conn)
+    test_conn.commit()
+    states = []
+
+    def read(text):
+        states.append(test_conn.info.transaction_status)
+        return fake_read(text)
+
+    def rerank(pairs):
+        states.append(test_conn.info.transaction_status)
+        return fake_rerank(pairs)
+
+    def explain(query, results):
+        states.append(test_conn.info.transaction_status)
+        return {}
+
+    analysis.analyze(test_conn, case_id, read=read, embed=fake_embed, embed_many=fake_embed_many, rerank=rerank,
+                     explain=explain)
+    assert states and set(states) == {TransactionStatus.IDLE}
+    assert cases.get_case(test_conn, case_id).analysis_status == "done"
