@@ -1,0 +1,32 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: navigator
+      POSTGRES_PASSWORD: navigator
+      POSTGRES_DB: navigator
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U navigator"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://navigator:navigator@db:5432/navigator
+      HF_HOME: /cache/hf
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["8501:8501"]
+    volumes:
+      - hf_cache:/cache/hf          # keeps the bge-m3 download (~2.3 GB) between runs
+      - ./config:/app/config
+      - ./eval:/app/eval
+    command: uv run streamlit run app/streamlit_app.py --server.address 0.0.0.0
+
+volumes:
+  pgdata:
+  hf_cache:

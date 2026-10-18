@@ -1,0 +1,42 @@
+defaults:
+  user_agent: "HackApertus-ExpertiseNavigator/0.1 (research prototype; contact: team)"
+  delay_seconds: 1.0          # per host
+  timeout_seconds: 20
+  max_depth: 3
+
+sources:
+  - id: artorg
+    name: "ARTORG Center for Biomedical Engineering Research"
+    seeds:
+      - https://www.artorg.unibe.ch/research/index_eng.html
+      - https://www.artorg.unibe.ch/index_eng.html
+    allow_hosts: ["www.artorg.unibe.ch"]
+    include_patterns: ['index_eng\.html$']
+    exclude_patterns: ['/news_and_events/', '/studies/', '/jobs/', '/open_positions/', '/publications/']
+    priority_patterns: ['/group_members/', '/persons/', '/research/', '/facilities/', '/services/']
+    max_pages: 45
+
+  - id: dcb
+    name: "Diabetes Center Berne"
+    seeds:
+      - https://www.dcberne.com/en/team/
+      - https://www.dcberne.com/en/projects/
+      - https://www.dcberne.com/en/focus-areas/
+      - https://www.dcberne.com/en/
+    allow_hosts: ["www.dcberne.com"]
+    include_patterns: ['^https://www\.dcberne\.com/en/']
+    exclude_patterns: ['/wp-json/', '/wp-content/', '/feed/', '/category/press-release/', '/newsletters/', '/career/', '/data-protection-statement/', '/legal-notice/', '\?']
+    priority_patterns: ['/team/', '/projects/', '/focus-areas/', '/offering/', '/innovation/', '/reserach/']
+    max_pages: 30
+
+  - id: unibe
+    name: "University of Bern"
+    seeds:
+      - https://www.medizin.unibe.ch/index_eng.html
+      - https://www.unibe.ch/facultiesinstitutes/index_eng.html
+    allow_hosts_regex: '^[a-z0-9.-]+\.unibe\.ch$'
+    deny_hosts: ["www.artorg.unibe.ch", "intern.unibe.ch", "karriere.unibe.ch", "teachinghub.unibe.ch", "mediarelations.unibe.ch", "www.ub.unibe.ch"]
+    include_patterns: ['index_eng\.html$']
+    exclude_patterns: ['/news', '/studies/', '/studium/', '/jobs/', '/legal_notice/', '/imprint/']
+    priority_patterns: ['/research', '/forschung', '/team', '/persons/', '/group', '/institute', '/departement', '/department']
+    max_pages: 25
