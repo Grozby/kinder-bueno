@@ -57,7 +57,7 @@ docker compose up -d app frontend                          # API + UI
   own data: `DB_PORT=55432 API_PORT=18000 UI_PORT=15173 docker compose -p navclean up -d`.
 - Single steps also work in the container: `docker compose run --rm app uv run navigator <command>`.
 - The compose UI calls the real backend. `VITE_USE_MOCK=true docker compose up -d frontend` brings back the mock,
-  e.g. for UI parts the backend does not serve yet (re-crawl #80; reviewer score and notes).
+  e.g. for UI parts the backend does not serve yet (reviewer score, notes and similar cases).
 
 ### Demo
 

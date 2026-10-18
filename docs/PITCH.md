@@ -79,8 +79,8 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
    list still shows the nearest entities (Diabetes Center Berne "found for" crop analysis), which reads as noise.
 7. *(Optional)* **Sources** page: the crawl graph, then "Ranked pages": the 100 pages ranked by verified
    facts, judge rate and feedback. Block a page (the ⊘ button): "It no longer appears in results", and its
-   facts leave search and cases at once (#79). Press "Undo" in the toast right away. Don't start a re-crawl:
-   it is not served yet (#80).
+   facts leave search and cases at once (#79). Press "Undo" in the toast right away. Don't start a re-crawl
+   (#80): it re-fetches and re-extracts the whole source, which takes minutes.
 
 **If something is slow:** a search takes ~3–4 s (ranking ~1 s, plus Apertus calls for expansion and the
 "why" text); the gateway is shared with other teams. If it stalls, say so and switch to the next step.
