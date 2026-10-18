@@ -636,6 +636,13 @@ Results:
 
 Check: every cited claim id must belong to that entity. If a sentence cites no valid id or cites a wrong id → replace it with a template: `"Matches on: <first 2 expertise values>"` (or the best matching chunk's first sentence, if there is no expertise claim).
 
+As built (`explain.py`, wired into `/api/search`):
+- **One call per result, in parallel**, not one call for all ten. With one call, Apertus answered only the 1–5 results it found strongest (10 of 40 on 4 test queries); asking again for the missing ones reached 34 of 40 but took 5–8 s. One call per result: **40 of 40 in ~2 s**. Calls still running after 15 s are cancelled, and those results keep the template.
+- The prompt adds "a sentence without a claim id is thrown away", "a sentence for EVERY result", the bare id as key, and one worked example (Apertus wrote sentences without ids otherwise).
+- At most 10 claims per result in the prompt (expertise, description, role, name first; no email/phone). A citation is valid only if it is one of these ids, so every cited claim is on the card's evidence list.
+- `EXPLAIN_MODEL` (optional) runs explanations on another model, e.g. 8B while the gateway is slow.
+- Known gap: people whose own evidence is only a role or a member-page listing get true but bland sentences ("… is the contact person [9953]"). Their unit's claims are not on their card, so they can't be cited (follow-up issue).
+
 ### 8.7 No reliable result
 
 If the best semantic similarity across all chunks is below `MIN_SIM` (start at 0.45, tune with the eval set) AND the keyword search returns no hits → return no results and show:
