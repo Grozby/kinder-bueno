@@ -365,6 +365,10 @@ export const mockBackend = {
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
   },
+  // The store keeps the pitches the mock generates, so there is nothing stored to reload
+  async getPitch(_id: string): Promise<Pitch | null> {
+    return null
+  },
   async generatePitch(id: string, entityIds: number[]): Promise<Pitch> {
     await wait(1800)
     const c = readCase(id)

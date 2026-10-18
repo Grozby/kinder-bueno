@@ -34,6 +34,12 @@ const realBackend = {
       method: 'POST',
       body: JSON.stringify({ entity_ids: entityIds }),
     }),
+  // The last pitch stored on the case; null if none was generated yet
+  getPitch: (id: string) =>
+    api<Pitch>(`/cases/${id}/pitch`).catch((e: Error) => {
+      if (e.message.startsWith('404')) return null
+      throw e
+    }),
 
   chat: (req: ChatRequest) =>
     api<ChatResponse>('/chat', { method: 'POST', body: JSON.stringify(req) }),

@@ -163,6 +163,13 @@ export const useCasesStore = defineStore('cases', () => {
     ;(flagged.value[caseId] ??= []).push(claimId)
   }
 
+  // After a reload: the last pitch stored on the case
+  async function loadPitch(id: string) {
+    if (pitches.value[id]) return
+    const pitch = await backend.getPitch(id)
+    if (pitch) pitches.value[id] = pitch
+  }
+
   async function generatePitch(id: string) {
     const pitch = await backend.generatePitch(id, selected.value[id] ?? [])
     pitches.value[id] = pitch
@@ -191,6 +198,7 @@ export const useCasesStore = defineStore('cases', () => {
     sendChat,
     rate,
     flagFact,
+    loadPitch,
     generatePitch,
   }
 })

@@ -37,6 +37,7 @@ Write 3 to 5 short paragraphs, addressed to the company's team. Plain text, no h
 Use ONLY the facts listed for the references. Do not add facts, numbers or names.
 Every sentence about a reference MUST cite the claim ids it uses in square brackets, like [12][15].
 A sentence about a reference without a claim id is thrown away.
+Claim ids are ONLY the numbers in square brackets before each fact, never anything else.
 Write natural sentences: do not copy the list, the field names or the quotes.
 A "lab topic (via <unit>)" is a topic of the person's unit, NOT the person's own expertise:
 write "in <unit>, which works on ..." and name the unit.
@@ -47,10 +48,10 @@ Company: Glucora (medical devices)
 Summary: Glucora builds a patch that measures glucose without a needle.
 Needs: glucose sensors; clinical studies
 References:
-7 Anna Muster (person)
+- Anna Muster (person)
   [12] role: Group Head — "Anna Muster, Group Head"
   [15] expertise: glucose sensors — "develops glucose sensors for type 1 diabetes"
-9 Diabetes Lab (unit)
+- Diabetes Lab (unit)
   [21] description: diabetes technology research — "research on diabetes technology"
 Answer: {"pitch": "Dear Glucora team,\\n\\nBern has the expertise your needle-free patch needs. Anna Muster, a group head, develops glucose sensors for type 1 diabetes [12][15]. The Diabetes Lab does research on diabetes technology [21].\\n\\nWe would be happy to introduce you."}"""
 
@@ -64,7 +65,8 @@ def format_prompt(company: str, industry: str | None, summary: str | None, needs
     for r in results[:MAX_REFERENCES]:
         rows = [f'  [{e.claim_id}] {_label(e)}: {_flat(e.value)} — "{_flat(e.quote)[:MAX_QUOTE]}"'
                 for e in prompt_claims(r.evidence)]
-        blocks.append("\n".join([f"{r.entity_id} {r.name} ({r.type})", *rows]))
+        # No entity id in the header: Apertus cites it as if it were a claim id
+        blocks.append("\n".join([f"- {r.name} ({r.type})", *rows]))
     lines = [f"Company: {company}" + (f" ({industry})" if industry else "")]
     if summary:
         lines.append(f"Summary: {_flat(summary)}")

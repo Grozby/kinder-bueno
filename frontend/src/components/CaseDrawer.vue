@@ -91,6 +91,7 @@ watch(
     showAll.value = false
     openEvidence.value = new Set()
     pitchError.value = null
+    if (id) store.loadPitch(id).catch(() => {}) // no stored pitch is fine: the button generates one
     if (!id || analysis !== 'done') return
     refsLoading.value = true
     refsError.value = null
