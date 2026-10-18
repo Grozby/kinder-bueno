@@ -66,8 +66,8 @@ function onPick(e: Event) {
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   cursor: pointer;
   transition:

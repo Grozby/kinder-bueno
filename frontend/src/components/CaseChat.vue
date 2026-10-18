@@ -43,7 +43,7 @@ async function send(message = draft.value.trim()) {
       </p>
       <div v-for="(t, i) in turns" :key="i" class="turn">
         <p class="msg">{{ t.message }}</p>
-        <p v-if="t.error" class="reply score-bad">The chat failed: {{ t.error }}</p>
+        <p v-if="t.error" class="reply text-error">The chat failed: {{ t.error }}</p>
         <p v-else-if="!t.response" class="reply muted">
           <LoaderCircle class="spin" :size="14" /> Searching…
         </p>
@@ -111,7 +111,7 @@ async function send(message = draft.value.trim()) {
 
 <style scoped>
 .chat {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
 }
 .log {
@@ -150,7 +150,7 @@ async function send(message = draft.value.trim()) {
 .results {
   list-style: none;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
 }
 .results li {
@@ -160,7 +160,7 @@ async function send(message = draft.value.trim()) {
   padding: 0.6rem 0.75rem;
 }
 .results li + li {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
 }
 .result-main {
   flex: 1;
@@ -201,7 +201,7 @@ async function send(message = draft.value.trim()) {
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
   background: var(--surface-alt);
 }
 </style>

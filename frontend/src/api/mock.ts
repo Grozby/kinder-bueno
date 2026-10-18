@@ -209,6 +209,9 @@ seedCase('helvetic-glucotech.pdf', 'new', 12)
 seedCase('aare-robotics.pdf', 'new', 40)
 seedCase('cardiosense-ag.pdf', 'in_review', 180)
 seedCase('alpine-bioprint.pdf', 'accepted', 2000)
+seedCase('nordsee-logistics.pdf', 'rejected', 300)
+seedCase('lakeside-fintech.pdf', 'rejected', 1500)
+seedCase('solaris-mining-tools.pdf', 'rejected', 4300)
 
 // --- sources ---
 

@@ -50,7 +50,7 @@ function onDragStart(e: DragEvent) {
     </header>
 
     <p v-if="pending" class="state muted">Analysing business model…</p>
-    <p v-else-if="failed" class="state score-bad"><TriangleAlert :size="14" /> Analysis failed</p>
+    <p v-else-if="failed" class="state text-error"><TriangleAlert :size="14" /> Analysis failed</p>
     <ul v-else class="criteria">
       <li v-for="b in item.score_breakdown.slice(0, 3)" :key="b.criterion">
         <span>{{ b.criterion }}</span>
@@ -95,20 +95,23 @@ function onDragStart(e: DragEvent) {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1rem;
+  padding: 1rem 1.1rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   cursor: grab;
-  transition: border-color 0.15s;
+  transition:
+    box-shadow 0.18s,
+    transform 0.18s;
 }
 .card:hover {
-  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 .card:focus-visible {
   outline: 2px solid var(--focus);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 .card:active {
   cursor: grabbing;
@@ -171,13 +174,13 @@ h3 {
   height: 100%;
 }
 .fill-good {
-  background: var(--good);
+  background: var(--score-strong);
 }
 .fill-mid {
-  background: var(--mid);
+  background: var(--score-partial);
 }
 .fill-bad {
-  background: var(--bad);
+  background: var(--score-weak);
 }
 
 footer {
@@ -185,7 +188,7 @@ footer {
   align-items: center;
   gap: 0.5rem;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
 }
 .when {
   font-size: 13px;
@@ -199,14 +202,17 @@ footer {
   place-items: center;
   width: 30px;
   height: 30px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-alt);
   color: var(--text-muted);
   cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 .reject:hover {
-  border-color: var(--bern-red);
+  background: var(--bern-red-tint);
   color: var(--bern-red);
 }
 .reject:focus-visible {

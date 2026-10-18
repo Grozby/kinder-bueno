@@ -69,7 +69,9 @@ circle {
   transform-origin: center;
   animation: spin 1s linear infinite;
 }
+/* The number stays in text ink; only the ring carries the score colour */
 .label {
+  color: var(--text);
   font-weight: 700;
   font-size: 0.34em;
   font-variant-numeric: tabular-nums;

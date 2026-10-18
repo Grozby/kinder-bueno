@@ -125,7 +125,7 @@ onMounted(() => {
             placeholder="https://www.example.unibe.ch/index_eng.html"
             required
           />
-          <small v-if="form.url && !urlValid" class="score-bad">Enter a full http(s) URL.</small>
+          <small v-if="form.url && !urlValid" class="text-error">Enter a full http(s) URL.</small>
         </label>
         <label class="field wide">
           <span class="field-label">Name <span class="muted">(optional)</span></span>
@@ -173,7 +173,7 @@ onMounted(() => {
         </div>
 
         <div class="submit">
-          <small v-if="formError" class="score-bad">{{ formError }}</small>
+          <small v-if="formError" class="text-error">{{ formError }}</small>
           <BaseButton @click="showForm = false">Cancel</BaseButton>
           <BaseButton type="submit" variant="primary" :loading="submitting" :disabled="!urlValid">
             Start crawl
@@ -310,7 +310,7 @@ h1 {
   flex-wrap: wrap;
   gap: 0.5rem 2rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
 }
 .kpis div {
   display: flex;
@@ -406,7 +406,7 @@ h1 {
   align-items: center;
   gap: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
 }
 
 .grid {
@@ -424,17 +424,21 @@ h1 {
   gap: 1.25rem;
   padding: 1.25rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition:
+    box-shadow 0.18s,
+    transform 0.18s;
 }
 .source:hover {
-  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 .source:focus-visible {
   outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .source.loading {
   min-height: 160px;
@@ -553,7 +557,7 @@ dd {
   padding: 0;
   max-height: 440px;
   overflow-y: auto;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   font-family: var(--mono);
   font-size: 12.5px;
@@ -564,7 +568,7 @@ dd {
   padding: 0.4rem 0.75rem;
 }
 .pages li + li {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
 }
 .pages a {
   color: var(--text);

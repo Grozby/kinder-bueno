@@ -168,7 +168,7 @@ async function copyPitch() {
       <p v-if="item.analysis_status === 'pending'" class="notice">
         <LoaderCircle class="spin" :size="16" /> The business model is being analysed.
       </p>
-      <p v-else-if="item.analysis_status === 'failed'" class="notice score-bad">
+      <p v-else-if="item.analysis_status === 'failed'" class="notice text-error">
         <TriangleAlert :size="16" /> The analysis failed. Please upload the PDF again.
       </p>
 
@@ -198,7 +198,7 @@ async function copyPitch() {
             <p v-if="refsLoading" class="notice">
               <LoaderCircle class="spin" :size="16" /> Loading references…
             </p>
-            <p v-else-if="refsError" class="notice score-bad">{{ refsError }}</p>
+            <p v-else-if="refsError" class="notice text-error">{{ refsError }}</p>
             <ul v-else class="refs">
               <li
                 v-for="r in visibleRefs"
@@ -294,7 +294,7 @@ async function copyPitch() {
             <p v-if="item.status !== 'accepted'" class="muted small">
               Accept this company to generate a pitch from the selected references.
             </p>
-            <p v-else-if="pitchError" class="notice score-bad">{{ pitchError }}</p>
+            <p v-else-if="pitchError" class="notice text-error">{{ pitchError }}</p>
             <div v-else-if="pitch" class="pitch">
               <div class="pitch-bar">
                 <span class="muted small">
@@ -377,7 +377,7 @@ async function copyPitch() {
 }
 .col-side {
   padding-left: 2rem;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--border-soft);
 }
 
 section > .section-label {
@@ -428,7 +428,7 @@ section > .section-label {
 .refs {
   list-style: none;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
 }
 .ref {
@@ -439,7 +439,7 @@ section > .section-label {
   border-left: 3px solid transparent;
 }
 .ref + .ref {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
 }
 .ref.on {
   border-left-color: var(--bern-red);
@@ -536,7 +536,7 @@ a.icon-btn:hover {
 }
 
 .pitch {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
 }
 .pitch-bar {
@@ -544,7 +544,7 @@ a.icon-btn:hover {
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.5rem 0.4rem 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
   background: var(--surface-alt);
 }
 .pitch-text {
@@ -566,7 +566,7 @@ a.icon-btn:hover {
   .col-side {
     padding: 1.75rem 0 0;
     border-left: 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-soft);
   }
   .head {
     flex-wrap: wrap;

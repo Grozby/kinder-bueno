@@ -224,7 +224,8 @@ function onBearDrop(e: DragEvent) {
     <BaseOverlay
       :open="store.showDiscarded"
       :title="`Discarded cases (${store.byStatus.rejected.length})`"
-      width="460px"
+      side="center"
+      width="1000px"
       @close="store.showDiscarded = false"
     >
       <div v-if="store.byStatus.rejected.length" class="rejected-list">
@@ -334,26 +335,25 @@ h1 {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #e9e9e9;
-  border: 1px solid var(--border);
-  border-top: 5px solid var(--col-color);
-  border-radius: var(--radius);
+  background: #ececec;
+  border-radius: var(--radius-lg);
   transition:
     background-color 0.15s,
-    border-color 0.15s;
+    box-shadow 0.15s;
 }
+/* Stages progress grey → black → blue; blue means "accept" as in the score scale */
 .col-new {
-  --col-color: var(--text);
+  --col-color: var(--text-muted);
 }
 .col-in_review {
-  --col-color: var(--mid);
+  --col-color: var(--text);
 }
 .col-accepted {
-  --col-color: var(--good);
+  --col-color: var(--score-strong);
 }
 .column.over {
   background: var(--bern-red-tint);
-  border-color: var(--bern-red);
+  box-shadow: inset 0 0 0 2px var(--bern-red);
 }
 .column header {
   flex: none;
@@ -361,19 +361,30 @@ h1 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.1rem 0.75rem;
+  padding: 1.1rem 1.2rem 0.75rem;
 }
 .column h2 {
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 19px;
+}
+.column h2::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--col-color);
 }
 .hint {
+  margin-left: calc(10px + 0.55rem);
   font-size: 13px;
   color: var(--text-muted);
 }
 .count {
-  min-width: 34px;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius);
+  min-width: 30px;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
   background: var(--col-color);
   color: #fff;
   text-align: center;
@@ -399,15 +410,15 @@ h1 {
   display: grid;
   place-items: center;
   min-height: 140px;
-  border: 2px dashed var(--border-strong);
-  border-radius: var(--radius);
+  border: 2px dashed #d4d4d4;
+  border-radius: var(--radius-lg);
   color: var(--text-faint);
   font-size: 14px;
 }
 
 .rejected-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 0.75rem;
 }
 

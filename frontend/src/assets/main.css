@@ -16,6 +16,14 @@
   --text-faint: #8c8c8c;
   --focus: #1d1d1d;
 
+  /* Fit scores: diverging Bern red ↔ neutral grey ↔ blue. Red/blue stays apart for every
+     colour-vision deficiency (dataviz checks: CVD ΔE 22); all three clear 3:1 on #fff and #f6f6f6.
+     Same meaning as the actions: red = reject, blue = accept. */
+  --score-weak: var(--bern-red);
+  --score-partial: #8c8c8c;
+  --score-strong: #1c5cab;
+
+  /* Status only (validated, crawling, failed, errors); always shown with an icon or label */
   --good: #1e7b3c;
   --good-tint: #e8f3ec;
   --mid: #a35c00;
@@ -23,9 +31,12 @@
   --bad: #c1121f;
   --bad-tint: #fbe9ea;
 
-  --radius: 4px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --border-soft: #ebebeb;
+  --radius: 8px; /* controls: buttons, inputs, small boxes */
+  --radius-lg: 14px; /* containers: cards, columns, dialogs */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.18);
   --font: 'Source Sans 3', 'Helvetica Neue', Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -53,6 +64,29 @@ a {
   color: inherit;
 }
 
+/* Thin, discreet scrollbars: Firefox and recent Chromium use the standard properties,
+   older WebKit the pseudo-elements. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.35);
+}
+
 h1,
 h2,
 h3 {
@@ -74,8 +108,8 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: var(--radius);
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
   background: var(--surface-alt);
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -122,12 +156,16 @@ h3 {
 }
 
 .score-good {
-  color: var(--good);
+  color: var(--score-strong);
 }
 .score-mid {
-  color: var(--mid);
+  color: var(--score-partial);
 }
 .score-bad {
+  color: var(--score-weak);
+}
+
+.text-error {
   color: var(--bad);
 }
 

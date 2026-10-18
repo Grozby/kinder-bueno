@@ -116,7 +116,8 @@ onBeforeUnmount(() => {
 }
 .side-center .panel {
   max-height: calc(100vh - 2rem);
-  border-radius: var(--radius);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
 
@@ -125,7 +126,7 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 1rem;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
 }
 .panel-title {
   flex: 1;
@@ -141,7 +142,7 @@ onBeforeUnmount(() => {
   width: 36px;
   height: 36px;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: 999px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
