@@ -2,11 +2,13 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from fake_chat import SearchModel
 from test_analysis import new_case, run
 from test_api import fake_embed
 
 from navigator.api import (
     app,
+    get_chat_model,
     get_conn,
     get_embed,
     get_expand,
@@ -21,6 +23,7 @@ def client(test_conn, graph):
     app.dependency_overrides[get_conn] = lambda: test_conn
     app.dependency_overrides[get_embed] = lambda: fake_embed
     app.dependency_overrides[get_expand] = lambda: lambda q: Expansion()
+    app.dependency_overrides[get_chat_model] = lambda: SearchModel()  # the agent searches the message (#97)
     # A checked sentence for Bob only, so the stored "why" can be told apart from the template
     app.dependency_overrides[get_explain] = lambda: lambda q, results: {
         r.entity_id: f"Works on glucose sensors [{glucose}]." for r in results if r.name == "Bob Beispiel"}

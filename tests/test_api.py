@@ -4,8 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import onehot
+from fake_chat import SearchModel
 from navigator.api import (
-    app, get_conn, get_embed, get_expand, get_explain, get_page_rules, get_seeds,
+    app, get_chat_model, get_conn, get_embed, get_expand, get_explain, get_page_rules, get_seeds,
 )
 from navigator.expand import Expansion
 from navigator.pages import SourceRules, guess_kind
@@ -26,6 +27,7 @@ def client(test_conn, graph):
     app.dependency_overrides[get_embed] = lambda: fake_embed
     app.dependency_overrides[get_expand] = lambda: lambda q: Expansion()  # expansion failed / disabled
     app.dependency_overrides[get_explain] = lambda: lambda q, results: {}  # explanations failed: template
+    app.dependency_overrides[get_chat_model] = lambda: SearchModel()  # the agent searches the message (#97)
     app.dependency_overrides[get_seeds] = lambda: {"artorg": "https://artorg.example/"}  # dcb is not validated
     app.dependency_overrides[get_page_rules] = lambda: {"artorg": SourceRules(exclude=[r"/alice$"], priority=[r"/lab"])}
     yield TestClient(app)
