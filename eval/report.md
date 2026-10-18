@@ -4,40 +4,40 @@
 
 | use case | query | results | expected found | recall@10 | judged relevant | expansion terms |
 |---|---|---|---|---|---|---|
-| glucose | continuous glucose monitoring | 10 | Diabetes Center Berne | 20% | 6/10 | 8 |
-| glucose | glucose sensors | 10 | Diabetes Center Berne | 20% | 4/10 | 15 |
-| glucose | biosensing for diabetes | 10 | Diabetes Center Berne, Lilian Witthauer | 40% | 5/10 | 11 |
-| surgery | computer-assisted surgery | 10 | – | 0% | 1/10 | 10 |
-| surgery | surgical robots | 10 | – | 0% | 3/10 | 12 |
-| surgery | image-guided intervention | 10 | – | 0% | 6/9 | 12 |
-| cardio | cardiovascular engineering | 10 | Dominik Obrist | 25% | 7/9 | 15 |
-| cardio | heart valve research | 10 | Longnus Lab | 25% | 4/10 | 16 |
-| cardio | implant materials | 10 | – | 0% | 5/10 | 16 |
+| glucose | continuous glucose monitoring | 10 | Diabetes Center Berne, Lilian Witthauer | 40% | 5/10 | 8 |
+| glucose | glucose sensors | 10 | Diabetes Center Berne, Lilian Witthauer | 40% | 6/10 | 15 |
+| glucose | biosensing for diabetes | 10 | Lilian Witthauer, Thomas Züger, Christoph Stettler | 60% | 7/10 | 11 |
+| surgery | computer-assisted surgery | 10 | Chair for Image-guided Therapy | 17% | 6/9 | 10 |
+| surgery | surgical robots | 10 | Chair for Image-guided Therapy, Manuela Eugster, Philipp Aebischer | 50% | 2/9 | 12 |
+| surgery | image-guided intervention | 10 | Chair for Image-guided Therapy, Manuela Eugster | 33% | 3/10 | 12 |
+| cardio | cardiovascular engineering | 10 | Dominik Obrist, Cardiovascular Research Cluster Bern, Odening Lab | 75% | 6/10 | 14 |
+| cardio | heart valve research | 10 | Dominik Obrist, Cardiovascular Research Cluster Bern, Odening Lab, Longnus Lab | 100% | 6/10 | 16 |
+| cardio | implant materials | 10 | – | 0% | 2/9 | 16 |
 
 ## Metrics (plan 10.2)
 
 | metric | value | target |
 |---|---|---|
-| recall@10 (mean of 9 queries) | 14% | ≥ 80% |
-| lay-term recall@10 (phrasings b, c) | 14% | ≥ 80% |
-| phrasing overlap, glucose (mean Jaccard of top-10 sets) | 53% | report |
-| phrasing overlap, surgery (mean Jaccard of top-10 sets) | 29% | report |
-| phrasing overlap, cardio (mean Jaccard of top-10 sets) | 18% | report |
+| recall@10 (mean of 9 queries) | 46% | ≥ 80% |
+| lay-term recall@10 (phrasings b, c) | 47% | ≥ 80% |
+| phrasing overlap, glucose (mean Jaccard of top-10 sets) | 69% | report |
+| phrasing overlap, surgery (mean Jaccard of top-10 sets) | 34% | report |
+| phrasing overlap, cardio (mean Jaccard of top-10 sets) | 17% | report |
 | traceability (displayed claims shown + source URL) | 100% | 100% |
-| field fill, person results: role | 100% | report |
-| field fill, person results: affiliations | 79% | report |
+| field fill, person results: role | 98% | report |
+| field fill, person results: affiliations | 100% | report |
 | field fill, person results: expertise | 0% | report |
 | field fill, person results: sources | 100% | report |
-| judged precision@10 [PoC] (mean of 9 judged queries) | 47% | report |
-| judge gold agreement [PoC] (gold hits judged relevant) | 100% (6 / 6) | report; < 80% = judge not reliable |
+| judged precision@10 [PoC] (mean of 9 judged queries) | 49% | report |
+| judge gold agreement [PoC] (gold hits judged relevant) | 60% (12 / 20) | judge not reliable |
 | extraction drop rate (unverified raw claims) | 13% (221 / 1705) | report |
 
 ## Source coverage
 
 | source | pages | entities | shown claims |
 |---|---|---|---|
-| artorg | 45 | 273 | 929 |
-| dcb | 30 | 127 | 396 |
+| artorg | 45 | 268 | 929 |
+| dcb | 30 | 126 | 396 |
 | unibe | 25 | 83 | 242 |
 
 ## Judge verdicts [PoC] (verified claims)
