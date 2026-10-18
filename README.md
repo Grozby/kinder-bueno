@@ -227,6 +227,16 @@ Keep `priority_patterns` narrow and anchored to the site root: they decide what 
 - Designed for the Swiss nDSG and the GDPR where it applies. No user accounts: feedback is stored with an
   anonymous session id. Its optional free-text comment is stored as typed, so it should not ask for personal data.
 
+## Submission package
+
+```bash
+scripts/submission.sh slides.pdf slides.pptx   # dist/submission.zip: slides, docs/REPORT.md as PDF, eval reports, HANDOFF.md
+```
+
+Re-run `navigator eval` and `navigator case-eval` first, and update the numbers in `docs/REPORT.md`,
+`docs/PITCH.md` and the slides. The report is printed with headless Chrome (`CHROME=` for another path). The demo
+dump is never included: it goes to the challenge owner separately.
+
 ## Tests
 
 ```bash

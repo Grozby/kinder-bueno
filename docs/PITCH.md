@@ -1,8 +1,8 @@
 # Pitch and demo script
 
-Numbers come from `eval/report.md` (9 gold queries, 100 pages; run after #76) and `navigator stats`. Re-run
-`uv run navigator eval` before presenting and update the numbers here (re-run on 2026-10-18 after #95: same
-numbers). Demo timings were measured on the Docker setup on 2026-10-18 (rehearsal, #34), and the script was
+Numbers come from `eval/report.md` (9 gold queries, 100 pages; last run on 2026-10-18 on main `ad33a2a`,
+after #130) and `navigator stats`. Re-run `uv run navigator eval` before presenting and update the numbers here,
+in `docs/REPORT.md` and in the slides. Demo timings were measured on the Docker setup on 2026-10-18 (rehearsal, #34), and the script was
 rehearsed again three times on a fresh stack restored from `checkpoints/demo.dump`, on main after #95.
 
 ## Slides (5 minutes)
@@ -20,22 +20,24 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
      example and list labels like "Alumni".
    - Traceability in the eval: **100%** of displayed facts are verified and link to their source.
 4. **Results (honest).**
-   - recall@10: **60%** (target 80%), lay-term phrasings 61%, up from 14% after ranking work. Best on cardio
+   - recall@10: **64%** (target 80%), lay-term phrasings 67%, up from 14% after ranking work. Best on cardio
      (80–100% for all 3 phrasings), weakest on surgery (29–43%: the image-guided therapy chair's head is not in
      the 100 crawled pages).
-   - Synonyms: "glucose sensors" and "continuous glucose monitoring" share 43% of their top 10; both find the
-     Diabetes Center Berne, Lilian Witthauer and the AI in Health and Nutrition lab.
+   - Synonyms: the three glucose phrasings share 60% of their top 10 on average; "glucose sensors" and
+     "continuous glucose monitoring" both find Lilian Witthauer, Stavroula Mougiakakou and her AI in Health and
+     Nutrition lab.
    - Field fill for people: role 100%, affiliation 100% (249 people linked to their lab from member pages).
-     97% of people show **their lab's topics**, labelled as the lab's and linked to the lab page. Personal
+     98% of people show **their lab's topics**, labelled as the lab's and linked to the lab page. Personal
      expertise is 0%: the pages state topics for labs, not for each person, and we don't pretend otherwise.
-   - Precision (LLM judge, PoC): 60% of the top-10 results judged relevant. The judge agrees with the human
-     gold set on only 73% of gold hits, so treat this as a signal, not a measurement.
+   - Precision (LLM judge, PoC): 49% of the top-10 results judged relevant (60% before the last ranking
+     change, #130; on 77 unchanged results the judge flipped 9 verdicts). It agrees with the human gold set on
+     only 61% of gold hits, so treat this as a signal, not a measurement.
 5. **Sovereign and cheap to run.** Apertus (Swiss open LLM), local bge-m3 embeddings, Postgres, one
    `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
    and, measured on the same pages, not better); quote verification is what makes the small model safe to use. A new site is
    one config block (`config/sources.yaml`).
 6. **Next.** Scale from 100 to ~2,000 pages (config only; profile and facility pages for person-level
-   expertise), recall from 60% towards 80%, and widen the case board from research partners to suppliers,
+   expertise), recall from 64% towards 80%, and widen the case board from research partners to suppliers,
    manufacturers and advisors in Canton Bern, with every claim sourced.
 
 ## Demo (4 minutes)
@@ -90,12 +92,13 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
 - *Why 8B and not 70B?* We measured both on the same 100 pages. 70B was slower (15 vs ~10 min) and not
   better: recall@10 43% vs 46%, judged precision 46% vs 63%. Every fact still has to pass the quote check, and
   switching is one setting (`EXTRACT_MODEL`).
-- *Why is recall 60% and not 80%?* Every gold expert is in the database; the misses are people ranked 11th to
+- *Why is recall 64% and not 80%?* Every gold expert is in the database; the misses are people ranked 11th to
   40th behind their own lab, and one head whose member page is not crawled. A cross-encoder reranker adds 1 to
-  3 experts but takes 7–11 s per search on a CPU, so it is off; the next gain is crawling profile pages (#75).
+  3 experts but takes 7–11 s per search on a CPU, so it is off. A deeper crawl with profile pages (#75, 340
+  pages) reaches 58% today: the resolver keeps a few duplicates there, which are the next fix.
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
-  We report it as a signal, not as proof (judge agreement with the gold set: 73%).
+  We report it as a signal, not as proof (judge agreement with the gold set: 61–73% between runs).
 - *How is the fit score computed?* Five fixed criteria: research fit (40%, share of needs covered), expert
   pool, research units, infrastructure and running projects. Each counts only references whose verified
   topic claims match a need. It measures fit within our sources, not all of Canton Bern.
