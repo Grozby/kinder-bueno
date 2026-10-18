@@ -43,9 +43,17 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 ## Chat and feedback (section 8.9)
 
 - `POST /api/chat` with `{session_id, message}`; the frontend reads `reply`, `results`, `no_result`.
-- `POST /api/feedback` with `{session_id, query, entity_id, rating}` from the 👍/👎 buttons on a
-  reference. `query` is the company name. **Assumption:** `rating` is `"up"` or `"down"` — the plan
-  does not fix the type yet.
+- `POST /api/feedback` with `{session_id, query, entity_id, claim_id?, rating, comment?}`.
+  `query` is the company name.
+  - `rating` is `"up"` or `"down"` for the 👍/👎 buttons on a reference.
+  - `rating: "wrong_fact"` with a `claim_id` flags one evidence row (plan 9, "wrong fact" button).
+    The UI does not have this button yet.
+  - `404` if the entity does not exist or `claim_id` belongs to another entity.
+- Chat filters are single values (`ChatFilters`: `source` and `type`, each one value or `null`).
+  `GET /api/search` (debugging and eval, not used by the UI) takes several:
+  `?q=…&type=person&type=unit&source=dcb`.
+- `Evidence.judge_verdict` is `"supported"`, `"partial"` or `null` (not judged). Claims the judge
+  marks unsupported are never returned.
 
 ## Sources
 
