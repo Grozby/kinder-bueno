@@ -81,6 +81,26 @@ class FeedbackResponse(BaseModel):
     ok: bool = True
 
 
+class ChatFilters(BaseModel):
+    """Single values, unlike /api/search (docs/FRONTEND_API.md). None = all."""
+    source: str | None = None
+    type: EntityType | None = None
+
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str                # blank with new filters: re-run the last query
+    filters: ChatFilters | None = None  # None: keep the session's filters
+
+
+class ChatResponse(BaseModel):
+    reply: str                  # a template, never free text about entities (plan 8.10, reply check)
+    results: list[Result]
+    filters: ChatFilters        # the filters the server used
+    expansion: Expansion | None
+    no_result: bool
+
+
 SourceStatus = Literal["ready", "crawling", "failed"]
 PageStatus = Literal["queued", "crawled", "skipped", "failed"]
 

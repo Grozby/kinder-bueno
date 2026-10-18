@@ -2,8 +2,11 @@
 
 import logging
 import secrets
+import threading
+from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from typing import Annotated
 
 import anyio
@@ -20,6 +23,9 @@ from navigator.llm import LLM
 from navigator.models import (
     Case,
     CaseStatusUpdate,
+    ChatFilters,
+    ChatRequest,
+    ChatResponse,
     CrawledPage,
     EntityType,
     Expansion,
@@ -109,12 +115,44 @@ def get_analyze() -> Callable[[str], None]:
     return run
 
 
+@dataclass
+class ChatSession:
+    query: str | None = None
+    filters: ChatFilters = field(default_factory=ChatFilters)
+    results: list[Result] = field(default_factory=list)  # for "#2" / "her" in the agent follow-up (plan 8.10)
+
+
+class ChatSessions:
+    """Chat state in process memory (one worker, plan 8.9): lost on restart. The oldest are dropped past `size`."""
+
+    def __init__(self, size: int = 1000) -> None:
+        self.size = size
+        self._sessions: OrderedDict[str, ChatSession] = OrderedDict()
+        self._lock = threading.Lock()  # sync routes run in a thread pool
+
+    def get(self, session_id: str) -> ChatSession:
+        with self._lock:
+            session = self._sessions.pop(session_id, None) or ChatSession()
+            self._sessions[session_id] = session
+            while len(self._sessions) > self.size:
+                self._sessions.popitem(last=False)
+            return session
+
+
+chat_sessions = ChatSessions()
+
+
+def get_sessions() -> ChatSessions:
+    return chat_sessions
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 Seeds = Annotated[dict[str, str], Depends(get_seeds)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
 Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
 Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_explain)]
 Analyze = Annotated[Callable[[str], None], Depends(get_analyze)]
+Sessions = Annotated[ChatSessions, Depends(get_sessions)]
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -129,6 +167,19 @@ async def internal_error(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
+def run_search(
+    conn: psycopg.Connection, embed: Callable, expand: Callable, explain: Callable,
+    q: str, sources: list[str], types: list[EntityType],
+) -> SearchResponse:
+    """The search pipeline shared by /api/search and /api/chat: expand → rank → build → explain."""
+    terms = expand(q)
+    ranking = rank_entities(conn, q, sources=sources, types=types, extra_terms=terms.terms, embed=embed)
+    results = build_results(conn, ranking.ranked)
+    results = apply_why(results, explain(q, results)) if results else results
+    expansion = Expansion(en=terms.en, de=terms.de) if terms.terms else None
+    return SearchResponse(results=results, expansion=expansion, no_result=not results)
+
+
 @app.get("/api/search")
 def search(
     conn: Conn,
@@ -141,12 +192,33 @@ def search(
 ) -> SearchResponse:
     """Stateless search. Filters repeat like the UI checkboxes: `?type=person&type=unit&source=dcb`.
     No source = all sources; no type = person and unit."""
-    terms = expand(q)
-    ranking = rank_entities(conn, q, sources=source, types=type, extra_terms=terms.terms, embed=embed)
-    results = build_results(conn, ranking.ranked)
-    results = apply_why(results, explain(q, results)) if results else results
-    expansion = Expansion(en=terms.en, de=terms.de) if terms.terms else None
-    return SearchResponse(results=results, expansion=expansion, no_result=not results)
+    return run_search(conn, embed, expand, explain, q, source, type)
+
+
+def chat_reply(n: int, query: str, filters: ChatFilters) -> str:
+    """The template reply of plan 8.10: it states what was searched, never facts about entities."""
+    used = [f"{k}: {v}" for k, v in (("source", filters.source), ("type", filters.type)) if v]
+    return f"Showing {n} results for '{query}'" + (f" ({', '.join(used)})" if used else "") + "."
+
+
+@app.post("/api/chat")
+def chat(conn: Conn, embed: Embed, expand: Expand, explain: Explain, sessions: Sessions, body: ChatRequest) -> ChatResponse:
+    """Plain refinement chat (#50): each message is a new search with the session's filters; a blank
+    message with new `filters` re-runs the last query. The LangGraph agent (plan 8.10) is a follow-up."""
+    session = sessions.get(body.session_id)
+    query = body.message.strip() or session.query
+    if query is None:
+        raise HTTPException(status_code=422, detail="Type a search first")
+    filters = body.filters or session.filters
+    found = run_search(
+        conn, embed, expand, explain, query,
+        [filters.source] if filters.source else [], [filters.type] if filters.type else [],
+    )
+    session.query, session.filters, session.results = query, filters, found.results
+    return ChatResponse(
+        reply=chat_reply(len(found.results), query, filters), results=found.results, filters=filters,
+        expansion=found.expansion, no_result=found.no_result,
+    )
 
 
 @app.get("/api/stats")
