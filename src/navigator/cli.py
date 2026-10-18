@@ -66,8 +66,11 @@ def extract(
     resolve_after: bool = typer.Option(
         True, "--resolve/--no-resolve", help="Run resolve afterwards (rebuilds entities, claims, relations)."
     ),
+    judge_after: bool = typer.Option(
+        True, "--judge/--no-judge", help="Run the claim judge after resolve (skipped when JUDGE_ENABLED=false)."
+    ),
 ) -> None:
-    """Extract claims and relations with Apertus, verify quotes, store raw results, then resolve.
+    """Extract claims and relations with Apertus, verify quotes, store raw results, then resolve and judge.
     Only the selected pages' raw rows are replaced; resolve rebuilds from all raw rows."""
     settings = get_settings()
     with db.connect(settings.database_url) as conn:
@@ -85,6 +88,8 @@ def extract(
             typer.echo("Resolving...")
             for name, n in sorted(run_resolve(conn).items()):
                 typer.echo(f"  {name:<26}{n:>6}")
+            if judge_after and settings.judge_enabled:
+                _run_judge(conn, settings, source)
 
 
 @app.command()
@@ -105,6 +110,7 @@ def reverify(
             typer.echo("Resolving...")
             for name, n in sorted(run_resolve(conn).items()):
                 typer.echo(f"  {name:<26}{n:>6}")
+            typer.echo("Resolve reset the judge verdicts: run `navigator judge` to judge the claims again.")
 
 
 def _print_extraction_report(results: list) -> None:
@@ -131,9 +137,24 @@ def stats() -> None:
     settings = get_settings()
     with db.connect(settings.database_url) as conn:
         rows = db.stats(conn)
+        judge_rows = db.judge_counts(conn)
     typer.echo(f"{'source':<10}{'pages':>8}{'chunks':>8}{'entities':>10}{'claims':>8}")
     for source_id, pages, chunks, entities, claims in rows:
         typer.echo(f"{source_id:<10}{pages:>8}{chunks:>8}{entities:>10}{claims:>8}")
+    _print_judge_counts(judge_rows)
+
+
+def _print_judge_counts(rows: list[tuple]) -> None:
+    """Claim judge verdicts (plan 7.8) per source, for claims and relations."""
+    if not rows:
+        return
+    verdicts = ("supported", "partial", "unsupported", "not judged")
+    typer.echo(f"\njudge     {'':<10}" + "".join(f"{v:>13}" for v in verdicts))
+    table: dict[tuple, dict] = {}
+    for source_id, kind, verdict, n in rows:
+        table.setdefault((source_id, kind), {})[verdict] = n
+    for (source_id, kind), counts in table.items():
+        typer.echo(f"{source_id:<10}{kind:<10}" + "".join(f"{counts.get(v, 0):>13}" for v in verdicts))
 
 
 @app.command()
@@ -205,6 +226,7 @@ def resolve() -> None:
         counts = run_resolve(conn)
     for name, n in sorted(counts.items()):
         typer.echo(f"{name:<26}{n:>6}")
+    typer.echo("Resolve reset the judge verdicts: run `navigator judge` to judge the claims again.")
 
 
 @app.command("eval")
@@ -238,12 +260,35 @@ def ingest(
     source: str | None = typer.Option(None, help="Source id. Default: all sources."),
     max_pages: int | None = typer.Option(None, help="Override max_pages from config (crawl)."),
 ) -> None:
-    """Whole pipeline: init-db → crawl → embed → extract → resolve (plan 11)."""
+    """Whole pipeline: init-db → crawl → embed → extract → resolve → judge (plan 11)."""
     init_db()
     crawl(source=source, max_pages=max_pages)
     embed(source=source)
-    extract(source=source, limit=None, url_like=None, resolve_after=True)
+    extract(source=source, limit=None, url_like=None, resolve_after=True, judge_after=True)
     stats()
+
+
+def _run_judge(conn, settings, source: str | None) -> None:
+    from navigator.judge import run_judge
+
+    model = settings.judge_model or settings.llm_model
+    typer.echo(f"Judging claims with {model}...")
+    counts = run_judge(conn, LLM(settings, settings.judge_model), source)
+    typer.echo(f"  pages: {counts.pop(('pages', 'judged'), 0)}")
+    for (table, verdict), n in sorted(counts.items()):
+        typer.echo(f"  {table:<9}{verdict:<13}{n:>6}")
+
+
+@app.command()
+def judge(source: str | None = typer.Option(None, help="Source id. Default: all sources.")) -> None:
+    """Judge whether each quote supports its claim (plan 7.8); "unsupported" claims are then hidden.
+    Run it after resolve: `extract`, `reverify` and `resolve` rebuild the claims and reset the verdicts."""
+    settings = get_settings()
+    if not settings.judge_enabled:
+        typer.echo("JUDGE_ENABLED=false: skipped.")
+        return
+    with db.connect(settings.database_url) as conn:
+        _run_judge(conn, settings, source)
 
 
 if __name__ == "__main__":

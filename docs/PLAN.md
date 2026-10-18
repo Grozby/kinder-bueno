@@ -554,6 +554,12 @@ User message: `"Page URL: <url>\nPage title: <title>\n\nItems:\n[1] <entity_type
 
 Unit tests SHOULD cover: verdict parsing, missing id → NULL, failed call → all NULL, "shown claim" rule.
 
+As built (`judge.py`, `navigator judge [--source]`; `extract` and `ingest` run it after resolve):
+- The prompt adds a `listed_in` rule (#23): it only claims that the person appears on that unit's member list, so it is "supported" if the quote is the person's own entry. Result: 245 of 249 `listed_in` relations supported (3 partial, 1 not judged).
+- Max 25 items per call (bigger pages are split), 180 s timeout, all calls in parallel. A re-run first resets the judged rows of those pages, so a missing verdict is NULL, not a stale one. `JUDGE_MODEL` (optional) overrides the model.
+- First run (2026-10-18, 70B, 96 pages, ~2.4 min): claims 399 supported / 120 partial / **36 unsupported** / 3 not judged; relations 434 / 35 / 31 / 1. It catches real errors, e.g. an external collaborator ("Prof. Sylviane Muller, Strasbourg") made `member_of` a lab, a unit `works_on` itself, and umbrella-unit topics whose quote is only the page title.
+- Eval before → after: recall@10 46% → 46%, judged precision@10 59% → 62%, judge gold agreement 80% → 85%, traceability 100%.
+
 ---
 
 ## 8. Search (`search.py`, `explain.py`)

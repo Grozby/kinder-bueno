@@ -43,7 +43,7 @@ cantonal networks. The only outside calls are the crawled public sites and the A
 ```bash
 cp .env.example .env                                       # then set KEERA_API_KEY
 docker compose up -d db                                    # Postgres 16 + pgvector
-docker compose run --rm app uv run navigator ingest        # init-db → crawl → embed → extract → resolve
+docker compose run --rm app uv run navigator ingest        # init-db → crawl → embed → extract → resolve → judge
 docker compose up -d app frontend                          # API + UI
 ```
 
@@ -73,7 +73,8 @@ Run the steps in this order, for all sources or one source with `--source ID`:
 uv run navigator ingest       # all of the steps below, in order
 uv run navigator crawl        # crawl + clean pages into `page`
 uv run navigator embed        # chunk + embed pages into `chunk` (bge-m3, ~2.3 GB download on first run)
-uv run navigator extract      # Apertus extracts facts with quotes, quotes are verified, then resolve
+uv run navigator extract      # Apertus extracts facts with quotes, quotes are verified, then resolve + judge
+uv run navigator judge        # claim judge only (plan 7.8): does each quote support its fact?
 uv run navigator stats        # pages, chunks, entities and claims per source
 ```
 
@@ -90,6 +91,11 @@ search until it is embedded again:
 uv run navigator crawl --source dcb
 uv run navigator embed --source dcb
 ```
+
+**The claim judge runs last.** `extract`, `reverify` and `resolve` rebuild the claims and reset its
+verdicts, so `extract` runs `judge` itself (`--no-judge` to skip, or `JUDGE_ENABLED=false`); after
+`reverify` or `resolve`, run `uv run navigator judge`. Claims judged `unsupported` are hidden, and
+`partial` ones carry a marker. `navigator stats` shows the verdict counts.
 
 ## Debugging search
 
