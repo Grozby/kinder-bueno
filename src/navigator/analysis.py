@@ -29,7 +29,7 @@ from navigator.explain import check_sentence, prompt_claims
 from navigator.llm import LLM
 from navigator.models import Result, ScoreItem
 from navigator.rank import MAX_PER_UNIT, _units, fairness_cap, rank_entities
-from navigator.results import build_results
+from navigator.results import build_results, shown
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +44,9 @@ MATCH_SIM = 0.62      # bge-m3 cosine between a need and a claim value. On Gluco
                       # (CGM, insulin delivery); below were robotics or image segmentation for the wrong need
 TOPIC_FIELDS = {"expertise", "description", "unit_expertise"}
 NAME_TYPES = {"project", "infrastructure"}  # their names say what they are ("Cleanroom")
+# A unit with this many shown topic claims is an umbrella ("ARTORG Center": 62-86) that covers almost any need;
+# the specific labs have at most ~30. Umbrellas and their members stay references but do not count as matches.
+UMBRELLA_TOPICS = 50
 
 # criterion, weight, points per match (score = min(100, matches * points)); research fit is a share of needs
 CRITERIA = [
@@ -128,13 +131,26 @@ class Match:
     sim: float
 
 
+def umbrella_units(conn: psycopg.Connection) -> set[str]:
+    """Names of the umbrella units (see UMBRELLA_TOPICS)."""
+    rows = conn.execute(
+        f"""SELECT e.name FROM entity e JOIN claim c ON c.entity_id = e.id
+            WHERE e.type = 'unit' AND c.field IN ('expertise', 'description') AND {shown("c")}
+            GROUP BY e.id HAVING count(*) >= %s""",
+        (UMBRELLA_TOPICS,),
+    )
+    return {r[0] for r in rows}
+
+
 def match_needs(
-    results: list[Result], needs: list[str], embed_many: Callable[[list[str]], np.ndarray]
+    results: list[Result], needs: list[str], embed_many: Callable[[list[str]], np.ndarray],
+    umbrellas: set[str] = frozenset(),
 ) -> dict[int, list[Match]]:
-    """Per entity, the needs it matches, best claim per need."""
+    """Per entity, the needs it matches, best claim per need. Umbrella units and their topics do not count."""
     candidates = [
         (r.entity_id, e.value, e.via_unit) for r in results for e in r.evidence
-        if e.field in TOPIC_FIELDS or (e.field == "name" and r.type in NAME_TYPES)
+        if (e.field in TOPIC_FIELDS or (e.field == "name" and r.type in NAME_TYPES))
+        and not (r.type == "unit" and r.name in umbrellas) and e.via_unit not in umbrellas
     ]
     if not candidates:
         return {}
@@ -235,7 +251,7 @@ def analyze(
         info = read(found[0])
         refs = find_references(conn, info.needs, embed)
         results = build_results(conn, [(e, s) for e, s, _ in refs])
-        matches = match_needs(results, info.needs, embed_many)
+        matches = match_needs(results, info.needs, embed_many, umbrella_units(conn))
         score, rows = score_case(info.needs, results, matches)
         # The need each reference is explained with: its best match, else the first need it was found for
         found_for = {e: n for e, _, n in refs}
