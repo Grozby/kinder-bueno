@@ -33,12 +33,14 @@ export const useCasesStore = defineStore('cases', () => {
   const showDiscarded = ref(false)
 
   // Per case: references (backend top 25, plus results added from the chat), the entity ids
-  // chosen for the pitch, the last pitch, the chat turns, and the feedback given per entity
+  // chosen for the pitch, the last pitch, the chat turns, the feedback given per entity,
+  // and the claims flagged as wrong facts
   const references = ref<Record<string, Result[]>>({})
   const selected = ref<Record<string, number[]>>({})
   const pitches = ref<Record<string, Pitch>>({})
   const chats = ref<Record<string, ChatTurn[]>>({})
   const ratings = ref<Record<string, Record<number, Rating>>>({})
+  const flagged = ref<Record<string, number[]>>({})
 
   const byStatus = computed(() => {
     const groups: Record<CaseStatus, Case[]> = {
@@ -150,6 +152,17 @@ export const useCasesStore = defineStore('cases', () => {
     ;(ratings.value[caseId] ??= {})[entityId] = rating
   }
 
+  async function flagFact(caseId: string, query: string, entityId: number, claimId: number) {
+    await backend.feedback({
+      session_id: sessionId(caseId),
+      query,
+      entity_id: entityId,
+      claim_id: claimId,
+      rating: 'wrong_fact',
+    })
+    ;(flagged.value[caseId] ??= []).push(claimId)
+  }
+
   async function generatePitch(id: string) {
     const pitch = await backend.generatePitch(id, selected.value[id] ?? [])
     pitches.value[id] = pitch
@@ -167,6 +180,7 @@ export const useCasesStore = defineStore('cases', () => {
     pitches,
     chats,
     ratings,
+    flagged,
     byStatus,
     load,
     upload,
@@ -176,6 +190,7 @@ export const useCasesStore = defineStore('cases', () => {
     addReference,
     sendChat,
     rate,
+    flagFact,
     generatePitch,
   }
 })

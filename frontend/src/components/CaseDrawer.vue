@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ListChecks,
   Copy,
   ExternalLink,
   FolderKanban,
@@ -27,6 +28,7 @@ import type { Case, CaseStatus, EntityType, Rating } from '@/api'
 import { DEFAULT_REFERENCES, MAX_REFERENCES, useCasesStore } from '@/stores/cases'
 import { hostOf, timeAgo } from '@/utils/format'
 import CaseChat from './CaseChat.vue'
+import EvidenceList from './EvidenceList.vue'
 import ScoreRing from './ScoreRing.vue'
 import BaseButton from './ui/BaseButton.vue'
 import BaseOverlay from './ui/BaseOverlay.vue'
@@ -37,6 +39,7 @@ const emit = defineEmits<{ close: []; move: [status: CaseStatus]; reject: [] }>(
 const store = useCasesStore()
 
 const showAll = ref(false)
+const openEvidence = ref(new Set<number>())
 const refsLoading = ref(false)
 const refsError = ref<string | null>(null)
 const pitchLoading = ref(false)
@@ -53,9 +56,20 @@ const visibleRefs = computed(() =>
 )
 const pitch = computed(() => (props.item ? store.pitches[props.item.id] : undefined))
 const ratings = computed(() => (props.item ? (store.ratings[props.item.id] ?? {}) : {}))
+const flagged = computed(() => (props.item ? (store.flagged[props.item.id] ?? []) : []))
 
 function rate(entityId: number, rating: Rating) {
   if (props.item) store.rate(props.item.id, props.item.company_name, entityId, rating)
+}
+
+function flag(entityId: number, claimId: number) {
+  if (props.item) store.flagFact(props.item.id, props.item.company_name, entityId, claimId)
+}
+
+function toggleEvidence(entityId: number) {
+  const open = new Set(openEvidence.value)
+  if (!open.delete(entityId)) open.add(entityId)
+  openEvidence.value = open
 }
 
 const TYPE_ICON: Record<EntityType, Component> = {
@@ -75,6 +89,7 @@ watch(
   () => [props.item?.id, props.item?.analysis_status] as const,
   async ([id, analysis]) => {
     showAll.value = false
+    openEvidence.value = new Set()
     pitchError.value = null
     if (!id || analysis !== 'done') return
     refsLoading.value = true
@@ -206,52 +221,70 @@ async function copyPitch() {
                 class="ref"
                 :class="{ on: selectedIds.has(r.entity_id) }"
               >
-                <label :title="r.why">
-                  <input
-                    type="checkbox"
-                    :checked="selectedIds.has(r.entity_id)"
-                    @change="store.toggleReference(item.id, r.entity_id)"
-                  />
-                  <span class="rank">{{ refs.indexOf(r) + 1 }}</span>
-                  <component :is="TYPE_ICON[r.type]" :size="15" class="type-icon" />
-                  <span class="ref-text">
-                    <span class="ref-line">
-                      <strong>{{ r.name }}</strong>
-                      <span v-if="r.affiliations.length" class="muted">
-                        · {{ r.affiliations.join(', ') }}
+                <div class="ref-row">
+                  <label :title="r.why">
+                    <input
+                      type="checkbox"
+                      :checked="selectedIds.has(r.entity_id)"
+                      @change="store.toggleReference(item.id, r.entity_id)"
+                    />
+                    <span class="rank">{{ refs.indexOf(r) + 1 }}</span>
+                    <component :is="TYPE_ICON[r.type]" :size="15" class="type-icon" />
+                    <span class="ref-text">
+                      <span class="ref-line">
+                        <strong>{{ r.name }}</strong>
+                        <span v-if="r.affiliations.length" class="muted">
+                          · {{ r.affiliations.join(', ') }}
+                        </span>
                       </span>
+                      <span class="why">{{ r.why }}</span>
                     </span>
-                    <span class="why">{{ r.why }}</span>
-                  </span>
-                </label>
-                <a
-                  v-if="r.sources[0]"
-                  :href="r.sources[0]"
-                  target="_blank"
-                  rel="noopener"
-                  class="icon-btn"
-                  :title="`Source: ${hostOf(r.sources[0])}`"
-                >
-                  <ExternalLink :size="14" />
-                </a>
-                <button
-                  class="icon-btn"
-                  :class="{ on: ratings[r.entity_id] === 'up' }"
-                  :disabled="!!ratings[r.entity_id]"
-                  title="Good reference"
-                  @click="rate(r.entity_id, 'up')"
-                >
-                  <ThumbsUp :size="14" />
-                </button>
-                <button
-                  class="icon-btn"
-                  :class="{ on: ratings[r.entity_id] === 'down' }"
-                  :disabled="!!ratings[r.entity_id]"
-                  title="Bad reference"
-                  @click="rate(r.entity_id, 'down')"
-                >
-                  <ThumbsDown :size="14" />
-                </button>
+                  </label>
+                  <a
+                    v-if="r.sources[0]"
+                    :href="r.sources[0]"
+                    target="_blank"
+                    rel="noopener"
+                    class="icon-btn"
+                    :title="`Source: ${hostOf(r.sources[0])}`"
+                  >
+                    <ExternalLink :size="14" />
+                  </a>
+                  <button
+                    class="icon-btn"
+                    :class="{ on: ratings[r.entity_id] === 'up' }"
+                    :disabled="!!ratings[r.entity_id]"
+                    title="Good reference"
+                    @click="rate(r.entity_id, 'up')"
+                  >
+                    <ThumbsUp :size="14" />
+                  </button>
+                  <button
+                    class="icon-btn"
+                    :class="{ on: ratings[r.entity_id] === 'down' }"
+                    :disabled="!!ratings[r.entity_id]"
+                    title="Bad reference"
+                    @click="rate(r.entity_id, 'down')"
+                  >
+                    <ThumbsDown :size="14" />
+                  </button>
+                  <button
+                    class="icon-btn"
+                    :class="{ open: openEvidence.has(r.entity_id) }"
+                    :title="`Evidence (${r.evidence.length})`"
+                    :aria-expanded="openEvidence.has(r.entity_id)"
+                    @click="toggleEvidence(r.entity_id)"
+                  >
+                    <ListChecks :size="14" />
+                  </button>
+                </div>
+                <EvidenceList
+                  v-if="openEvidence.has(r.entity_id)"
+                  class="ref-evidence"
+                  :evidence="r.evidence"
+                  :flagged="flagged"
+                  @flag="(claimId) => flag(r.entity_id, claimId)"
+                />
               </li>
             </ul>
             <button
@@ -432,11 +465,16 @@ section > .section-label {
   border-radius: var(--radius);
 }
 .ref {
+  padding: 0.4rem 0.6rem 0.4rem 0.75rem;
+  border-left: 3px solid transparent;
+}
+.ref-row {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.4rem 0.6rem 0.4rem 0.75rem;
-  border-left: 3px solid transparent;
+}
+.ref-evidence {
+  margin: 0.4rem 0 0.2rem;
 }
 .ref + .ref {
   border-top: 1px solid var(--border-soft);
@@ -512,6 +550,9 @@ a.icon-btn:hover {
 .icon-btn:disabled {
   cursor: default;
   opacity: 0.4;
+}
+.icon-btn.open {
+  color: var(--bern-red);
 }
 .icon-btn.on {
   opacity: 1;

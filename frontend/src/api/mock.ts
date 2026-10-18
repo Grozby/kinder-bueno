@@ -106,8 +106,44 @@ function toResult(i: number, why: string, score: number): Result {
     why,
     score,
     sources: [ROOT_URLS[sourceId]!],
-    unit_topics: [],
-    evidence: [],
+    unit_topics: type === 'person' ? [topics[(i + 2) % topics.length]!] : [],
+    evidence: [
+      {
+        claim_id: (i + 1) * 10 + 1,
+        field: 'affiliation',
+        value: affiliation,
+        quote: `${name} is part of the ${affiliation}.`,
+        url: ROOT_URLS[sourceId]!,
+        judge_verdict: 'supported',
+        judge_reason: null,
+        via_unit: null,
+      },
+      {
+        claim_id: (i + 1) * 10 + 2,
+        field: 'expertise',
+        value: topics[i % topics.length]!,
+        quote: `Research focuses on ${topics[i % topics.length]} and related areas.`,
+        url: ROOT_URLS[sourceId]!,
+        judge_verdict: i % 3 === 0 ? 'partial' : 'supported',
+        judge_reason: i % 3 === 0 ? 'The quote names the area but not this entity.' : null,
+        via_unit: null,
+      },
+      // A person's card also shows the topics of their unit, labelled as the unit's (#44)
+      ...(type === 'person'
+        ? [
+            {
+              claim_id: (i + 1) * 10 + 3,
+              field: 'unit_expertise',
+              value: topics[(i + 2) % topics.length]!,
+              quote: `The ${affiliation} works on ${topics[(i + 2) % topics.length]}.`,
+              url: ROOT_URLS[sourceId]!,
+              judge_verdict: 'supported' as const,
+              judge_reason: null,
+              via_unit: affiliation,
+            },
+          ]
+        : []),
+    ],
   }
 }
 
