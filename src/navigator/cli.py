@@ -308,9 +308,9 @@ def resolve() -> None:
 def evaluate(
     expand: bool = typer.Option(True, help="Use query expansion, like /api/search."),
     judge: bool = typer.Option(True, help="Run the eval judge [PoC] for judged precision@10 (plan 10.3)."),
-    gold: str = typer.Option("eval/gold.yaml", help="Gold set (plan 10.1)."),
-    out: str = typer.Option("eval/report.md", help="Where to save the Markdown report."),
-    judge_log: str = typer.Option("eval/judge_log.jsonl", help="Where to save the eval judge verdicts."),
+    gold: str | None = typer.Option(None, help="Gold set (plan 10.1). Default: EVAL_DIR/gold.yaml."),
+    out: str | None = typer.Option(None, help="Where to save the Markdown report. Default: EVAL_DIR/report.md."),
+    judge_log: str | None = typer.Option(None, help="Eval judge verdicts. Default: EVAL_DIR/judge_log.jsonl."),
 ) -> None:
     """Run the gold queries and report the plan 10.2 metrics (stdout and eval/report.md)."""
     import json
@@ -320,6 +320,9 @@ def evaluate(
     from navigator.evaluate import load_gold, run
 
     settings = get_settings()
+    gold = gold or settings.eval_dir / "gold.yaml"
+    out = out or settings.eval_dir / "report.md"
+    judge_log = judge_log or settings.eval_dir / "judge_log.jsonl"
     with chunks_db.connect(settings.database_url) as conn:
         text, verdicts = run(conn, lambda: LLM(settings), load_gold(Path(gold)), expand=expand, judge=judge)
     Path(out).write_text(text)
@@ -387,8 +390,10 @@ def llm_speed(
 
 @app.command("case-eval")
 def case_eval(
-    gold: str = typer.Option("eval/cases.yaml", help="Example business models with expected matches (#73)."),
-    out: str = typer.Option("eval/case_report.md", help="Where to save the Markdown report."),
+    gold: str | None = typer.Option(
+        None, help="Example business models with expected matches (#73). Default: EVAL_DIR/cases.yaml."
+    ),
+    out: str | None = typer.Option(None, help="Where to save the Markdown report. Default: EVAL_DIR/case_report.md."),
 ) -> None:
     """Run the case analysis read-only on the example PDFs and compare with the expected matches (#73)."""
     from pathlib import Path
@@ -399,6 +404,8 @@ def case_eval(
     from navigator.embed import embed_documents, embed_query
 
     settings = get_settings()
+    gold = gold or settings.eval_dir / "cases.yaml"
+    out = out or settings.eval_dir / "case_report.md"
     with chunks_db.connect(settings.database_url) as conn:
         outcomes = [  # one LLM client per asyncio.run: the client is bound to its event loop
             evaluate_case(conn, case, lambda text: asyncio.run(read_case(LLM(settings), text)), embed_query,

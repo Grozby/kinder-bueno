@@ -1,5 +1,6 @@
 """Case eval (#73): gold file, metrics and report. No database: the analysis output is built by hand."""
 
+from pathlib import Path
 
 from test_analysis import result
 
@@ -16,7 +17,7 @@ def test_gold_file_loads_and_points_at_readable_pdfs():
     assert [c.id for c in cases] == ["glucora", "repolar", "precisa", "vinora"]
     for c in cases:
         assert c.needs, c.id  # pinned, so matching changes are measured on the same input
-        assert pdf_text((PROJECT_ROOT / c.pdf).read_bytes())
+        assert pdf_text(Path(c.pdf).read_bytes())
         assert c.score[0] <= c.score[1]
 
 

@@ -100,6 +100,10 @@ uv sync
 uv run navigator init-db      # schema + sources from config/sources.yaml
 ```
 
+Installed as a package (`pip install` of the wheel) instead of run from the checkout, `navigator` reads `.env`,
+`config/sources.yaml` and `eval/` from the working directory. `NAVIGATOR_ENV_FILE`, `SOURCES_FILE` and `EVAL_DIR`
+point elsewhere.
+
 ## Pipeline
 
 Run the steps in this order, for all sources or one source with `--source ID`:
