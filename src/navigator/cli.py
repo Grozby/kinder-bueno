@@ -9,7 +9,7 @@ from navigator import db
 from collections import Counter
 
 from navigator.crawl import crawl_source
-from navigator.extract import extract_pages
+from navigator.extract import extract_pages, reverify as reverify_rows
 from navigator.llm import LLM
 from navigator.resolve import resolve as run_resolve
 from navigator.settings import get_settings
@@ -82,6 +82,26 @@ def extract(
         _print_extraction_report(results)
         if resolve_after:
             # Resolve rebuilds the claim table, so judge verdicts are reset: run the judge after it.
+            typer.echo("Resolving...")
+            for name, n in sorted(run_resolve(conn).items()):
+                typer.echo(f"  {name:<26}{n:>6}")
+
+
+@app.command()
+def reverify(
+    resolve_after: bool = typer.Option(True, "--resolve/--no-resolve", help="Run resolve afterwards."),
+) -> None:
+    """Re-run the verification rules on stored raw rows (no LLM calls), e.g. after a rule change."""
+    settings = get_settings()
+    with db.connect(settings.database_url) as conn:
+        rows = db.raw_rows_for_reverify(conn)
+        claim_updates, relation_updates = reverify_rows(rows)
+        db.update_raw_verification(conn, claim_updates, relation_updates)
+        for label, updates in (("claims", claim_updates), ("relations", relation_updates)):
+            ok = sum(u[0] for u in updates)
+            reasons = Counter(u[2] for u in updates if not u[0])
+            typer.echo(f"{label}: {ok} / {len(updates)} verified; rejected: {dict(reasons.most_common())}")
+        if resolve_after:
             typer.echo("Resolving...")
             for name, n in sorted(run_resolve(conn).items()):
                 typer.echo(f"  {name:<26}{n:>6}")

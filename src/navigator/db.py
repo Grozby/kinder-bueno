@@ -75,6 +75,28 @@ def replace_raw_extractions(conn: psycopg.Connection, results: list) -> None:
         )
 
 
+def raw_rows_for_reverify(conn: psycopg.Connection) -> list[tuple]:
+    """Every raw claim and relation with its page title and text (see extract.reverify)."""
+    claims = conn.execute(
+        "SELECT 'claim', r.id, coalesce(p.title, ''), p.text, r.entity_type, r.entity_name, r.field, r.value, r.quote "
+        "FROM raw_claim r JOIN page p ON p.id = r.page_id ORDER BY r.id"
+    ).fetchall()
+    relations = conn.execute(
+        "SELECT 'relation', r.id, coalesce(p.title, ''), p.text, r.from_type, r.from_name, r.rel, r.to_type, "
+        "r.to_name, r.quote FROM raw_relation r JOIN page p ON p.id = r.page_id ORDER BY r.id"
+    ).fetchall()
+    return claims + relations
+
+
+def update_raw_verification(conn: psycopg.Connection, claim_updates: list[tuple], relation_updates: list[tuple]) -> None:
+    """Rows: (verified, quote, fail_reason, id)."""
+    with conn.transaction(), conn.cursor() as cur:
+        cur.executemany("UPDATE raw_claim SET verified = %s, quote = %s, fail_reason = %s WHERE id = %s", claim_updates)
+        cur.executemany(
+            "UPDATE raw_relation SET verified = %s, quote = %s, fail_reason = %s WHERE id = %s", relation_updates
+        )
+
+
 def stats(conn: psycopg.Connection) -> list[tuple]:
     """Counts per source: pages, chunks, entities with verified claims, verified claims."""
     return conn.execute(
