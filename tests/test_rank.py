@@ -3,7 +3,7 @@
 import pytest
 
 from conftest import onehot
-from navigator.rank import _units, entity_scores, fairness_cap, rank_entities
+from navigator.rank import _units, entity_scores, fairness_cap, idf, inherit, rank_entities
 from navigator.search import ChunkHit
 
 
@@ -11,15 +11,38 @@ def _hit(chunk_id: int, page_id: int, text: str, score: float) -> ChunkHit:
     return ChunkHit(chunk_id, page_id, f"https://p{page_id}", text, score, None)
 
 
-def test_quote_in_chunk_gets_full_weight_same_page_half():
+def test_quote_in_chunk_gets_full_weight_same_page_less():
     hits = [_hit(1, 10, "Anna Muster works on  Surgical robotics.", 1.0)]
     claims = [(1, 10, "surgical robotics"), (2, 10, "cardiac imaging"), (3, 99, "surgical robotics")]
-    assert entity_scores(hits, claims) == {1: 1.0, 2: 0.5}
+    assert entity_scores(hits, claims) == {1: 1.0, 2: 0.25}
 
 
-def test_entity_score_is_sum_of_best_three_chunks():
+def test_entity_score_is_its_best_chunk():
+    # a long page with many matching chunks must not beat a one-chunk lab page (#29)
     hits = [_hit(i, 10, "quote", s) for i, s in enumerate([0.4, 0.3, 0.2, 0.1], start=1)]
-    assert entity_scores(hits, [(7, 10, "quote")]) == {7: pytest.approx(0.9)}
+    assert entity_scores(hits, [(7, 10, "quote")]) == {7: pytest.approx(0.4)}
+
+
+def test_chunk_naming_many_entities_counts_less_for_each():
+    hits = [_hit(1, 10, "anna ben carl dora", 1.0)]
+    claims = [(1, 10, "anna"), (2, 10, "ben"), (3, 10, "carl"), (4, 10, "dora")]
+    assert entity_scores(hits, claims) == {e: pytest.approx(0.5) for e in (1, 2, 3, 4)}  # 1 / sqrt(4)
+
+
+def test_entity_weight_scales_its_score():
+    hits = [_hit(1, 10, "quote", 1.0)]
+    assert entity_scores(hits, [(7, 10, "quote")], weight={7: 0.3}) == {7: pytest.approx(0.3)}
+
+
+def test_idf_is_one_on_a_single_page_and_small_on_most_pages():
+    assert idf(1, 100) == pytest.approx(1.0)
+    assert idf(50, 100) < 0.3 < idf(5, 100)
+
+
+def test_members_inherit_their_best_units_score():
+    scores = {10: 1.0, 11: 0.4, 1: 0.1}  # units 10, 11; person 1 has its own score
+    out = inherit(scores, [(1, 10), (1, 11), (2, 11), (3, 99)], share=0.5)
+    assert out == {10: 1.0, 11: 0.4, 1: pytest.approx(0.6), 2: pytest.approx(0.2)}  # 3: unit 99 did not match
 
 
 def test_fairness_cap_allows_three_per_unit():
@@ -40,6 +63,16 @@ def test_rank_orders_by_relevance(test_conn, graph):
 def test_no_reliable_result_when_low_similarity_and_no_keyword_hit(test_conn, graph):
     ranking = rank_entities(test_conn, "zebrafish", embed=lambda q: onehot({10: 1.0}))
     assert (ranking.ranked, ranking.no_result) == ([], True)
+
+
+def test_member_found_through_the_unit_only(test_conn, graph):
+    # Bob's own claims are on page 3; "insulin" only matches the lab page. He is listed in the lab: he inherits.
+    test_conn.execute(
+        "INSERT INTO relation (from_id, rel, to_id, quote, page_id, verified) VALUES (%s, 'listed_in', %s, 'q', %s, true)",
+        (graph["bob"], graph["lab"], graph["p3"]),
+    )
+    ids = [e for e, _ in rank_entities(test_conn, "insulin", embed=lambda q: onehot({2: 1.0})).ranked]
+    assert graph["bob"] in ids and graph["lab"] in ids
 
 
 def test_projects_only_when_asked(test_conn, graph):

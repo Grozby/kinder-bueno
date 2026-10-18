@@ -63,11 +63,13 @@ def person_keys(people: dict[Mention, _Person]) -> dict[Mention, str]:
     """norm_key per person mention, with the email / shared unit / same source rules of PLAN 7.7."""
     keys: dict[Mention, str] = {}
     email_units: dict[str, defaultdict] = defaultdict(lambda: defaultdict(set))  # norm name -> email -> units
+    email_sources: dict[str, defaultdict] = defaultdict(lambda: defaultdict(set))  # norm name -> email -> sources
     by_name: dict[str, list[Mention]] = defaultdict(list)
     for m, p in people.items():
         if p.emails:
             keys[m] = "email:" + min(p.emails)
             email_units[norm_name(p.name)][min(p.emails)] |= p.units
+            email_sources[norm_name(p.name)][min(p.emails)].add(p.source)
         else:
             by_name[norm_name(p.name)].append(m)
 
@@ -84,8 +86,12 @@ def person_keys(people: dict[Mention, _Person]) -> dict[Mention, str]:
             clusters[uf.find(m)].append(m)
         for members in clusters.values():
             units = set().union(*(people[m].units for m in members))
-            # Rule 3: merge into the one email person of the same name that shares a unit.
+            sources = {people[m].source for m in members}
+            # Rule 3: merge into the one email person of the same name that shares a unit, else a source
+            # (same-source name-only mentions merge too, rule 2). Two candidates: keep apart.
             matches = [e for e, e_units in email_units.get(name, {}).items() if units & e_units]
+            if not matches:
+                matches = [e for e, e_srcs in email_sources.get(name, {}).items() if sources & e_srcs]
             if len(matches) == 1:
                 key = "email:" + matches[0]
             elif len(clusters) > 1:
@@ -170,6 +176,21 @@ def _load(conn: psycopg.Connection) -> tuple[list, list]:
     return claims, relations
 
 
+def acronym_aliases(unit_names: dict[str, str]) -> dict[str, str]:
+    """{acronym key: full key} for unit names like "DCB" whose letters are the initials of exactly one other
+    unit ("Diabetes Center Berne"). `unit_names` maps key -> a display name. No other fuzzy matching."""
+    initials: dict[str, list[str]] = defaultdict(list)
+    for key in unit_names:
+        words = [w for w in re.split(r"[\s,&-]+", key) if w and w not in {"for", "of", "and", "the"}]
+        if len(words) >= 2:
+            initials["".join(w[0] for w in words)].append(key)
+    return {
+        key: initials[key][0]
+        for key, name in unit_names.items()
+        if name.isupper() and " " not in key and len(initials.get(key, [])) == 1
+    }
+
+
 def mention_keys(claims: list, relations: list) -> dict[Mention, str]:
     """(type, name, page) -> norm_key for every entity named in a verified claim or relation."""
     keys: dict[Mention, str] = {}
@@ -192,7 +213,16 @@ def mention_keys(claims: list, relations: list) -> dict[Mention, str]:
         add(ttype, tname, page_id, source)
         if ftype == "person" and rel in MEMBER_REL:
             people[m].units.add(norm_unit(tname))
+    aliases = acronym_aliases({k: name for (etype, name, _), k in keys.items() if etype == "unit"})
+    keys = {m: aliases.get(k, k) if m[0] == "unit" else k for m, k in keys.items()}
+    for p in people.values():
+        p.units = {aliases.get(u, u) for u in p.units}
     return keys | person_keys(people)
+
+
+def _display_name(names: Counter) -> str:
+    """The most common raw name; on a tie not an acronym ("Diabetes Center Berne" over "DCB"), else the first seen."""
+    return max(names.items(), key=lambda kv: (kv[1], not kv[0].isupper()))[0]
 
 
 def resolve(conn: psycopg.Connection) -> Counter:
@@ -213,7 +243,7 @@ def resolve(conn: psycopg.Connection) -> Counter:
             ids[(etype, key)] = conn.execute(
                 "INSERT INTO entity (type, name, norm_key) VALUES (%s, %s, %s) "
                 "ON CONFLICT (type, norm_key) DO UPDATE SET name = EXCLUDED.name RETURNING id",
-                (etype, counter.most_common(1)[0][0], key),
+                (etype, _display_name(counter), key),
             ).fetchone()[0]
             counts[f"entities ({etype})"] += 1
         conn.execute("DELETE FROM entity WHERE NOT (id = ANY(%s))", (list(ids.values()),))

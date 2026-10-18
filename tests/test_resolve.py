@@ -6,7 +6,7 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from navigator import db
-from navigator.resolve import looks_like_person, norm_name, norm_unit, parent_url, resolve
+from navigator.resolve import acronym_aliases, looks_like_person, norm_name, norm_unit, parent_url, resolve
 from navigator.results import build_results
 from navigator.settings import PROJECT_ROOT, get_settings
 from navigator.sources import load_sources
@@ -236,3 +236,38 @@ def test_dcb_team_page_uses_the_fixed_unit_name(conn):
     _claim(conn, team, "person", "Lea Weber", "role", "Data Scientist")
     resolve(conn)
     assert _listed(conn) == [("Lea Weber", "Diabetes Center Berne", "Lea Weber")]
+
+
+def test_name_only_person_merges_into_email_person_of_the_same_source(conn):
+    p1, p2 = _page(conn, "artorg", "https://a/1"), _page(conn, "artorg", "https://a/2")
+    _claim(conn, p1, "person", "Prof. Dr. Dominik Muster", "email", "dominik.muster@unibe.ch")
+    _claim(conn, p2, "person", "Dominik Muster", "role", "Professor")  # no shared unit, same source
+    resolve(conn)
+    assert _people(conn) == {"email:dominik.muster@unibe.ch": ["dominik.muster@unibe.ch", "Professor"]}
+
+
+def test_two_email_people_of_the_same_name_stay_apart_from_a_name_only_one(conn):
+    p1, p2, p3 = (_page(conn, "artorg", f"https://a/{i}") for i in (1, 2, 3))
+    _claim(conn, p1, "person", "Anna Meier", "email", "anna.meier@unibe.ch")
+    _claim(conn, p2, "person", "Anna Meier", "email", "a.meier@insel.ch")
+    _claim(conn, p3, "person", "Anna Meier", "role", "Nurse")
+    resolve(conn)
+    assert set(_people(conn)) == {"email:anna.meier@unibe.ch", "email:a.meier@insel.ch", "name:anna meier"}
+
+
+def test_acronym_unit_merges_into_its_one_full_name():
+    names = {"dcb": "DCB", "diabetes center berne": "Diabetes Center Berne", "dcb research ag": "DCB Research AG",
+             "nrg": "NRG", "neuro robotics group": "Neuro Robotics Group", "neuro rehab group": "Neuro Rehab Group",
+             "artorg": "ARTORG"}
+    # NRG fits two units: ambiguous, kept apart. ARTORG fits none. Lowercase or multi-word keys are never aliases.
+    assert acronym_aliases(names) == {"dcb": "diabetes center berne"}
+
+
+def test_acronym_unit_is_merged_in_resolve(conn):
+    p1 = _page(conn, "dcb", "https://d/1")
+    _claim(conn, p1, "unit", "DCB", "expertise", "insulin pumps")
+    _claim(conn, p1, "unit", "Diabetes Center Berne", "name", "Diabetes Center Berne")
+    resolve(conn)
+    assert conn.execute("SELECT name, norm_key FROM entity WHERE type = 'unit'").fetchall() == [
+        ("Diabetes Center Berne", "diabetes center berne")
+    ]
