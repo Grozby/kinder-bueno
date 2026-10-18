@@ -15,7 +15,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import cases, chunks_db
+from navigator import cases, chunks_db, pitch
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -32,6 +32,8 @@ from navigator.models import (
     FeedbackCounts,
     FeedbackRequest,
     FeedbackResponse,
+    Pitch,
+    PitchRequest,
     Result,
     SearchResponse,
     Source,
@@ -146,6 +148,13 @@ def get_sessions() -> ChatSessions:
     return chat_sessions
 
 
+def get_write_pitch(request: Request) -> Callable[[tuple, list[Result]], str]:
+    """The pitch writer: (company, industry, summary, needs) and the references -> checked text or template.
+    Runs on the explain LLM (EXPLAIN_MODEL), which is the fast one while the gateway is slow."""
+    llm = request.app.state.explain_llm
+    return lambda context, results: anyio.from_thread.run(pitch.write_pitch, llm, *context, results)
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 Seeds = Annotated[dict[str, str], Depends(get_seeds)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
@@ -153,6 +162,7 @@ Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
 Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_explain)]
 Analyze = Annotated[Callable[[str], None], Depends(get_analyze)]
 Sessions = Annotated[ChatSessions, Depends(get_sessions)]
+WritePitch = Annotated[Callable[[tuple, list[Result]], str], Depends(get_write_pitch)]
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -367,3 +377,27 @@ def update_case(conn: Conn, case_id: str, body: CaseStatusUpdate) -> Case:
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
+
+
+@app.post("/api/cases/{case_id}/pitch")
+def generate_pitch(conn: Conn, write: WritePitch, case_id: str, body: PitchRequest) -> Pitch:
+    """A sales pitch from the selected references only; every sentence about one cites its claims. Stored on the case."""
+    context = pitch.case_context(conn, case_id)
+    if context is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    entity_ids = list(dict.fromkeys(body.entity_ids))
+    if unknown := pitch.unknown_entities(conn, entity_ids):
+        raise HTTPException(status_code=404, detail=f"Unknown entity ids: {unknown}")
+    results = build_results(conn, [(i, 0.0) for i in entity_ids])
+    return pitch.save_pitch(conn, case_id, write(context, results), entity_ids)
+
+
+@app.get("/api/cases/{case_id}/pitch")
+def get_pitch(conn: Conn, case_id: str) -> Pitch:
+    """The last pitch generated for the case; 404 if the case does not exist or has none yet."""
+    if pitch.case_context(conn, case_id) is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    stored = pitch.load_pitch(conn, case_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="No pitch yet")
+    return stored

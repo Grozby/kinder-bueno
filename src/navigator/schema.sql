@@ -128,6 +128,8 @@ CREATE TABLE IF NOT EXISTS "case" (
   summary         text,
   pdf_text        text NOT NULL,
   needs           jsonb NOT NULL DEFAULT '[]',  -- analysis output (#53): search queries
-  refs            jsonb NOT NULL DEFAULT '[]'   -- analysis output (#53): [{entity_id, needs}], best first
+  refs            jsonb NOT NULL DEFAULT '[]',  -- analysis output (#53): [{entity_id, needs}], best first
+  pitch           jsonb                         -- last sales pitch (#54): {text, entity_ids, generated_at}
 );
 CREATE INDEX IF NOT EXISTS case_uploaded_idx ON "case"(uploaded_at DESC);
+ALTER TABLE "case" ADD COLUMN IF NOT EXISTS pitch jsonb;

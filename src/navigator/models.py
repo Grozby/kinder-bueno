@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 EntityType = Literal["person", "unit", "project", "infrastructure"]
 Rating = Literal["up", "down", "wrong_fact"]
@@ -152,3 +152,14 @@ class Case(BaseModel):
 
 class CaseStatusUpdate(BaseModel):
     status: CaseStatus
+
+
+class PitchRequest(BaseModel):
+    entity_ids: list[int] = Field(min_length=1)  # the selected references; may include chat results
+
+
+class Pitch(BaseModel):
+    """A sales pitch for a case (#54). Every sentence about a reference cites claim ids, e.g. [12]."""
+    text: str
+    entity_ids: list[int]
+    generated_at: datetime
