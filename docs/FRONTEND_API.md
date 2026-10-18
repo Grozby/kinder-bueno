@@ -76,6 +76,15 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
   removed. If none is left, or the gateway fails or takes over 30 s, the text is a template that lists the
   references and their cited topics. Takes ~10–15 s. `404` for an unknown case or entity id, `422` for an
   empty list. The last pitch is stored on the case; the drawer loads it with `GET` when it opens.
+- Citations in the UI (#109, frontend only; `utils/citations.ts`). A run of ids (`[12][15]`, `[12] [15]` or
+  `[12, 15]`, the forms `explain.cited_ids` accepts) is one group.
+  - In the pitch and in chat results, each group shows as a small number. A click opens the cited facts,
+    with value, quote and source link, taken from the evidence rows of the references in the drawer.
+  - A group with an id outside that evidence stays as written, so a citation is never hidden.
+  - A reference row's one-line `why` shows no ids: they would sit past the ellipsis, and the row's evidence
+    button lists the same facts.
+  - "Copy" on the pitch writes each group as numbers of its source pages (`[1]`, one per distinct page) and
+    adds a `Sources:` list with the URLs, like the partner report.
 - Report and slides (#96): made from the stored selection, in the background (~1 min); poll
   `GET …/documents` until `status` is `done` or `failed` (`none` before the first run).
   - `POST` needs an accepted case (`409` otherwise) and a non-empty selection (`422`). While a job runs, it returns

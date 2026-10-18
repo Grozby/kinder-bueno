@@ -6,7 +6,9 @@ import { computed, nextTick, ref, useTemplateRef } from 'vue'
 
 import { SHOW_UNFINISHED } from '@/api'
 import { useCasesStore } from '@/stores/cases'
+import { evidenceIndex } from '@/utils/citations'
 import { hostOf } from '@/utils/format'
+import CitedText from './CitedText.vue'
 import BaseButton from './ui/BaseButton.vue'
 
 const props = defineProps<{ caseId: string }>()
@@ -58,7 +60,9 @@ async function send(message = draft.value.trim()) {
               <div class="result-main">
                 <strong>{{ r.name }}</strong>
                 <span class="muted small">{{ r.affiliations.join(', ') }}</span>
-                <span class="small">{{ r.why }}</span>
+                <span class="small"
+                  ><CitedText :text="r.why" :evidence="evidenceIndex([r])"
+                /></span>
                 <a
                   v-for="u in r.sources.slice(0, 2)"
                   :key="u"
