@@ -5,8 +5,14 @@ import psycopg
 import pytest
 
 from navigator import chunks_db
-from navigator.search import ChunkHit, cap_per_page, keyword_search, query_words, rrf, search_chunks
-from navigator.settings import get_settings
+from navigator.search import (
+    ChunkHit,
+    cap_per_page,
+    keyword_search,
+    query_words,
+    rrf,
+    search_chunks,
+)
 
 DIM = 1024
 
@@ -42,19 +48,11 @@ def _onehot(i: int) -> np.ndarray:
 
 
 @pytest.fixture
-def conn():
-    """A connection whose test data is rolled back at the end."""
-    try:
-        connection = chunks_db.connect(get_settings().database_url)
-    except psycopg.OperationalError:
-        pytest.skip("Postgres not running")
-    with connection:
-        try:
-            with connection.transaction() as tx:
-                yield connection
-                raise psycopg.Rollback(tx)
-        except psycopg.errors.UndefinedTable:
-            pytest.skip("schema not applied")
+def conn(test_database_url):
+    """A connection to the run's test database (tests/conftest.py) whose test data is rolled back at the end."""
+    with chunks_db.connect(test_database_url) as connection, connection.transaction() as tx:
+        yield connection
+        raise psycopg.Rollback(tx)
 
 
 @pytest.fixture
