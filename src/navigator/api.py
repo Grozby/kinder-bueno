@@ -1,14 +1,16 @@
 """HTTP API (plan 8.9). Run with `navigator serve`."""
 
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
+import numpy as np
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from navigator import db
+from navigator import chunks_db
 from navigator.models import (
     EntityType,
     FeedbackCounts,
@@ -18,24 +20,39 @@ from navigator.models import (
     SourceStats,
     StatsResponse,
 )
+from navigator.rank import rank_entities
 from navigator.results import build_results, shown
 from navigator.settings import get_settings
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Research & Expertise Navigator")
 
-DEFAULT_TYPES = ["person", "unit"]  # plan 8.4: projects / infrastructure only when the filter asks
-MAX_RESULTS = 10
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Load the embedding model at startup, not on the first search (plan 8.9)."""
+    from navigator.embed import get_model
+
+    get_model()
+    yield
+
+
+app = FastAPI(title="Research & Expertise Navigator", lifespan=lifespan)
 
 
 def get_conn() -> Iterator[psycopg.Connection]:
-    """One connection per request; commits on success."""
-    with db.connect(get_settings().database_url) as conn:
+    """One connection per request (pgvector registered); commits on success."""
+    with chunks_db.connect(get_settings().database_url) as conn:
         yield conn
 
 
+def get_embed() -> Callable[[str], np.ndarray]:
+    from navigator.embed import embed_query
+
+    return embed_query
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
+Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -50,47 +67,18 @@ async def internal_error(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
-def _temporary_rank(
-    conn: psycopg.Connection, q: str, source: list[str], type: list[EntityType]
-) -> list[tuple[int, float]]:
-    """TEMPORARY ranker until search.py lands: entities ranked by how many shown claims match a query word."""
-    words = [w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") for w in q.lower().split()]
-    if not words:
-        return []
-    rows = conn.execute(
-        f"""
-        SELECT c.entity_id, count(*) AS hits
-        FROM claim c
-        JOIN entity e ON e.id = c.entity_id
-        JOIN page p ON p.id = c.page_id
-        WHERE {shown("c")}
-          AND c.value ILIKE ANY(%(patterns)s)
-          AND e.type = ANY(%(types)s)
-          AND (cardinality(%(source)s::text[]) = 0 OR p.source_id = ANY(%(source)s))
-        GROUP BY c.entity_id
-        ORDER BY hits DESC, c.entity_id
-        LIMIT %(limit)s
-        """,
-        {
-            "patterns": [f"%{w}%" for w in words],
-            "types": type or DEFAULT_TYPES,
-            "source": source,
-            "limit": MAX_RESULTS,
-        },
-    ).fetchall()
-    return [(entity_id, float(hits)) for entity_id, hits in rows]
-
-
 @app.get("/api/search")
 def search(
     conn: Conn,
+    embed: Embed,
     q: Annotated[str, Query(min_length=1)],
     source: Annotated[list[str], Query()] = [],
     type: Annotated[list[EntityType], Query()] = [],
 ) -> SearchResponse:
     """Stateless search. Filters repeat like the UI checkboxes: `?type=person&type=unit&source=dcb`.
     No source = all sources; no type = person and unit."""
-    results = build_results(conn, _temporary_rank(conn, q, source, type))
+    ranking = rank_entities(conn, q, sources=source, types=type, embed=embed)
+    results = build_results(conn, ranking.ranked)
     return SearchResponse(results=results, expansion=None, no_result=not results)
 
 

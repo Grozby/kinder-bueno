@@ -3,12 +3,23 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from navigator.api import app, get_conn
+from conftest import onehot
+from navigator.api import app, get_conn, get_embed
+
+
+def fake_embed(query: str):
+    """'glucose' is closest to page 3 (Bob), then page 1 (Alice); 'insulin' is page 2 (the lab); else nothing."""
+    if "glucose" in query:
+        return onehot({3: 0.8, 1: 0.6})
+    if "insulin" in query:
+        return onehot({2: 1.0})
+    return onehot({10: 1.0})
 
 
 @pytest.fixture
 def client(test_conn, graph):
     app.dependency_overrides[get_conn] = lambda: test_conn
+    app.dependency_overrides[get_embed] = lambda: fake_embed
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -18,7 +29,8 @@ def test_search_hit(client, graph):
     assert body["no_result"] is False
     assert body["expansion"] is None
     names = [r["name"] for r in body["results"]]
-    assert set(names) == {"Alice Muster", "Bob Beispiel"}  # Carol has only unverified claims
+    assert set(names[:2]) == {"Alice Muster", "Bob Beispiel"}  # the units on page 2 match only semantically
+    assert "Carol Hidden" not in names  # only unverified claims
     assert body["results"][0]["evidence"][0]["claim_id"]
 
 
@@ -26,13 +38,13 @@ def test_search_filters(client, graph):
     assert [r["name"] for r in client.get("/api/search", params={"q": "glucose", "source": "dcb"}).json()["results"]] \
         == ["Bob Beispiel"]
     units = client.get("/api/search", params={"q": "insulin", "type": "unit"}).json()["results"]
-    assert [r["name"] for r in units] == ["Diabetes Lab"]
+    assert {r["name"] for r in units} == {"Diabetes Lab", "ARTORG Center"}  # both named on the lab page
 
 
 def test_search_multiple_filter_values(client, graph):
     params = {"q": "glucose insulin", "type": ["person", "unit"], "source": ["artorg", "dcb"]}
     names = {r["name"] for r in client.get("/api/search", params=params).json()["results"]}
-    assert names == {"Alice Muster", "Bob Beispiel", "Diabetes Lab"}
+    assert names == {"Alice Muster", "Bob Beispiel", "Diabetes Lab", "ARTORG Center"}
     params = {"q": "glucose insulin", "type": ["unit"], "source": ["dcb"]}
     assert client.get("/api/search", params=params).json()["no_result"] is True
 
@@ -51,7 +63,7 @@ def test_stats_shape(client, graph):
     assert body["feedback"] == {"up": 0, "down": 0, "wrong_fact": 0}
     artorg = next(s for s in body["sources"] if s["source"] == "artorg")
     # artorg: center, lab, alice (robotics claim hidden), project, infrastructure
-    assert artorg == {"source": "artorg", "pages": 2, "chunks": 0, "entities": 5, "shown_claims": 10}
+    assert artorg == {"source": "artorg", "pages": 2, "chunks": 2, "entities": 5, "shown_claims": 10}
 
 
 def test_feedback_insert_with_snapshot(client, test_conn, graph):
