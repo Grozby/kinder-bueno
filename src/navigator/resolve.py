@@ -226,6 +226,21 @@ def acronym_aliases(unit_names: dict[str, str]) -> dict[str, str]:
     }
 
 
+# "spn-005 - pilot study on painless glucose monitoring": a project code, a dash (unidecode turns "–" into "-") or a
+# colon, then its title
+PROJECT_CODE = re.compile(r"^([a-z]{2,8}-?\d{1,4}[a-z]?)(?:\s+-\s+|\s*:\s*)(.+)$")
+
+
+def project_code_aliases(project_keys: set[str]) -> dict[str, str]:
+    """{code key: full key} for a project named by its code alone ("SPN-005" on its own page) when exactly one
+    other project is "<code> – <title>" (the listing pages). No other fuzzy matching."""
+    full: dict[str, list[str]] = defaultdict(list)
+    for key in project_keys:
+        if m := PROJECT_CODE.match(key):
+            full[m.group(1)].append(key)
+    return {code: keys[0] for code, keys in full.items() if code in project_keys and len(keys) == 1}
+
+
 def mention_keys(claims: list, relations: list) -> dict[Mention, str]:
     """(type, name, page) -> norm_key for every entity named in a verified claim or relation."""
     keys: dict[Mention, str] = {}
@@ -249,7 +264,8 @@ def mention_keys(claims: list, relations: list) -> dict[Mention, str]:
         if ftype == "person" and rel in MEMBER_REL:
             people[m].units.add(norm_unit(tname))
     aliases = acronym_aliases({k: name for (etype, name, _), k in keys.items() if etype == "unit"})
-    keys = {m: aliases.get(k, k) if m[0] == "unit" else k for m, k in keys.items()}
+    codes = project_code_aliases({k for m, k in keys.items() if m[0] == "project"})
+    keys = {m: (aliases if m[0] == "unit" else codes if m[0] == "project" else {}).get(k, k) for m, k in keys.items()}
     for p in people.values():
         p.units = {aliases.get(u, u) for u in p.units}
     return keys | person_keys(people)
