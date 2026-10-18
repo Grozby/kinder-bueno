@@ -8,7 +8,7 @@ from navigator.sources import SourcesFile, load_sources
 def test_real_config_loads():
     sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
     assert [s.id for s in sources.sources] == ["artorg", "dcb", "unibe"]
-    assert sum(s.max_pages for s in sources.sources) == 100
+    assert sum(s.max_pages for s in sources.sources) == 340  # artorg 110, dcb 30, unibe 200 (#75)
     assert sources.get("dcb").name == "Diabetes Center Berne"
 
 
