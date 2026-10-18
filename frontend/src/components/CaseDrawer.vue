@@ -35,9 +35,11 @@ import {
   type Rating,
 } from '@/api'
 import { DEFAULT_REFERENCES, MAX_REFERENCES, useCasesStore } from '@/stores/cases'
+import { evidenceIndex, withFootnotes, withoutCitations } from '@/utils/citations'
 import { hostOf, timeAgo } from '@/utils/format'
 import CaseAssessment from './CaseAssessment.vue'
 import CaseChat from './CaseChat.vue'
+import CitedText from './CitedText.vue'
 import EvidenceList from './EvidenceList.vue'
 import ScoreRing from './ScoreRing.vue'
 import SimilarCases from './SimilarCases.vue'
@@ -75,6 +77,9 @@ const docs = computed(() => (props.item ? store.documents[props.item.id] : undef
 const docsStarting = ref(false)
 const docsError = ref<string | null>(null)
 const docUrl = (kind: DocumentKind) => (props.item ? backend.documentUrl(props.item.id, kind) : '')
+// The pitch cites claims of any reference (#109). A reference row's one-line "why" drops its ids:
+// they sit past the ellipsis, and the row's evidence button lists the same facts.
+const allEvidence = computed(() => evidenceIndex(refs.value))
 const ratings = computed(() => (props.item ? (store.ratings[props.item.id] ?? {}) : {}))
 const flagged = computed(() => (props.item ? (store.flagged[props.item.id] ?? []) : []))
 
@@ -156,7 +161,7 @@ async function makeDocuments() {
 
 async function copyPitch() {
   if (!pitch.value) return
-  await navigator.clipboard.writeText(pitch.value.text)
+  await navigator.clipboard.writeText(withFootnotes(pitch.value.text, allEvidence.value))
   copied.value = true
   setTimeout(() => (copied.value = false), 1500)
 }
@@ -286,7 +291,7 @@ async function copyPitch() {
                 :class="{ on: selectedIds.has(r.entity_id) }"
               >
                 <div class="ref-row">
-                  <label :title="r.why">
+                  <label :title="withoutCitations(r.why)">
                     <input
                       type="checkbox"
                       :checked="selectedIds.has(r.entity_id)"
@@ -301,7 +306,7 @@ async function copyPitch() {
                           · {{ r.affiliations.join(', ') }}
                         </span>
                       </span>
-                      <span class="why">{{ r.why }}</span>
+                      <span class="why">{{ withoutCitations(r.why) }}</span>
                     </span>
                   </label>
                   <a
@@ -401,7 +406,7 @@ async function copyPitch() {
                   {{ copied ? 'Copied' : 'Copy' }}
                 </BaseButton>
               </div>
-              <p class="pitch-text">{{ pitch.text }}</p>
+              <p class="pitch-text"><CitedText :text="pitch.text" :evidence="allEvidence" /></p>
             </div>
           </section>
 
