@@ -5,6 +5,7 @@ Time budget: 8 hours. Team: 2 people.
 This plan is the single source of truth. An agent or a person must be able to build the prototype from this file only.
 
 Writing rules for this file: short sentences, simple words. "MUST" means required. "SHOULD" means do it if time allows.
+**[PoC]** marks proof-of-concept parts (LLM judge, chat, feedback). They are SHOULD items: build them fast and simple, and drop them first if time runs out (see section 13).
 
 ---
 
@@ -14,10 +15,11 @@ Build an end-to-end prototype:
 
 ```
 public web pages → crawl → clean text → extract facts (with quotes) → verify quotes
-→ store in Postgres → search (keyword + semantic) → structured, source-backed results in a web UI
+→ judge claims [PoC] → store in Postgres → search (keyword + semantic)
+→ structured, source-backed results in a web UI with chat refinement [PoC]
 ```
 
-A user types a question like "glucose sensors". The system returns people and research units. Each result shows:
+A user types a question like "glucose sensors". The system returns people and research units. **[PoC]** The user can then refine in a chat: "only DCB", "more like the 2nd one", "who works with her?". Each result shows:
 
 - person name and contact (if public)
 - role / function
@@ -39,7 +41,8 @@ Tomorrow: the same pipeline (crawl → verified facts → search) feeds location
 
 - Business reports for companies.
 - Supplier or manufacturer data.
-- User accounts, login, admin UI.
+- User accounts, login, admin UI. Chat state is per browser session only (an anonymous `session_id`), never per user.
+- Free-text Q&A chat over the knowledge base. The chat only refines searches; it shows result cards, not free-text facts.
 - Graph database (Neo4j). Postgres only. The schema keeps entities and relations in tables, so Neo4j can be added later.
 - Full crawl of all University of Bern websites.
 - Live web search at query time.
@@ -59,7 +62,7 @@ Tomorrow: the same pipeline (crawl → verified facts → search) feeds location
 
 Ethical rules from the challenge, and how we meet them:
 
-- **Traceability:** quote verification (section 7.4). Explanations only use stored quotes (section 8.6).
+- **Traceability:** quote verification (section 7.6). **[PoC]** An LLM judge checks that the quote supports the claim (section 7.8). Explanations and chat replies only use stored quotes (sections 8.6, 8.10).
 - **Fair representation:** max 3 results per unit in the top 10 (section 8.5). No ranking boost for big institutes.
 - **Accuracy:** if no good match, the UI says "No reliable source found for this query" (section 8.7).
 - **Data protection (nDSG / GDPR):** only public fields, every field linked to source, no data from other places, data is replaced on every recrawl. Add a short note in the README.
@@ -71,16 +74,19 @@ Ethical rules from the challenge, and how we meet them:
 | Topic | Decision |
 |---|---|
 | Language | Python 3.12, managed with `uv` (project already exists) |
-| Run environment | `docker-compose`: one `db` service, one `app` service. No connection to Canton Bern networks. |
+| Run environment | `docker-compose`: `db`, `app` (backend API) and `frontend` services. No connection to Canton Bern networks. |
 | Database | Postgres 16 with `pgvector` (Docker image `pgvector/pgvector:pg16`) |
 | LLM | Apertus v1.5 70B via the Keera gateway (OpenAI-compatible API) |
 | LLM model name | `apertus-v1-5-70b` for all steps. Do NOT use the `-thinking` variants (slower, extra reasoning text breaks JSON parsing). |
 | Embeddings | `BAAI/bge-m3` (1024 dimensions, multilingual), runs locally on CPU via `sentence-transformers`. The gateway has no embedding model. |
 | Keyword search | Postgres full-text search, `simple` config (mixed German/English text) |
-| UI | Streamlit |
+| UI | Vue 3 + Vite + TypeScript, PrimeVue 5, Pinia, vue-router, in `frontend/` (scaffold already in the repo). *Pending teammate review.* |
+| Backend API | FastAPI + uvicorn on port 8000, **one worker** (the chat state lives in process memory). The Vite dev server proxies `/api` to it. |
+| LLM judge [PoC] | Same model, `apertus-v1-5-70b`, temperature 0. It judges its own extractions, so it is **biased** (self-preference). Accepted for the PoC; say so in the pitch. No human calibration now (see section 16). |
+| Chat state [PoC] | LangGraph `StateGraph` + `MemorySaver` checkpointer, `thread_id` = browser `session_id`. Later: swap to `PostgresSaver` (same Postgres). |
 | Crawl size | **100 pages total** to start. Configurable. Scale up later. |
 | Graph DB | Not now. Postgres tables `entity` + `relation` keep the data graph-shaped. |
-| Reranker | SHOULD only: `BAAI/bge-reranker-v2-m3` on top 50, only if time remains at hour 6. |
+| Reranker | Later (after the hackathon): `BAAI/bge-reranker-v2-m3` on top 50. Its hour-6 slot now goes to the chat [PoC]. |
 
 ### LLM endpoint facts (checked)
 
@@ -90,6 +96,7 @@ Ethical rules from the challenge, and how we meet them:
 - Test call to `apertus-v1-5-70b`: works, ~1.3 s for a short answer.
 - Rate limits: **unknown**. Check in hour 1 (send 16 parallel requests, look for HTTP 429).
 - JSON mode (`response_format={"type": "json_object"}`): **unknown**. Try it. If the gateway rejects it, remove it and parse the first JSON object from the text.
+- Tool calling (OpenAI `tools` + `tool_choice: "auto"`): **works** (checked). The gateway is vLLM. Test: "Find experts on glucose sensors at DCB only." → `search(query="glucose sensors", source="dcb")`, `finish_reason: "tool_calls"`.
 
 Python client:
 
@@ -178,11 +185,19 @@ kinder-bueno/
 │   ├── extract.py             # page → claims (with quotes)
 │   ├── verify.py              # quote check
 │   ├── resolve.py             # merge duplicate entities
+│   ├── judge.py               # [PoC] LLM judge: claim support (7.8) + eval relevance (10.3)
 │   ├── search.py              # expansion, hybrid search, RRF, grouping, fairness
 │   ├── explain.py             # "why it matches" sentences
+│   ├── agent.py               # [PoC] LangGraph chat agent
+│   ├── api.py                 # FastAPI app: /api/search, /api/chat, /api/feedback, /api/stats
 │   └── cli.py                 # typer CLI
-├── app/
-│   └── streamlit_app.py
+├── frontend/                  # Vue 3 + PrimeVue app (section 9)
+│   ├── vite.config.ts         # proxies /api to BACKEND_URL (default http://localhost:8000)
+│   └── src/
+│       ├── api/client.ts      # all backend calls go through here
+│       ├── stores/chat.ts     # Pinia: session_id, turns, filters
+│       ├── views/HomeView.vue
+│       └── components/        # ResultCard.vue, ChatTurn.vue, FilterPanel.vue
 ├── eval/
 │   ├── gold.yaml
 │   └── run_eval.py
@@ -198,10 +213,15 @@ Delete the placeholder `main.py`.
 
 ```
 httpx[http2] selectolax psycopg[binary] pgvector sentence-transformers
-openai pydantic pydantic-settings pyyaml typer streamlit tenacity unidecode rapidfuzz
+openai pydantic pydantic-settings pyyaml typer tenacity unidecode rapidfuzz
+fastapi==0.144.0 uvicorn==0.54.0
+langgraph==1.2.16 langchain-openai==1.7.2          # [PoC] chat agent
 ```
 
 Dev: `pytest`.
+
+Versions of the new packages are pinned (latest on PyPI on 2026-10-18), because LangChain-family APIs change often.
+Frontend: `npm ci` in `frontend/` (versions in `frontend/package.json`).
 
 ---
 
@@ -232,12 +252,24 @@ services:
       HF_HOME: /cache/hf
     depends_on:
       db: { condition: service_healthy }
-    ports: ["8501:8501"]
+    ports: ["8000:8000"]
     volumes:
       - hf_cache:/cache/hf          # keeps the bge-m3 download (~2.3 GB) between runs
       - ./config:/app/config
       - ./eval:/app/eval
-    command: uv run streamlit run app/streamlit_app.py --server.address 0.0.0.0
+    command: uv run navigator serve --host 0.0.0.0 --port 8000
+
+  frontend:                         # pending teammate review
+    image: node:24-slim
+    working_dir: /frontend
+    environment:
+      BACKEND_URL: http://app:8000  # read by vite.config.ts
+    depends_on: [app]
+    ports: ["5173:5173"]
+    volumes:
+      - ./frontend:/frontend
+      - /frontend/node_modules      # keep container node_modules separate from the host
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
 
 volumes:
   pgdata:
@@ -266,10 +298,10 @@ docker compose run --rm app uv run navigator init-db
 docker compose run --rm app uv run navigator ingest            # crawl + clean + chunk + embed + extract + verify + resolve, all sources
 docker compose run --rm app uv run navigator ingest --source dcb
 docker compose run --rm app uv run navigator eval
-docker compose up app                                          # UI at http://localhost:8501
+docker compose up app frontend                                 # UI at http://localhost:5173, API at http://localhost:8000/api
 ```
 
-For fast local development, people MAY also run `uv run navigator ...` on the host with `DATABASE_URL=postgresql://navigator:navigator@localhost:5432/navigator`.
+For fast local development, people MAY also run `uv run navigator ...` on the host with `DATABASE_URL=postgresql://navigator:navigator@localhost:5432/navigator`, and `npm run dev` in `frontend/` (it proxies `/api` to `localhost:8000`).
 
 ### 6.4 `.env.example`
 
@@ -280,13 +312,14 @@ LLM_MODEL=apertus-v1-5-70b
 LLM_CONCURRENCY=8
 EMBED_MODEL=BAAI/bge-m3
 DATABASE_URL=postgresql://navigator:navigator@localhost:5432/navigator
+JUDGE_ENABLED=true          # [PoC] false skips section 7.8
 ```
 
 ---
 
 ## 7. Ingestion pipeline
 
-Run order for each source: crawl → clean → chunk → embed → extract → verify → resolve.
+Run order for each source: crawl → clean → chunk → embed → extract → verify → resolve → judge [PoC].
 Each step MUST be safe to re-run (idempotent). Re-ingesting a source deletes that source's old pages, chunks and claims first (cascade), then writes new data. This also covers the data-protection rule "replace on recrawl".
 
 ### 7.1 Database schema (`src/navigator/schema.sql`)
@@ -334,7 +367,9 @@ CREATE TABLE IF NOT EXISTS claim (
   value       text NOT NULL,
   quote       text NOT NULL,              -- exact text from page.text
   page_id     int NOT NULL REFERENCES page(id) ON DELETE CASCADE,
-  verified    boolean NOT NULL DEFAULT false
+  verified    boolean NOT NULL DEFAULT false,
+  judge_verdict text CHECK (judge_verdict IN ('supported','partial','unsupported')),  -- [PoC] NULL = not judged
+  judge_reason  text                                                                   -- [PoC]
 );
 CREATE INDEX IF NOT EXISTS claim_entity_idx ON claim(entity_id);
 CREATE INDEX IF NOT EXISTS claim_page_idx ON claim(page_id);
@@ -347,11 +382,30 @@ CREATE TABLE IF NOT EXISTS relation (
   quote       text NOT NULL,
   page_id     int NOT NULL REFERENCES page(id) ON DELETE CASCADE,
   verified    boolean NOT NULL DEFAULT false,
+  judge_verdict text CHECK (judge_verdict IN ('supported','partial','unsupported')),  -- [PoC]
+  judge_reason  text,                                                                  -- [PoC]
   UNIQUE (from_id, rel, to_id, page_id)
+);
+
+-- [PoC] User feedback from the UI. Log only: it never changes what is shown.
+-- entity/claim ids change on re-ingest, so keep a text snapshot; ids become NULL.
+CREATE TABLE IF NOT EXISTS feedback (
+  id          serial PRIMARY KEY,
+  session_id  text NOT NULL,
+  query       text,
+  entity_id   int REFERENCES entity(id) ON DELETE SET NULL,
+  claim_id    int REFERENCES claim(id) ON DELETE SET NULL,
+  entity_name text,                       -- snapshot
+  claim_text  text,                       -- snapshot "field: value — quote"
+  rating      text NOT NULL CHECK (rating IN ('up','down','wrong_fact')),
+  comment     text,
+  created_at  timestamptz NOT NULL DEFAULT now()
 );
 ```
 
 Entities with no verified claims left after a re-ingest SHOULD be deleted by a cleanup query at the end of `ingest`.
+
+**Shown claim** (used everywhere below): `verified = true AND judge_verdict IS DISTINCT FROM 'unsupported'`. Same rule for relations. Without the judge (NULL verdict), this is the same as `verified = true`.
 
 ### 7.2 Crawl (`crawl.py`)
 
@@ -477,6 +531,64 @@ Rules for **units, projects, infrastructure**: `norm_key = norm_name(name)`. Als
 
 Implementation hint: during extraction, write claims into a staging list keyed by `(entity_type, entity_name, page_id)`. In `resolve`, compute keys, upsert into `entity`, then insert `claim` and `relation` rows with the final `entity_id`.
 
+### 7.8 Judge claims (`judge.py`) — [PoC]
+
+Quote verification (7.6) proves the quote is on the page. It does NOT prove the quote supports the claim. Example: an `expertise: "surgical robotics"` claim with a correct quote about something else. The judge closes this gap.
+
+Runs after `resolve`, on stored rows, so it can be re-run alone (`navigator judge`). Skip it if `JUDGE_ENABLED=false`.
+
+What is judged:
+- Only **verified** claims with field `expertise`, `description`, `bio` or `unit_type`, and all **verified relations**.
+- Not `name`, `role`, `email`, `phone`: check 2 of 7.6 already requires the value inside the quote.
+
+How:
+- **One call per page** with all judged claims and relations of that page, numbered. Same client, concurrency, retries and JSON parsing as 7.5.
+- Write `judge_verdict` and `judge_reason` to each row.
+- If the call fails, or a claim id is missing in the answer → leave `judge_verdict` NULL. The claim stays shown. **The judge MUST NOT block or fail the pipeline.**
+- Effect on display: `unsupported` → hidden (see "shown claim" in 7.1). `partial` → shown with a small "partial" marker and the reason as tooltip. `supported` → shown normally.
+
+**System prompt (draft, tune with the eval):**
+
+```
+You check facts extracted from one web page of a research institution.
+For each numbered item, decide if the quote supports the stated fact.
+Return ONLY a JSON object. No other text.
+
+Verdicts:
+- "supported": the quote states the fact, or the fact is a fair short summary of the quote.
+- "partial": the quote is related, but the fact is broader, narrower, or adds a detail
+  that the quote does not state.
+- "unsupported": the quote does not say this, or says it about another person or unit.
+
+Rules:
+- Use ONLY the quote and the names given. Do not use your own knowledge.
+- If you are unsure between two verdicts, choose the stricter one.
+- "reason": one short sentence.
+
+Examples:
+[1] person "Anna Muster" — expertise: "surgical robotics"
+    quote: "Her group develops robotic systems for minimally invasive surgery."
+    → supported
+[2] unit "Diabetes Technology Lab" — expertise: "artificial pancreas"
+    quote: "The lab works on continuous glucose monitoring."
+    → unsupported (glucose monitoring is not an artificial pancreas)
+[3] person "Marc Beispiel" — bio: "leads the cardiac imaging group since 2015"
+    quote: "Marc Beispiel leads the cardiac imaging group."
+    → partial (the year is not in the quote)
+[4] relation: person "Anna Muster" works_on project "SNAQ"
+    quote: "SNAQ is developed by the DCB innovation team."
+    → unsupported (the quote does not name the person)
+
+JSON format:
+{"verdicts": [{"id": 1, "verdict": "supported|partial|unsupported", "reason": "..."}]}
+```
+
+User message: `"Page URL: <url>\nPage title: <title>\n\nItems:\n[1] <entity_type> \"<entity name>\" — <field>: \"<value>\"\n    quote: \"<quote>\"\n..."`. Relations as in example [4]. The full page text is NOT sent (shorter, cheaper, and the judge must decide from the quote alone).
+
+**Known limit:** the judge is the same model as the extractor, so it tends to agree with itself. Report its verdict counts (section 10.2), and treat it as a filter for obvious errors, not as proof.
+
+Unit tests SHOULD cover: verdict parsing, missing id → NULL, failed call → all NULL, "shown claim" rule.
+
 ---
 
 ## 8. Search (`search.py`, `explain.py`)
@@ -520,7 +632,7 @@ FROM chunk ORDER BY embedding <=> :vec LIMIT 50;
 ### 8.4 Fuse and group
 
 1. Reciprocal Rank Fusion over the 3 ranked lists (keyword, semantic-original, semantic-expanded): `score(chunk) = Σ 1 / (60 + rank)`.
-2. Map chunks to entities: an entity is linked to a chunk if it has a verified claim on the same page (`claim.page_id = chunk.page_id`) whose quote appears in that chunk's text. If none of its quotes are in the chunk, link it at half weight (same page only).
+2. Map chunks to entities: an entity is linked to a chunk if it has a shown claim (7.1) on the same page (`claim.page_id = chunk.page_id`) whose quote appears in that chunk's text. If none of its quotes are in the chunk, link it at half weight (same page only).
 3. Entity score = sum of its best 3 chunk scores.
 4. Result types: `person` and `unit` by default. Projects and infrastructure appear inside the person/unit card (via relations), and as their own results only if the UI filter asks for them.
 
@@ -532,7 +644,7 @@ Go down the ranked list. For each result, find its unit (person → `member_of` 
 
 One call for all top-10 results together (saves time).
 
-Input per result: entity id, name, and its verified claims as a numbered list `[claim_id] field: value — "quote"`.
+Input per result: entity id, name, and its shown claims (7.1) as a numbered list `[claim_id] field: value — "quote"`.
 
 Prompt:
 
@@ -553,11 +665,20 @@ Check: every cited claim id must belong to that entity. If a sentence cites no v
 If the best semantic similarity across all chunks is below `MIN_SIM` (start at 0.45, tune with the eval set) AND the keyword search returns no hits → return no results and show:
 "No reliable source found for this query. Try other words, or the information may not be public."
 
-Also: never show a result with zero verified claims.
+Also: never show a result with zero shown claims.
 
 ### 8.8 Result object
 
 ```python
+class Evidence(BaseModel):
+    claim_id: int               # needed for "wrong fact" feedback
+    field: str
+    value: str
+    quote: str
+    url: str
+    judge_verdict: str | None   # [PoC] "supported" | "partial" | None
+    judge_reason: str | None    # [PoC]
+
 class Result(BaseModel):
     entity_id: int
     type: Literal["person", "unit", "project", "infrastructure"]
@@ -571,28 +692,117 @@ class Result(BaseModel):
     why: str
     score: float
     sources: list[str]          # distinct page URLs of the claims shown
-    evidence: list[Evidence]    # (field, value, quote, url) for each claim shown
+    evidence: list[Evidence]    # one row per claim shown
 ```
+
+### 8.9 HTTP API (`api.py`, FastAPI)
+
+`navigator serve` starts `uvicorn navigator.api:app` on port 8000 with **one worker**. All routes are under `/api`. Pydantic models from 8.8 are the response types, so FastAPI documents them at `/docs`.
+
+| Route | Request | Response |
+|---|---|---|
+| `GET /api/search` | `?q=&source=&type=` | `{results: Result[], expansion: {en, de}, no_result: bool}` — stateless, no chat |
+| `POST /api/chat` [PoC] | `{session_id, message, filters?}` | `{reply: str, results: Result[], filters: {source, type}, expansion, no_result}` |
+| `POST /api/feedback` [PoC] | `{session_id, query, entity_id, claim_id?, rating, comment?}` | `{ok: true}` |
+| `GET /api/stats` | — | counts per source (pages, chunks, entities, shown claims) + feedback counts |
+
+Rules:
+- `/api/chat` is **not streaming** (one JSON answer). Streaming (SSE) is later.
+- `filters` in a chat request is optional: the UI sends it when the user changes a filter in the side panel. The server writes it into the graph state before the agent runs, so UI and state stay in sync.
+- `/api/feedback` writes one `feedback` row (with the text snapshot). It never changes results.
+- Load the embedding model at startup (FastAPI lifespan), not on the first request.
+
+### 8.10 Chat agent (`agent.py`, LangGraph) — [PoC]
+
+Goal: refine searches in a conversation. The agent **only calls tools**. It never writes facts about people, units or projects. Every answer is the same result cards as `/api/search`.
+
+LLM: `ChatOpenAI(base_url=settings.llm_base_url, api_key=settings.keera_api_key, model=settings.llm_model, temperature=0)` from `langchain-openai`, with `bind_tools(...)`. Tool calling works on the gateway (section 3).
+
+State:
+
+```python
+class ChatState(TypedDict):
+    messages: Annotated[list[AnyMessage], add_messages]
+    query: str | None              # last search query
+    filters: dict                  # {"source": str | None, "type": str | None}
+    last_results: list[Result]     # for "#2", "her", "that lab"
+    expansion: dict | None
+    rounds: int                    # tool rounds in this user turn
+```
+
+Tools (plain Python functions, they call `search.py` and SQL):
+
+| Tool | Action |
+|---|---|
+| `search(query, source?, type?)` | run section 8 search with the merged filters; set `query`, `last_results` |
+| `set_filters(source?, type?)` | change `filters` (null removes one), then re-run the last `query` |
+| `more_like(result_number)` | take that result's shown `expertise` claims, search with them joined as the query; exclude the entity itself |
+| `related(result_number, rel?)` | walk shown `relation` rows of that entity (both directions), return the linked people/units as results |
+
+`result_number` is the 1-based position in `last_results`. Each tool returns a short summary to the model, like `"#1 [entity 42] Anna Muster — surgical robotics, medical imaging"`, so it can resolve "the 2nd one" or "her" in the next turn.
+
+Graph:
+
+```
+START → agent ──(tool calls)──▶ tools ──▶ agent      (max 3 tool rounds per user message)
+          └──(no tool call)──▶ respond → END
+```
+
+- `tools` is a custom node (not the prebuilt `ToolNode`), because tools must read and write `filters` and `last_results` in the state.
+- Checkpointer: `MemorySaver()`. `config={"configurable": {"thread_id": session_id}}`. State is lost when the server restarts. That is OK for the PoC.
+
+**System prompt (draft):**
+
+```
+You help users find research experts in Bern (ARTORG Center, Diabetes Center Berne,
+University of Bern). You work ONLY by calling tools.
+- A new topic → search.
+- "only DCB", "only people", "all sources again" → set_filters.
+- "more like #2", "similar to the second one" → more_like.
+- "who works with her?", "which lab is he in?", "what does this unit run?" → related.
+- Results are numbered #1, #2, ... in the last tool output. Use these numbers.
+Never state facts about people, units or projects yourself.
+After the tools, reply with ONE short sentence that says what you did,
+for example: "Showing people at DCB for 'glucose sensors'."
+If you mention a fact, cite the claim ids in square brackets, like [12].
+```
+
+Guardrails:
+- **Fallback:** if the model makes no tool call on the first message, or a tool call has bad arguments, or the gateway fails, or 3 rounds are used → run plain `search(message)` with the current filters. The chat is never worse than the search box.
+- **Reply check:** the same citation check as 8.6. If the reply cites an id that is not in `last_results`, or names an entity with no citation → replace it with a template: `"Showing <n> results for '<query>'<filters>."`
+- `no_result` (8.7) works the same as in search.
 
 ---
 
-## 9. UI (`app/streamlit_app.py`)
+## 9. UI (`frontend/`, Vue 3 + PrimeVue)
 
+*Pending teammate review: stack and layout below. The card content is fixed (section 1).*
+
+Stack: Vue 3 + Vite + TypeScript, PrimeVue 5 (`@primeuix/themes`), Pinia, vue-router. All backend calls go through `src/api/client.ts` (`/api/...`). Types in `src/api/types.ts` mirror the Pydantic models in 8.8.
+
+**One page** (`HomeView.vue`), chat layout:
 - Title: "Bern Research & Expertise Navigator".
-- One search box. Example query buttons: the 9 gold queries (section 10).
-- Filter: result type (People / Units / Projects / Infrastructure), source (ARTORG / DCB / UniBE).
-- Expander "Search terms used": shows the query expansion (shows the synonym handling to the jury).
-- One card per result:
-  - name (bold), type badge, source badges
-  - role, affiliations, contact
-  - expertise as tags
-  - projects, infrastructure
-  - "Why it matches" sentence
-  - links to source pages (clickable)
-  - expander "Evidence": table of field / value / quote / link
-- Empty state: the "No reliable source found" message.
-- Footer: "All information comes from public pages of the listed institutions. Click a source link to verify. Not an endorsement."
-- Sidebar: counts of pages, chunks, entities, verified claims per source.
+- Chat input at the bottom (PrimeVue `InputText` + `Button`). The first message runs a search. Follow-ups refine it (section 8.10).
+- Example query buttons: the 9 gold queries (section 10). They send a first message.
+- Each **turn** shows: the user message, the assistant `reply` sentence, a "Search terms used" panel (the expansion, to show synonym handling to the jury), and the result cards. Older turns are collapsed (PrimeVue `Panel`, toggleable).
+- Side panel: filters — result type (People / Units / Projects / Infrastructure) and source (ARTORG / DCB / UniBE). They show the `filters` from the last chat response. A change sends `filters` with the next chat request (8.9).
+- Side panel: counts from `/api/stats`.
+- "New search" button: new `session_id`, empty turns.
+
+**Pinia store** `stores/chat.ts`: `session_id = crypto.randomUUID()`, kept in `sessionStorage` (survives reload, not shared across tabs); `turns[]`; `filters`; `loading`.
+
+**Result card** (`ResultCard.vue`, PrimeVue `Card` + `Tag`):
+- name (bold), type tag, source tags
+- role, affiliations, contact
+- expertise as tags
+- projects, infrastructure
+- "Why it matches" sentence
+- links to source pages (clickable)
+- "Evidence" accordion: table (`DataTable`) of field / value / quote / link. **[PoC]** `partial` claims show a small "partial" tag with `judge_reason` as tooltip.
+- **[PoC] Feedback:** 👍 / 👎 buttons on the card, and a "wrong fact" button on each evidence row (sends `claim_id`). After a click, show "Thanks" and disable the buttons. Nothing else changes.
+
+Empty state: the "No reliable source found" message.
+Footer: "All information comes from public pages of the listed institutions. Click a source link to verify. Not an endorsement."
 
 ---
 
@@ -643,8 +853,39 @@ For each query, run the full search (including expansion, without the explanatio
 | field fill | for person results: share with role, affiliation, expertise, source filled | report |
 | source coverage | pages / entities / verified claims per source | all 3 > 0 |
 | extraction drop rate | unverified claims / all claims (from DB) | report (shows the quote check works) |
+| judge verdicts [PoC] | counts of supported / partial / unsupported / NULL among judged claims (7.8) | report (shows the judge works) |
+| judged precision@10 [PoC] | share of top-10 results the eval judge marks relevant (10.3), mean over the 9 queries | report |
+| judge gold agreement [PoC] | share of gold `expected` entities found in the top 10 that the eval judge marks relevant | report; if < 0.8, the judge is not reliable — say so |
+| feedback [PoC] | counts of up / down / wrong_fact (from DB) | report |
 
 Output: a Markdown table printed to stdout and saved to `eval/report.md`. Put the numbers in the pitch.
+
+### 10.3 Eval judge (`judge.py`) — [PoC]
+
+The gold set only gives recall. The eval judge gives a precision number without more human labels.
+
+- One call per query, with all top-10 results.
+- The judge sees only the query and each result's shown evidence (`field: value — "quote"`). No URLs, no scores.
+- Binary verdict per result. Temperature 0. Same model as everything else, so it is biased (section 3). This is a PoC metric, not ground truth.
+- If the call fails → mark that query "not judged" and leave it out of the mean.
+
+**Prompt (draft):**
+
+```
+You judge results of an expert search in the Bern research ecosystem.
+For each result, decide if this person or unit is a good match for the query.
+Use ONLY the evidence listed. Do not use your own knowledge.
+- relevant = true: the evidence shows work on the query topic or a close sub-topic.
+- relevant = false: otherwise, or if the evidence is too thin to tell.
+Return ONLY JSON: {"<entity_id>": {"relevant": true|false, "reason": "<one short sentence>"}, ...}
+Query: <query>
+Results:
+<entity_id> <name> (<type>)
+  - <field>: <value> — "<quote>"
+  ...
+```
+
+Save every verdict with its reason to `eval/judge_log.jsonl`, so a human can spot-check it later (section 16).
 
 ---
 
@@ -655,12 +896,14 @@ Output: a Markdown table printed to stdout and saved to `eval/report.md`. Put th
 | Command | Action |
 |---|---|
 | `navigator init-db` | run `schema.sql`, upsert `source` rows from config |
-| `navigator ingest [--source ID] [--max-pages N]` | crawl → clean → chunk → embed → extract → verify → resolve |
+| `navigator ingest [--source ID] [--max-pages N]` | crawl → clean → chunk → embed → extract → verify → resolve → judge |
 | `navigator crawl --source ID` | crawl + clean only (for debugging) |
-| `navigator extract --source ID` | extract + verify + resolve only (pages already stored) |
+| `navigator extract --source ID` | extract + verify + resolve + judge only (pages already stored) |
+| `navigator judge [--source ID]` | [PoC] re-run section 7.8 on stored claims |
 | `navigator search "query"` | print results as JSON (for debugging) |
-| `navigator eval` | run section 10.2 |
-| `navigator stats` | counts per source |
+| `navigator serve [--host H] [--port P]` | start the API (section 8.9), one worker |
+| `navigator eval [--no-judge]` | run section 10.2 (with the eval judge unless `--no-judge`) |
+| `navigator stats` | counts per source, incl. judge verdicts and feedback |
 
 ---
 
@@ -680,16 +923,16 @@ Integration contract between A and B: the database schema in section 7.1 and the
 
 | Hour | Person A (pipeline) | Person B (search + UI + eval) |
 |---|---|---|
-| 0–1 | uv deps, Docker, `schema.sql`, `settings.py`, `sources.yaml`, `init-db`. Test gateway rate limit + JSON mode. | `Result` model, Streamlit cards on fake data, `llm.py` shared client (agree with A). |
+| 0–1 | uv deps, Docker, `schema.sql`, `settings.py`, `sources.yaml`, `init-db`. Test gateway rate limit + JSON mode. | `Result` model, Vue result cards on fake data, FastAPI `/api/search` stub returning fake results, `llm.py` shared client (agree with A). |
 | 1–2 | `crawl.py` + `clean.py` (email decoding). Run crawl for all 3 sources (100 pages). | `embed.py`, `chunk.py`. Keyword + semantic search on chunks (works as soon as pages exist). |
 | 2–3 | `extract.py` + `verify.py` + unit tests. Run extraction. | Query expansion, RRF. Connect UI to real search (chunk-level results first). |
 | 3–4 | `resolve.py` + tests. Check extraction quality on 10 pages by hand; fix prompt. | Grouping by entity, fairness cap, result object from DB. |
-| 4–5 | Re-ingest all. `stats` command. Cleanup of orphan entities. | Gold set (with A: pick expected entities from crawled pages). `run_eval.py`. |
-| 5–6 | Fix pipeline issues found by eval (missing pages → add seeds; bad quotes → prompt). | `explain.py` + citation check, "no reliable source" path, evidence expander. |
-| 6–7 | **Both:** full run in Docker from clean state. Eval numbers. SHOULD: reranker. Tune `MIN_SIM`. | |
+| 4–5 | Re-ingest all. `stats` command. Cleanup of orphan entities. SHOULD [PoC]: `judge.py` claim judge (7.8) + `navigator judge`. | Gold set (with A: pick expected entities from crawled pages). `run_eval.py`. |
+| 5–6 | Fix pipeline issues found by eval (missing pages → add seeds; bad quotes → prompt). | `explain.py` + citation check, "no reliable source" path, evidence accordion. SHOULD [PoC]: eval judge (10.3). |
+| 6–7 | Full run in Docker from clean state. Eval numbers. Tune `MIN_SIM`. | SHOULD [PoC]: `agent.py` + `/api/chat` + chat layout; `feedback` table + `/api/feedback` + buttons. |
 | 7–8 | **Both:** README (setup, add a source, data-protection note, architecture diagram), pitch slides, demo script. | |
 
-Fallback if behind at hour 5: drop `explain.py` (use the template sentence), drop the reranker, drop source/type filters. Do NOT drop quote verification or the eval.
+Fallback if behind at hour 5, in this order: (1) drop the chat [PoC] (keep the search box on `/api/search`), (2) drop the claim judge [PoC] (`JUDGE_ENABLED=false`), (3) drop `explain.py` (use the template sentence), (4) drop source/type filters. **Keep the eval judge** (cheap, adds precision@10 to the pitch). Do NOT drop quote verification or the eval.
 
 ---
 
@@ -702,6 +945,9 @@ Fallback if behind at hour 5: drop `explain.py` (use the template sentence), dro
 - [ ] Synonym demo works: "glucose sensors" and "continuous glucose monitoring" return mostly the same people.
 - [ ] A query with no match shows the "No reliable source found" message (demo query: "quantum cryptography").
 - [ ] README explains setup, adding a source, and data protection.
+- [ ] [PoC] Claims judged `unsupported` are not shown; `partial` ones carry a marker. Eval report has the judge rows.
+- [ ] [PoC] Chat demo: "glucose sensors" → "only DCB" → "more like #1" → "who works with them?" works in one session.
+- [ ] [PoC] A "wrong fact" click writes a `feedback` row and changes nothing on screen.
 - [ ] No secrets in git (`git grep -i keera_api_key` shows only `.env.example` and settings code).
 
 ---
@@ -718,6 +964,11 @@ Fallback if behind at hour 5: drop `explain.py` (use the template sentence), dro
 | 100 pages miss a use case | gold set has < 2 expected entities | add targeted seed URLs, re-ingest that source |
 | Pages are German only | few English matches | expansion already adds German terms; bge-m3 is multilingual |
 | Wrong person merge | two people shown as one | merge rules are strict on purpose; check `resolve` tests |
+| [PoC] Judge agrees with itself (same model) | almost 0% `unsupported` | say it in the pitch; spot-check 10 claims by hand if time allows; it is still a filter for obvious errors |
+| [PoC] Judge too strict | many good `expertise` claims `unsupported`, recall@10 drops | compare recall@10 with `JUDGE_ENABLED=false`; loosen the "partial" rule in the prompt; or hide nothing and only mark |
+| [PoC] Tool-call drift | agent calls the wrong tool, bad `result_number`, or loops | 3-round cap + fallback to plain search (8.10); add 2 examples to the system prompt |
+| [PoC] Chat state lost | server restart or more than one worker | expected for the PoC (`MemorySaver`); run one worker; later `PostgresSaver` |
+| [PoC] Frontend/backend contract drift | UI breaks on new fields | `src/api/types.ts` mirrors 8.8; check `/docs` (FastAPI OpenAPI) |
 
 ---
 
@@ -726,3 +977,6 @@ Fallback if behind at hour 5: drop `explain.py` (use the template sentence), dro
 - Gateway rate limit and JSON-mode support: test in hour 1 (Person A).
 - Organisers may provide a UniBE subdomain inventory later. If it appears: add a loader that turns the list into `unibe` seeds, filtered to medicine / life-science hosts. Config change only.
 - Organisers' rule on a separate embedding model: we assume a local open model (bge-m3) next to Apertus is allowed. Confirm with organisers if possible.
+- [PoC] Frontend stack and chat layout (sections 3, 6.1, 9): confirm with the teammate who made the Vue scaffold.
+- [PoC] Judge calibration (after the hackathon): label ~30 claims by hand (supported / partial / unsupported, all 3 verdicts present), include the "wrong fact" feedback rows and spot-checks from `eval/judge_log.jsonl`, and report how often the judge agrees with the labels. Until then, the judge numbers are indicative only.
+- [PoC] Later: `PostgresSaver` for chat state, streaming chat (SSE), reranker.
