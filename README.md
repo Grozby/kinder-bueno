@@ -172,7 +172,7 @@ API's result objects; `--no-explain` skips the Apertus explanation calls. Read-o
 ## Evaluation
 
 ```bash
-uv run navigator eval             # 9 gold queries (eval/gold.yaml) through the /api/search pipeline
+uv run navigator eval             # 18 gold queries (eval/gold.yaml, v2) through the /api/search pipeline
 uv run navigator eval --no-expand --no-judge  # no gateway needed
 uv run navigator case-eval        # case analysis on 4 example PDFs (eval/cases.yaml), read-only
 ```

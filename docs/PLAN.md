@@ -862,7 +862,15 @@ Rules:
 
 ### 10.1 Gold set (`eval/gold.yaml`)
 
-3 use cases × 3 phrasings = 9 queries. Phrasings: (a) the site's own wording, (b) a lay term, (c) a synonym.
+**v2 (2026-10-19), for the 340-page crawl (#75):** 6 use cases × 3 phrasings = 18 queries, 39 expected entities (glucose,
+surgery, cardio as below, plus rehab, immuno, microbiome). Built from the current data: candidates from shown topic claims
+(cosine to the phrasings plus keywords, not from search), each checked against its quote and page, confirmed by the
+owner. Claims whose quote does not name the topic (example topics copied onto team pages, department lists repeated on
+every lab page) were not used. Changes to the v1 use cases: Stefan Weber removed (named only as head of a former group),
+Raphael Sznitman and Bally Lab added. v1 below is kept as `eval/gold_v1.yaml` (`navigator eval --gold eval/gold_v1.yaml`);
+on the 100-page DB, v2 recall is lower by design, since most v2 entities are not in those pages.
+
+v1: 3 use cases × 3 phrasings = 9 queries. Phrasings: (a) the site's own wording, (b) a lay term, (c) a synonym.
 
 ```yaml
 use_cases:
