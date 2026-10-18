@@ -110,11 +110,12 @@ def batches(items: list[Item], size: int = MAX_ITEMS) -> list[list[Item]]:
 
 
 async def judge_items(llm: LLM, page: Page, items: list[Item], timeout: float = TIMEOUT) -> dict[Item, tuple[str, str]]:
-    """Verdicts for one batch. Any failure gives {} (the verdicts stay NULL)."""
+    """Verdicts for one batch. Any failure gives {} (the verdicts stay NULL). `timeout` is per request, not
+    counting the wait for an LLM slot (#148)."""
     try:
-        data = await asyncio.wait_for(llm.chat_json(SYSTEM, format_items(page, items), max_tokens=2500), timeout)
+        data = await llm.chat_json(SYSTEM, format_items(page, items), max_tokens=2500, timeout=timeout)
     except Exception as e:  # LLM, network or timeout: never block the pipeline
-        log.warning("judge failed for %s: %s", page.url, e or type(e).__name__)
+        log.warning("judge failed for %s: %s %s", page.url, type(e).__name__, e)
         return {}
     return {items[i - 1]: v for i, v in parse_verdicts(data, len(items)).items()}
 
@@ -175,4 +176,8 @@ def run_judge(conn: psycopg.Connection, llm: LLM, source: str | None = None) -> 
     store_verdicts(conn, pages, verdicts)
     counts = Counter((item.table, verdicts.get(item, ("not judged",))[0]) for page in pages for item in page.items)
     counts[("pages", "judged")] = len(pages)
+    unjudged = sum(item not in verdicts for page in pages for item in page.items)
+    if unjudged:
+        log.warning("judge: %d of %d items not judged (failed calls are logged above)", unjudged,
+                    sum(len(page.items) for page in pages))
     return counts
