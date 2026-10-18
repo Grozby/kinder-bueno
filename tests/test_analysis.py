@@ -46,6 +46,11 @@ def test_parse_case_info():
     assert info.needs == ["glucose monitoring", "a", "b", "c", "d", "e"]  # deduplicated, at most 6
 
 
+def test_parse_case_info_drops_parentheses():
+    info = analysis.parse_case_info({"needs": ["Glucose sensor accuracy (MARD)", "(CGM)", "artificial pancreas"]})
+    assert info.needs == ["Glucose sensor accuracy", "artificial pancreas"]
+
+
 @pytest.mark.parametrize("data", [{}, {"needs": []}, {"needs": "glucose"}, {"needs": ["", None]}])
 def test_parse_case_info_without_needs(data):
     with pytest.raises(ValueError):
@@ -124,6 +129,8 @@ def test_analyze_stores_needs_references_and_score(test_conn, graph):
     assert "Carol Hidden" not in names
     bob = next(r for r in refs if r.name == "Bob Beispiel")
     assert bob.why.startswith("Matches 'glucose monitoring'. ")  # explanation failed: template
+    center = next(r for r in refs if r.name == "ARTORG Center")  # found for a need, no topic claim matches it
+    assert center.why.startswith("Found for '")
 
 
 def test_analysis_failure_marks_case_failed(test_conn, graph):

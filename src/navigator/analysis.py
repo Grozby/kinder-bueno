@@ -16,6 +16,7 @@ case "failed" instead, never half filled.
 
 import asyncio
 import logging
+import re
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -59,8 +60,14 @@ Return ONLY JSON: {"company_name": "...", "industry": "...", "summary": "...", "
 - industry: 2-4 words, for example "Medical devices".
 - summary: 1-2 sentences: what the company does and what it looks for. Use only the document.
 - needs: 3 to 6 research topics the company needs from universities and research groups. Each is ONE topic
-  as a short English search query of 2-5 words, for example "continuous glucose monitoring".
-  No "and", no parentheses, no abbreviations. Topics only: no places, money, regulations or company names."""
+  as a short English search query of 2-5 words. A request that names two topics becomes two needs.
+  No "and", no "/", no parentheses, no abbreviations. Topics only: no places, money, regulations,
+  study sizes or company names.
+
+Example needs for "We look for partners in CGM accuracy studies, closed-loop / artificial pancreas systems,
+and AI for meal photos and nutrition":
+["continuous glucose monitoring", "clinical validation of sensors", "artificial pancreas",
+ "food recognition from images", "nutrition estimation"]"""
 
 
 @dataclass
@@ -82,7 +89,8 @@ def parse_case_info(data: dict) -> CaseInfo:
     """Clean the model's answer. No usable need -> ValueError (the analysis fails)."""
     needs: dict[str, str] = {}
     for value in data.get("needs") if isinstance(data.get("needs"), list) else []:
-        need = _text(value, MAX_NEED_LEN)
+        # "(MARD)" or "(CGM)" adds nothing to the search and pulls the embedding off the topic
+        need = _text(re.sub(r"\([^()]*\)", " ", value) if isinstance(value, str) else None, MAX_NEED_LEN)
         if need:
             needs.setdefault(need.lower(), need)
     if not needs:
@@ -272,6 +280,8 @@ def references(conn: psycopg.Connection, case_id: str, limit: int) -> list[Resul
     for r in results:
         ref = refs[r.entity_id]
         sentence = ref.get("why") and check_sentence(ref["why"], {e.claim_id: e for e in prompt_claims(r.evidence)})
-        why = f"Matches '{ref['need']}': {sentence}" if sentence else f"Matches '{ref['need']}'. {r.why}"
+        # "Matches" only when a claim matched the need (it then counts in the score), else it was only found for it
+        label = f"{'Matches' if ref['need'] in ref['needs'] else 'Found for'} '{ref['need']}'"
+        why = f"{label}: {sentence}" if sentence else f"{label}. {r.why}"
         out.append(r.model_copy(update={"why": why}))
     return out
