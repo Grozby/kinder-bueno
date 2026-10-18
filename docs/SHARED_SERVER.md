@@ -15,6 +15,9 @@ With `API_TOKEN` set, every `/api/*` request needs `Authorization: Bearer <token
 `401 {"detail": "Invalid or missing token"}`. Without `API_TOKEN`, the API is open, as in local dev.
 `/docs` and `/openapi.json` stay open: they describe the API and contain no data.
 
+With `docker compose`, the same `API_TOKEN` from `.env` is used by the app, its healthcheck and the
+`frontend` service's proxy, so http://localhost:5173 works without extra setup.
+
 ## Teammate: using someone else's backend
 
 No database, `KEERA_API_KEY` or model download is needed: only the frontend runs locally.

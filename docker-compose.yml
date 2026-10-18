@@ -30,8 +30,8 @@ services:
       - ./config:/app/config
       - ./eval:/app/eval
     command: uv run navigator serve --host 0.0.0.0 --port 8000
-    healthcheck:                    # the API is ready once the embedding model is loaded
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/stats')\""]
+    healthcheck:                    # the API is ready once the embedding model is loaded; sends API_TOKEN if set
+      test: ["CMD", "python", "-c", "import os, urllib.request as u; u.urlopen(u.Request('http://localhost:8000/api/stats', headers={'Authorization': 'Bearer ' + os.environ.get('API_TOKEN', '')}))"]
       interval: 10s
       timeout: 5s
       retries: 60
@@ -42,6 +42,7 @@ services:
     working_dir: /frontend
     environment:
       BACKEND_URL: http://app:8000  # read by vite.config.ts
+      BACKEND_TOKEN: ${API_TOKEN:-}  # the app's API_TOKEN from .env, if set; the proxy adds it, the browser never sees it
     depends_on:
       app: { condition: service_healthy }
     ports: ["${UI_PORT:-5173}:5173"]
