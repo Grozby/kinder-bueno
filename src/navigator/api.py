@@ -388,7 +388,7 @@ def get_source(conn: Conn, seeds: Seeds, source_id: str) -> Source:
 
 
 def get_ingest() -> Callable[[str], None]:
-    """The background ingest of a source added from the UI, on its own connection."""
+    """The background ingest of a new (#55) or re-crawled (#80) source, on its own connection."""
     return lambda source_id: ingest.run_ingest(get_settings().database_url, source_id)
 
 
@@ -407,6 +407,27 @@ def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewS
     except Exception:
         ingest.finish()
         raise
+    conn.commit()  # the background ingest reads the source on another connection
+    background.add_task(run, source_id)
+    return _sources(conn, seeds, source_id)[0]
+
+
+@app.post("/api/sources/{source_id}/crawl")
+def recrawl_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, source_id: str,
+                   run: Annotated[Callable[[str], None], Depends(get_ingest)]) -> Source:
+    """Re-crawl a source with its current rules (#79) and ingest it in the background, as POST /api/sources.
+    Returns at once with status "crawling". Until the new data is swapped in, and if the run fails, the
+    source keeps its previous pages and facts. 409 while another ingest runs."""
+    if not ingest.try_start():
+        raise HTTPException(status_code=409, detail="Another source is being ingested; try again when it is ready")
+    try:
+        found = ingest.start_recrawl(conn, load_sources(get_settings().sources_file), source_id)
+    except Exception:
+        ingest.finish()
+        raise
+    if not found:
+        ingest.finish()
+        raise HTTPException(status_code=404, detail="Source not found")
     conn.commit()  # the background ingest reads the source on another connection
     background.add_task(run, source_id)
     return _sources(conn, seeds, source_id)[0]

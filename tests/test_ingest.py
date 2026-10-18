@@ -96,10 +96,17 @@ def _fake_pipeline(monkeypatch, pages, fail_at=None):
         return pages
 
     async def extract(llm, rows):
+        from types import SimpleNamespace
+
+        from navigator.extract import Checked, PageResult
+
         steps.append(("extract", len(rows)))
         if fail_at == "extract":
             raise RuntimeError("gateway down")
-        return []
+        if fail_at == "extract_errors":  # the gateway fails per page: extract_pages does not raise
+            return [PageResult(page_id=i, error="timeout") for i, *_ in rows]
+        claim = SimpleNamespace(entity_type="person", entity_name="Jane Doe", field="role", value="Head")
+        return [PageResult(page_id=i, claims=[Checked(claim, True, "Jane Doe, Head", None)]) for i, *_ in rows]
 
     def step(name, result=None):
         def run(*args, **kwargs):
@@ -137,6 +144,9 @@ def test_ingest_runs_the_pipeline_and_records_the_crawl(test_conn, test_database
     assert steps == [("crawl", 2), ("extract", 2), ("resolve",), ("judge",)]
     assert test_conn.execute("SELECT count(*) FROM page WHERE source_id = 'lab'").fetchone()[0] == 2
     assert test_conn.execute("SELECT count(*) FROM chunk").fetchone()[0] >= 2
+    # Raw rows point at the stored pages (extraction ran on page indexes before the pages existed)
+    raw = test_conn.execute("SELECT p.url FROM raw_claim r JOIN page p ON p.id = r.page_id ORDER BY p.url").fetchall()
+    assert raw == [("https://lab.test/",), ("https://lab.test/team",)]
     tree = test_conn.execute("SELECT url, parent, depth, status FROM crawl_url ORDER BY id").fetchall()
     assert tree == [("https://lab.test/", None, 0, "crawled"),
                     ("https://lab.test/team", "https://lab.test/", 1, "crawled"),
@@ -207,3 +217,89 @@ def test_post_source_while_an_ingest_runs_is_409(client):
     finally:
         ingest.finish()
     assert started == []
+
+
+# --- re-crawl (#80) ---
+
+def _old_page(test_conn) -> None:
+    """The source as a previous crawl left it: one page with a chunk."""
+    import numpy as np
+
+    pid = test_conn.execute("INSERT INTO page (source_id, url, title, text) VALUES ('lab', 'https://lab.test/old', "
+                            "'Old', 'old text') RETURNING id").fetchone()[0]
+    test_conn.execute("INSERT INTO chunk (page_id, ord, text, embedding) VALUES (%s, 0, 'old', %s)",
+                      (pid, np.zeros(1024)))
+    test_conn.commit()
+
+
+@pytest.mark.parametrize("fail_at", ["extract", "extract_errors", "resolve"])
+def test_failed_recrawl_keeps_the_previous_data(test_conn, test_database_url, monkeypatch, slot, fail_at):
+    test_conn.execute(
+        """INSERT INTO source (id, name, config, root_url) VALUES ('lab', 'Lab', %s, 'https://lab.test/')""",
+        (__import__("json").dumps({"source": source_config("lab", "Lab", "https://lab.test/", "lab.test", False,
+                                                           50).model_dump(), "max_depth": 2}),),
+    )
+    _old_page(test_conn)
+    _fake_pipeline(monkeypatch, [CrawledPage("https://lab.test/", "Lab", TEXT)], fail_at=fail_at)
+    assert ingest.try_start()
+    run_ingest(test_database_url, "lab")
+    status, error = test_conn.execute("SELECT status, error FROM source WHERE id = 'lab'").fetchone()
+    assert status == "failed" and error.startswith(fail_at.split("_")[0])
+    assert test_conn.execute("SELECT url FROM page WHERE source_id = 'lab'").fetchall() == [("https://lab.test/old",)]
+    assert test_conn.execute("SELECT count(*) FROM chunk").fetchone()[0] == 1
+
+
+def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_database_url, monkeypatch, slot):
+    from navigator.models import CrawlRulesUpdate
+    from navigator.rules import save_rules
+    from navigator.sources import load_sources
+    from navigator.settings import PROJECT_ROOT
+
+    sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+    test_conn.execute("INSERT INTO source (id, name) VALUES ('artorg', 'ARTORG')")
+    save_rules(test_conn, sources, "artorg", CrawlRulesUpdate(
+        allow_hosts=["www.artorg.unibe.ch"], include_patterns=[], exclude_patterns=[r"/team$"], priority_patterns=[]))
+    test_conn.commit()
+    seen = {}
+
+    async def crawl(source, defaults, on_url=None, **kwargs):
+        seen.update(exclude=source.exclude_patterns, depth=defaults.max_depth, seeds=source.seeds)
+        return [CrawledPage(source.seeds[0], "ARTORG", TEXT), CrawledPage("https://www.artorg.unibe.ch/team", "T", TEXT)]
+
+    _fake_pipeline(monkeypatch, [])
+    monkeypatch.setattr("navigator.crawl.crawl_source", crawl)
+    assert ingest.start_recrawl(test_conn, sources, "artorg")
+    test_conn.commit()
+    assert test_conn.execute("SELECT status, stage FROM source WHERE id = 'artorg'").fetchone() == ("crawling", "crawl")
+    assert ingest.try_start()
+    run_ingest(test_database_url, "artorg")
+    assert seen == {"exclude": [r"/team$"], "depth": sources.defaults.max_depth, "seeds": sources.get("artorg").seeds}
+    assert test_conn.execute("SELECT status FROM source WHERE id = 'artorg'").fetchone() == ("ready",)
+    # A page matching the stored exclude pattern (here: a seed-like page the fake crawler returned) is blocked
+    assert test_conn.execute("SELECT url FROM page WHERE blocked").fetchall() == [("https://www.artorg.unibe.ch/team",)]
+
+
+def test_start_recrawl_unknown_source(test_conn):
+    from navigator.sources import load_sources
+    from navigator.settings import PROJECT_ROOT
+
+    sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+    assert not ingest.start_recrawl(test_conn, sources, "nope")
+    test_conn.execute("INSERT INTO source (id, name) VALUES ('gone', 'Removed from sources.yaml')")
+    assert not ingest.start_recrawl(test_conn, sources, "gone")
+
+
+def test_recrawl_route(client, test_conn):
+    http, started = client
+    test_conn.execute("INSERT INTO source (id, name) VALUES ('artorg', 'ARTORG')")
+    res = http.post("/api/sources/artorg/crawl")
+    assert res.status_code == 200 and (res.json()["status"], res.json()["stage"]) == ("crawling", "crawl")
+    assert started == ["artorg"]
+    assert http.post("/api/sources/nope/crawl").status_code == 404
+    assert ingest.try_start()
+    try:
+        assert http.post("/api/sources/artorg/crawl").status_code == 409
+    finally:
+        ingest.finish()
+    assert started == ["artorg"]
+
