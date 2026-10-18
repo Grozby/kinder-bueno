@@ -67,6 +67,15 @@ def test_judge_query_sends_query_and_results():
     assert llm.prompts[0].startswith("Query: glucose sensors\nResults:\n7 Anna (person)")
 
 
+def test_judge_query_one_call_per_result():
+    """Each result is judged on its own, so its verdict does not depend on the others or their order."""
+    llm = FakeLLM({"7": {"relevant": True}, "8": {"relevant": False}})
+    verdicts = asyncio.run(judge_query(llm, "q", [_result(7, "Anna"), _result(8, "Ben")]))
+    assert verdicts == {7: Verdict(True, ""), 8: Verdict(False, "")}
+    assert len(llm.prompts) == 2
+    assert all(p.count("(person)") == 1 for p in llm.prompts)
+
+
 def test_judge_query_not_judged_on_error_timeout_empty_or_no_results():
     results = [_result(7, "Anna")]
     assert asyncio.run(judge_query(FakeLLM(error=ConnectionError("down")), "q", results)) is None
