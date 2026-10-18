@@ -891,6 +891,10 @@ For each query, run the full search (including expansion, without the explanatio
 
 Output: a Markdown table printed to stdout and saved to `eval/report.md`. Put the numbers in the pitch.
 
+As built (`evaluate.py`, `navigator eval`, `eval/run_eval.py`): the PoC rows (judged precision, judge gold agreement) are not implemented yet (10.3); judge verdict and feedback counts are. Name matching: people match when every word of the gold name is in the result name (titles like "Dr.-Ing." are kept by `norm_name`), units on `norm_unit`. Gold candidates were found with SQL over shown claims by topic (not from search results), then confirmed by a human.
+
+Baseline (2026-10-18, 8B extraction, expansion on): **recall@10 14%** (target 80%), traceability 100%, drop rate 13%. Main causes (see the ranking issue): umbrella units ("ARTORG Center", in two spellings) have claims on nearly every page and take top slots; the expected labs and their heads are pushed out (surgery 0%).
+
 ### 10.3 Eval judge (`judge.py`) — [PoC]
 
 The gold set only gives recall. The eval judge gives a precision number without more human labels.
