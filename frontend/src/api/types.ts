@@ -22,7 +22,7 @@ export interface Case {
   score: number | null // 0-100 overall fit of Canton Bern; null while pending
   score_breakdown: ScoreItem[]
   summary: string | null // short summary for the person using the app
-  // Not served by the backend yet (FRONTEND_API.md "Review"); the UI treats missing as empty
+  // FRONTEND_API.md "Review, notes and similar cases" (#108); the UI treats missing as empty
   review?: Review | null
   notes_count?: number
   similar_cases?: SimilarCase[] // best first, at most 3

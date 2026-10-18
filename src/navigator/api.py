@@ -26,6 +26,7 @@ from navigator.models import (
     CaseChatTurn,
     CaseDocuments,
     CaseFeedback,
+    CaseNote,
     CaseStatusUpdate,
     DocumentKind,
     ChatFilters,
@@ -39,11 +40,13 @@ from navigator.models import (
     FeedbackCounts,
     FeedbackRequest,
     FeedbackResponse,
+    NoteInput,
     PageDetail,
     Pitch,
     PitchRequest,
     ResourcePage,
     Result,
+    ReviewInput,
     SearchResponse,
     NewSource,
     Selection,
@@ -590,6 +593,47 @@ def update_case(conn: Conn, case_id: str, body: CaseStatusUpdate) -> Case:
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
+
+
+@app.put("/api/cases/{case_id}/review")
+def set_review(conn: Conn, case_id: str, body: ReviewInput) -> Case:
+    """The reviewer's own score (#108), clamped to 0-100, next to the AI score. `reason` is required."""
+    case = cases.set_review(conn, case_id, body)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
+@app.delete("/api/cases/{case_id}/review")
+def clear_review(conn: Conn, case_id: str) -> Case:
+    case = cases.set_review(conn, case_id, None)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
+@app.get("/api/cases/{case_id}/notes")
+def list_notes(conn: Conn, case_id: str) -> list[CaseNote]:
+    """Internal notes (#108), oldest first. They never reach the pitch, the documents or an LLM prompt."""
+    notes = cases.list_notes(conn, case_id)
+    if notes is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return notes
+
+
+@app.post("/api/cases/{case_id}/notes")
+def add_note(conn: Conn, case_id: str, body: NoteInput) -> CaseNote:
+    note = cases.add_note(conn, case_id, body)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return note
+
+
+@app.delete("/api/cases/{case_id}/notes/{note_id}")
+def delete_note(conn: Conn, case_id: str, note_id: str) -> dict[str, bool]:
+    if not cases.delete_note(conn, case_id, note_id):
+        raise HTTPException(status_code=404, detail="Note not found")
+    return {"ok": True}
 
 
 @app.post("/api/cases/{case_id}/pitch")
