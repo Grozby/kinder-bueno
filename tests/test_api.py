@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import onehot
-from navigator.api import app, get_conn, get_embed, get_expand, get_explain, get_seeds
+from navigator.api import ChatSessions, app, get_conn, get_embed, get_expand, get_explain, get_seeds, get_sessions
 from navigator.expand import Expansion
 
 
@@ -24,6 +24,8 @@ def client(test_conn, graph):
     app.dependency_overrides[get_expand] = lambda: lambda q: Expansion()  # expansion failed / disabled
     app.dependency_overrides[get_explain] = lambda: lambda q, results: {}  # explanations failed: template
     app.dependency_overrides[get_seeds] = lambda: {"artorg": "https://artorg.example/"}  # dcb is not validated
+    sessions = ChatSessions()  # fresh chat state per test
+    app.dependency_overrides[get_sessions] = lambda: sessions
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -174,3 +176,62 @@ def test_seeds_from_sources_yaml():
     seeds = get_seeds()
     assert {"artorg", "dcb", "unibe"} <= seeds.keys()
     assert seeds["artorg"] == "https://www.artorg.unibe.ch/research/index_eng.html"
+
+
+def chat(client, message, session_id="case-1", **kwargs):
+    return client.post("/api/chat", json={"session_id": session_id, "message": message, **kwargs})
+
+
+def test_chat_shape_matches_search(client, graph):
+    body = chat(client, "glucose").json()
+    assert set(body) == {"reply", "results", "filters", "expansion", "no_result"}
+    assert body["filters"] == {"source": None, "type": None}
+    search = client.get("/api/search", params={"q": "glucose"}).json()
+    assert body["results"] == search["results"]
+    assert body["reply"] == f"Showing {len(search['results'])} results for 'glucose'."
+    assert body["no_result"] is False
+
+
+def test_chat_filters_are_applied_and_kept(client, graph):
+    body = chat(client, "glucose", filters={"source": "dcb", "type": None}).json()
+    assert [r["name"] for r in body["results"]] == ["Bob Beispiel"]
+    assert body["filters"] == {"source": "dcb", "type": None}
+    assert body["reply"] == "Showing 1 results for 'glucose' (source: dcb)."
+    # A next message without filters keeps the session's filters
+    body = chat(client, "insulin").json()
+    assert body["filters"] == {"source": "dcb", "type": None}
+    assert {r["name"] for r in body["results"]} <= {"Bob Beispiel"}
+
+
+def test_chat_filter_only_message_reruns_last_query(client, graph):
+    chat(client, "insulin")
+    body = chat(client, "  ", filters={"source": None, "type": "unit"}).json()
+    assert {r["name"] for r in body["results"]} == {"Diabetes Lab", "ARTORG Center"}
+    assert body["reply"] == "Showing 2 results for 'insulin' (type: unit)."
+
+
+def test_chat_sessions_are_separate(client, graph):
+    chat(client, "insulin", session_id="case-1")
+    response = chat(client, "", session_id="case-2", filters={"source": None, "type": "unit"})
+    assert response.status_code == 422  # unknown session starts empty: nothing to re-run
+    assert response.json() == {"detail": "Type a search first"}
+
+
+def test_chat_no_result(client):
+    body = chat(client, "zebrafish").json()
+    assert body["results"] == [] and body["no_result"] is True
+    assert body["reply"] == "Showing 0 results for 'zebrafish'."
+
+
+def test_chat_rejects_unknown_type(client):
+    assert chat(client, "glucose", filters={"source": None, "type": "robot"}).status_code == 422
+
+
+def test_chat_sessions_drop_the_oldest():
+    sessions = ChatSessions(size=2)
+    sessions.get("a").query = "glucose"
+    sessions.get("b")
+    sessions.get("a")  # a is used again: b is now the oldest
+    sessions.get("c")
+    assert sessions.get("a").query == "glucose"
+    assert sessions.get("b").query is None  # dropped, starts empty

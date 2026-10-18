@@ -48,7 +48,15 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 
 ## Chat and feedback (section 8.9)
 
-- `POST /api/chat` with `{session_id, message}`; the frontend reads `reply`, `results`, `no_result`.
+- `POST /api/chat` with `{session_id, message, filters?}`; the frontend reads `reply`, `results`, `no_result`.
+  - Served since #50 as a plain chat, without the LangGraph agent of plan 8.10: each message is a new
+    search through the same pipeline as `GET /api/search`. "More like #2" or "who works with her?" are
+    searched as plain text.
+  - `filters` replaces the session's filters; without it, the session keeps the last ones. A blank
+    `message` with `filters` re-runs the last query (`422` if the session has none yet).
+  - `reply` is a template: `"Showing <n> results for '<query>' (source: dcb, type: person)."`.
+    The response also has `filters` (the ones the server used) and `expansion`.
+  - Sessions live in the API's memory: they are lost when the API restarts.
 - `POST /api/feedback` with `{session_id, query, entity_id, claim_id?, rating, comment?}`.
   `query` is the company name.
   - `rating` is `"up"` or `"down"` for the 👍/👎 buttons on a reference.
