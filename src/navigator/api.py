@@ -1,6 +1,7 @@
 """HTTP API (plan 8.9). Run with `navigator serve`."""
 
 import logging
+import secrets
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -9,7 +10,7 @@ import anyio
 import numpy as np
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from navigator import chunks_db
 from navigator.expand import Expansion as TermExpansion
@@ -44,6 +45,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Research & Expertise Navigator", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def require_token(request: Request, call_next: Callable) -> Response:
+    """Shared bearer token for /api when API_TOKEN is set (sharing the server on the LAN)."""
+    token = get_settings().api_token
+    if token and request.url.path.startswith("/api"):
+        given = request.headers.get("authorization", "").removeprefix("Bearer ")
+        if not secrets.compare_digest(given.encode(), token.encode()):
+            return JSONResponse(status_code=401, content={"detail": "Invalid or missing token"})
+    return await call_next(request)
 
 
 def get_conn() -> Iterator[psycopg.Connection]:

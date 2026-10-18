@@ -51,6 +51,16 @@ uv run navigator eval --no-expand # without query expansion (no gateway needed)
 Prints the plan 10.2 metrics (recall@10, phrasing overlap, traceability, field fill, coverage, drop rate)
 and saves them to `eval/report.md`. Re-run it after every change to extraction, resolve or ranking.
 
+## Sharing the backend with a teammate
+
+```bash
+echo "API_TOKEN=$(openssl rand -hex 24)" >> .env
+uv run navigator serve --host 0.0.0.0
+```
+
+The teammate runs only the frontend: `BACKEND_URL=http://<host-ip>:8000 BACKEND_TOKEN=<token> npm run dev`.
+Details and caveats in [`docs/SHARED_SERVER.md`](docs/SHARED_SERVER.md).
+
 ## Tests
 
 ```bash
