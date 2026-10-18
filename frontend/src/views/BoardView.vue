@@ -70,7 +70,7 @@ async function reject(id: string, el?: HTMLElement | null) {
 function rejectFromDrawer() {
   const id = openId.value
   openId.value = null
-  // Let the drawer slide away first, so the bear can see the card
+  // Let the pop-up close first, so the bear can see the card
   if (id) setTimeout(() => reject(id), 250)
 }
 

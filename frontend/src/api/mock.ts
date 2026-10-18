@@ -47,32 +47,32 @@ const CRITERIA = [
 const REFERENCE_POOL: Array<[EntityType, string, string, string]> = [
   ['unit', 'Muster Lab for Surgical Robotics', 'ARTORG Center', 'artorg'],
   ['person', 'Prof. Dr. Anna Muster', 'ARTORG Center', 'artorg'],
-  ['project', 'Smart Insulin Patch (demo)', 'Diabetes Center Berne', 'dcb'],
+  ['project', 'Smart Insulin Patch', 'Diabetes Center Berne', 'dcb'],
   ['infrastructure', 'Cleanroom & Prototyping Platform', 'University of Bern', 'unibe'],
   ['person', 'Dr. Luca Beispiel', 'Diabetes Center Berne', 'dcb'],
   ['unit', 'Institute for Muster Imaging', 'University of Bern', 'unibe'],
-  ['project', 'Closed-Loop Glucose Control (demo)', 'Diabetes Center Berne', 'dcb'],
+  ['project', 'Closed-Loop Glucose Control', 'Diabetes Center Berne', 'dcb'],
   ['person', 'PD Dr. Sara Exempel', 'University of Bern', 'unibe'],
   ['infrastructure', 'Biomechanics Testing Facility', 'ARTORG Center', 'artorg'],
   ['unit', 'Muster Group for Cardiovascular Engineering', 'ARTORG Center', 'artorg'],
   ['person', 'Dr. Jonas Platzhalter', 'ARTORG Center', 'artorg'],
-  ['project', 'AI Nutrition Coach (demo)', 'Diabetes Center Berne', 'dcb'],
+  ['project', 'AI Nutrition Coach', 'Diabetes Center Berne', 'dcb'],
   ['unit', 'Department for Muster Medicine', 'University of Bern', 'unibe'],
   ['person', 'Prof. Dr. Mia Vorlage', 'University of Bern', 'unibe'],
   ['infrastructure', 'Translational Imaging Center', 'University of Bern', 'unibe'],
-  ['project', 'Wearable Sensor Validation (demo)', 'ARTORG Center', 'artorg'],
+  ['project', 'Wearable Sensor Validation', 'ARTORG Center', 'artorg'],
   ['person', 'Dr. Noah Muster', 'Diabetes Center Berne', 'dcb'],
-  ['unit', 'Innovation Office (demo)', 'University of Bern', 'unibe'],
-  ['project', 'Gait Analysis Platform (demo)', 'ARTORG Center', 'artorg'],
+  ['unit', 'Innovation Office', 'University of Bern', 'unibe'],
+  ['project', 'Gait Analysis Platform', 'ARTORG Center', 'artorg'],
   ['person', 'Dr. Lea Beispiel', 'University of Bern', 'unibe'],
-  ['infrastructure', 'Clinical Trials Unit (demo)', 'University of Bern', 'unibe'],
+  ['infrastructure', 'Clinical Trials Unit', 'University of Bern', 'unibe'],
   ['unit', 'Muster Lab for Hearing Research', 'ARTORG Center', 'artorg'],
   ['person', 'Prof. Dr. Tim Exempel', 'ARTORG Center', 'artorg'],
-  ['project', 'Digital Twin of the Heart (demo)', 'ARTORG Center', 'artorg'],
-  ['unit', 'Startup Accelerator (demo)', 'Diabetes Center Berne', 'dcb'],
+  ['project', 'Digital Twin of the Heart', 'ARTORG Center', 'artorg'],
+  ['unit', 'Startup Accelerator', 'Diabetes Center Berne', 'dcb'],
   ['person', 'Dr. Eva Platzhalter', 'Diabetes Center Berne', 'dcb'],
-  ['infrastructure', 'Biobank (demo)', 'University of Bern', 'unibe'],
-  ['project', 'Robotic Cochlear Implantation (demo)', 'ARTORG Center', 'artorg'],
+  ['infrastructure', 'Biobank', 'University of Bern', 'unibe'],
+  ['project', 'Robotic Cochlear Implantation', 'ARTORG Center', 'artorg'],
   ['unit', 'Center for Muster Data Science', 'University of Bern', 'unibe'],
   ['person', 'Dr. Ben Vorlage', 'University of Bern', 'unibe'],
 ]
@@ -97,7 +97,7 @@ function toResult(i: number, why: string, score: number): Result {
     entity_id: i + 1,
     type,
     name,
-    role: type === 'person' ? ['Researcher (demo)'] : [],
+    role: type === 'person' ? ['Researcher'] : [],
     contact: [],
     affiliations: [affiliation],
     expertise: [topics[i % topics.length]!, topics[(i + 1) % topics.length]!],
@@ -124,13 +124,46 @@ function companyFromFile(fileName: string): string {
   return base.replace(/\b\w/g, (c) => c.toUpperCase()) || 'Unnamed company'
 }
 
+// [strong, partial, weak] rationale per criterion
+const RATIONALES: Record<string, [string, string, string]> = {
+  'Research fit': [
+    'Several Bern research groups work on the core technology.',
+    'Some groups work on related topics, few on the core technology.',
+    'Little research in Bern on the core technology.',
+  ],
+  'Talent pool': [
+    'Universities train many graduates in the required fields.',
+    'Graduates are available, but in neighbouring fields.',
+    'Few local graduates with the required profile.',
+  ],
+  'Infrastructure & labs': [
+    'Labs and platforms the company needs are open to industry partners.',
+    'Some shared infrastructure fits; specialised equipment is missing.',
+    'The required infrastructure is not available in Bern.',
+  ],
+  'Industry network': [
+    'Strong cluster of companies and hospitals in the same field.',
+    'A few potential partners and pilot customers.',
+    'Hardly any companies in the same field.',
+  ],
+  'Market access': [
+    'Direct access to clinical partners and the Swiss market.',
+    'Market access is possible through partners.',
+    'The main market is far from Bern.',
+  ],
+}
+
 function analyse(c: Case): Case {
   const rand = rng(hash(c.file_name))
-  const breakdown = CRITERIA.map((criterion) => ({
-    criterion,
-    score: Math.round(15 + rand() * 85),
-    rationale: `Placeholder rationale for "${criterion}" from the mock backend.`,
-  }))
+  const breakdown = CRITERIA.map((criterion) => {
+    const score = Math.round(15 + rand() * 85)
+    const [strong, partial, weak] = RATIONALES[criterion]!
+    return {
+      criterion,
+      score,
+      rationale: score >= 70 ? strong : score >= 45 ? partial : weak,
+    }
+  })
   const score = Math.round(breakdown.reduce((sum, b) => sum + b.score, 0) / breakdown.length)
   const industry = INDUSTRIES[Math.floor(rand() * INDUSTRIES.length)] ?? 'MedTech'
   return {
@@ -140,9 +173,9 @@ function analyse(c: Case): Case {
     score,
     score_breakdown: breakdown,
     summary:
-      `${c.company_name} is a ${industry.toLowerCase()} company. ` +
-      `This is a mock summary: the real backend reads the business model PDF and explains ` +
-      `what the company does, what it needs from a location, and how Canton Bern matches it.`,
+      `${c.company_name} is a ${industry.toLowerCase()} company looking for a location in ` +
+      `Switzerland. It needs access to applied research, qualified engineers and clinical ` +
+      `partners to bring its products to market.`,
   }
 }
 
@@ -287,7 +320,7 @@ export const mockBackend = {
     await wait(400)
     const c = readCase(id)
     const rand = rng(hash(c.file_name) ^ 0x9e3779b9)
-    const why = `Placeholder: matches the ${c.industry ?? 'company'} focus of ${c.company_name}.`
+    const why = `Works on topics close to the ${c.industry ?? 'company'} focus of ${c.company_name}.`
     return REFERENCE_POOL.map((_, i) => toResult(i, why, rand()))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
@@ -303,8 +336,6 @@ export const mockBackend = {
         `Canton Bern is a strong home for ${c.industry?.toLowerCase() ?? 'your'} companies. ` +
         `Based on your business model, these partners could support you from day one:\n\n` +
         `${lines.join('\n')}\n\n` +
-        `(Mock pitch built from ${refs.length} selected references. The real backend writes this ` +
-        `with Apertus and only uses facts from the selected sources.)\n\n` +
         `We would be happy to introduce you.\nBern Economic Development Agency`,
       entity_ids: entityIds,
       generated_at: new Date().toISOString(),
@@ -315,7 +346,7 @@ export const mockBackend = {
   async chat(req: ChatRequest): Promise<ChatResponse> {
     await wait(900)
     const words = req.message.toLowerCase().match(/[a-zäöü]{4,}/g) ?? []
-    const all = REFERENCE_POOL.map((_, i) => toResult(i, `Matches "${req.message}" (demo).`, 0))
+    const all = REFERENCE_POOL.map((_, i) => toResult(i, `Matches "${req.message}".`, 0))
     const hits = all.filter((r) =>
       words.some((w) =>
         [r.name, ...r.affiliations, ...r.expertise].join(' ').toLowerCase().includes(w),

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// Case details as a centred pop-up: analysis and references on the left,
+// chat refinement and sales pitch on the right. Each column scrolls on its own.
 import {
   BadgeCheck,
   Building2,
@@ -23,7 +25,7 @@ import { computed, ref, watch, type Component } from 'vue'
 
 import type { Case, CaseStatus, EntityType, Rating } from '@/api'
 import { DEFAULT_REFERENCES, MAX_REFERENCES, useCasesStore } from '@/stores/cases'
-import { hostOf, scoreBand, timeAgo } from '@/utils/format'
+import { hostOf, timeAgo } from '@/utils/format'
 import CaseChat from './CaseChat.vue'
 import ScoreRing from './ScoreRing.vue'
 import BaseButton from './ui/BaseButton.vue'
@@ -113,53 +115,56 @@ async function copyPitch() {
   <BaseOverlay
     :open="item !== null"
     :title="item?.company_name"
-    width="640px"
+    side="center"
+    width="1200px"
+    height="88vh"
     @close="emit('close')"
   >
     <template #header>
       <div v-if="item" class="head">
-        <ScoreRing :score="item.score" :size="60" />
-        <div>
+        <ScoreRing :score="item.score" :size="56" />
+        <div class="head-text">
           <h2>{{ item.company_name }}</h2>
           <p class="meta">
             <span class="tag">{{ STATUS_LABEL[item.status] }}</span>
             <span v-if="item.industry" class="tag">{{ item.industry }}</span>
-            <span class="muted">Uploaded {{ timeAgo(item.uploaded_at) }}</span>
+            <span class="muted"
+              >{{ item.file_name }} · uploaded {{ timeAgo(item.uploaded_at) }}</span
+            >
           </p>
+        </div>
+        <div class="actions">
+          <BaseButton
+            v-if="item.status !== 'rejected'"
+            variant="danger"
+            :icon="X"
+            @click="emit('reject')"
+          >
+            Reject
+          </BaseButton>
+          <BaseButton v-else :icon="RotateCcw" @click="emit('move', 'new')">Restore</BaseButton>
+          <BaseButton
+            v-if="item.status === 'new'"
+            variant="primary"
+            :icon="Search"
+            :disabled="item.analysis_status === 'pending'"
+            @click="emit('move', 'in_review')"
+          >
+            Start review
+          </BaseButton>
+          <BaseButton
+            v-if="item.status === 'in_review'"
+            variant="primary"
+            :icon="BadgeCheck"
+            @click="emit('move', 'accepted')"
+          >
+            Accept
+          </BaseButton>
         </div>
       </div>
     </template>
 
-    <div v-if="item" class="body">
-      <div class="actions">
-        <BaseButton
-          v-if="item.status === 'new'"
-          variant="primary"
-          :icon="Search"
-          :disabled="item.analysis_status === 'pending'"
-          @click="emit('move', 'in_review')"
-        >
-          Start review
-        </BaseButton>
-        <BaseButton
-          v-if="item.status === 'in_review'"
-          variant="primary"
-          :icon="BadgeCheck"
-          @click="emit('move', 'accepted')"
-        >
-          Accept
-        </BaseButton>
-        <BaseButton
-          v-if="item.status !== 'rejected'"
-          variant="danger"
-          :icon="X"
-          @click="emit('reject')"
-        >
-          Reject
-        </BaseButton>
-        <BaseButton v-else :icon="RotateCcw" @click="emit('move', 'new')">Restore</BaseButton>
-      </div>
-
+    <template v-if="item">
       <p v-if="item.analysis_status === 'pending'" class="notice">
         <LoaderCircle class="spin" :size="16" /> The business model is being analysed.
       </p>
@@ -167,150 +172,153 @@ async function copyPitch() {
         <TriangleAlert :size="16" /> The analysis failed. Please upload the PDF again.
       </p>
 
-      <template v-else>
-        <section>
-          <h3 class="section-label">Summary</h3>
-          <p class="summary">{{ item.summary }}</p>
-        </section>
+      <div v-else class="layout">
+        <div class="col col-main">
+          <section>
+            <h3 class="section-label">Summary</h3>
+            <p class="summary">{{ item.summary }}</p>
+          </section>
 
-        <section>
-          <h3 class="section-label">Score breakdown</h3>
-          <ul class="breakdown">
-            <li v-for="b in item.score_breakdown" :key="b.criterion">
-              <div class="row">
-                <span>{{ b.criterion }}</span>
-                <strong :class="`score-${scoreBand(b.score)}`">{{ b.score }}</strong>
-              </div>
-              <div class="meter">
-                <span :class="`fill-${scoreBand(b.score)}`" :style="{ width: `${b.score}%` }" />
-              </div>
-              <p class="rationale">{{ b.rationale }}</p>
-            </li>
-          </ul>
-        </section>
+          <section>
+            <h3 class="section-label">Score breakdown</h3>
+            <ul class="criteria">
+              <li v-for="b in item.score_breakdown" :key="b.criterion" :title="b.rationale">
+                <ScoreRing :score="b.score" :size="68" />
+                <strong>{{ b.criterion }}</strong>
+                <span class="rationale">{{ b.rationale }}</span>
+              </li>
+            </ul>
+          </section>
 
-        <section>
-          <div class="section-head">
-            <h3 class="section-label">References</h3>
-            <span class="muted small">{{ selectedIds.size }} selected for the pitch</span>
-          </div>
-          <p v-if="refsLoading" class="notice">
-            <LoaderCircle class="spin" :size="16" /> Loading references…
-          </p>
-          <p v-else-if="refsError" class="notice score-bad">{{ refsError }}</p>
-          <ul v-else class="refs">
-            <li
-              v-for="r in visibleRefs"
-              :key="r.entity_id"
-              class="ref"
-              :class="{ on: selectedIds.has(r.entity_id) }"
-            >
-              <label>
-                <input
-                  type="checkbox"
-                  :checked="selectedIds.has(r.entity_id)"
-                  @change="store.toggleReference(item.id, r.entity_id)"
-                />
-                <span class="rank">{{ refs.indexOf(r) + 1 }}</span>
-                <span class="ref-main">
-                  <span class="ref-title">
-                    <component :is="TYPE_ICON[r.type]" :size="15" class="type-icon" />
-                    <strong>{{ r.name }}</strong>
-                  </span>
-                  <span v-if="r.affiliations.length" class="affiliation">
-                    {{ r.affiliations.join(', ') }}
-                  </span>
-                  <span class="why">{{ r.why }}</span>
-                  <span v-if="r.expertise.length" class="expertise">
-                    <span v-for="x in r.expertise.slice(0, 3)" :key="x" class="tag">{{ x }}</span>
-                  </span>
-                </span>
-              </label>
-              <div class="ref-foot">
-                <div class="links">
-                  <a v-for="u in r.sources" :key="u" :href="u" target="_blank" rel="noopener">
-                    {{ hostOf(u) }} <ExternalLink :size="12" />
-                  </a>
-                </div>
-                <div class="rating" role="group" aria-label="Rate this reference">
-                  <button
-                    :class="{ on: ratings[r.entity_id] === 'up' }"
-                    :disabled="!!ratings[r.entity_id]"
-                    title="Good reference"
-                    @click="rate(r.entity_id, 'up')"
-                  >
-                    <ThumbsUp :size="14" />
-                  </button>
-                  <button
-                    :class="{ on: ratings[r.entity_id] === 'down' }"
-                    :disabled="!!ratings[r.entity_id]"
-                    title="Bad reference"
-                    @click="rate(r.entity_id, 'down')"
-                  >
-                    <ThumbsDown :size="14" />
-                  </button>
-                </div>
-              </div>
-            </li>
-          </ul>
-          <button v-if="refs.length > DEFAULT_REFERENCES" class="more" @click="showAll = !showAll">
-            <template v-if="showAll"
-              >Show top {{ DEFAULT_REFERENCES }} only <ChevronUp :size="15"
-            /></template>
-            <template v-else>
-              Show all {{ Math.min(refs.length, MAX_REFERENCES) }} references
-              <ChevronDown :size="15" />
-            </template>
-          </button>
-        </section>
-
-        <section>
-          <h3 class="section-label">Refine with chat</h3>
-          <CaseChat :case-id="item.id" />
-        </section>
-
-        <section>
-          <div class="section-head">
-            <h3 class="section-label">Sales pitch</h3>
-            <BaseButton
-              v-if="item.status === 'accepted'"
-              variant="primary"
-              size="sm"
-              :icon="Sparkles"
-              :loading="pitchLoading"
-              :disabled="selectedIds.size === 0"
-              @click="generate"
-            >
-              {{ pitch ? 'Regenerate' : 'Generate pitch' }}
-            </BaseButton>
-          </div>
-          <p v-if="item.status !== 'accepted'" class="muted">
-            Accept this company to generate a pitch from the selected references.
-          </p>
-          <p v-else-if="pitchError" class="notice score-bad">{{ pitchError }}</p>
-          <div v-else-if="pitch" class="pitch">
-            <div class="pitch-bar">
-              <span class="muted small">
-                Built from {{ pitch.entity_ids.length }} references ·
-                {{ timeAgo(pitch.generated_at) }}
-              </span>
-              <BaseButton
-                size="sm"
-                variant="ghost"
-                :icon="copied ? Check : Copy"
-                @click="copyPitch"
+          <section>
+            <div class="section-head">
+              <h3 class="section-label">References</h3>
+              <span class="muted small">{{ selectedIds.size }} selected for the pitch</span>
+            </div>
+            <p v-if="refsLoading" class="notice">
+              <LoaderCircle class="spin" :size="16" /> Loading references…
+            </p>
+            <p v-else-if="refsError" class="notice score-bad">{{ refsError }}</p>
+            <ul v-else class="refs">
+              <li
+                v-for="r in visibleRefs"
+                :key="r.entity_id"
+                class="ref"
+                :class="{ on: selectedIds.has(r.entity_id) }"
               >
-                {{ copied ? 'Copied' : 'Copy' }}
+                <label :title="r.why">
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.has(r.entity_id)"
+                    @change="store.toggleReference(item.id, r.entity_id)"
+                  />
+                  <span class="rank">{{ refs.indexOf(r) + 1 }}</span>
+                  <component :is="TYPE_ICON[r.type]" :size="15" class="type-icon" />
+                  <span class="ref-text">
+                    <span class="ref-line">
+                      <strong>{{ r.name }}</strong>
+                      <span v-if="r.affiliations.length" class="muted">
+                        · {{ r.affiliations.join(', ') }}
+                      </span>
+                    </span>
+                    <span class="why">{{ r.why }}</span>
+                  </span>
+                </label>
+                <a
+                  v-if="r.sources[0]"
+                  :href="r.sources[0]"
+                  target="_blank"
+                  rel="noopener"
+                  class="icon-btn"
+                  :title="`Source: ${hostOf(r.sources[0])}`"
+                >
+                  <ExternalLink :size="14" />
+                </a>
+                <button
+                  class="icon-btn"
+                  :class="{ on: ratings[r.entity_id] === 'up' }"
+                  :disabled="!!ratings[r.entity_id]"
+                  title="Good reference"
+                  @click="rate(r.entity_id, 'up')"
+                >
+                  <ThumbsUp :size="14" />
+                </button>
+                <button
+                  class="icon-btn"
+                  :class="{ on: ratings[r.entity_id] === 'down' }"
+                  :disabled="!!ratings[r.entity_id]"
+                  title="Bad reference"
+                  @click="rate(r.entity_id, 'down')"
+                >
+                  <ThumbsDown :size="14" />
+                </button>
+              </li>
+            </ul>
+            <button
+              v-if="refs.length > DEFAULT_REFERENCES"
+              class="more"
+              @click="showAll = !showAll"
+            >
+              <template v-if="showAll">
+                Show top {{ DEFAULT_REFERENCES }} only <ChevronUp :size="15" />
+              </template>
+              <template v-else>
+                Show all {{ Math.min(refs.length, MAX_REFERENCES) }} references
+                <ChevronDown :size="15" />
+              </template>
+            </button>
+          </section>
+        </div>
+
+        <div class="col col-side">
+          <section>
+            <h3 class="section-label">Refine with chat</h3>
+            <CaseChat :case-id="item.id" />
+          </section>
+
+          <section>
+            <div class="section-head">
+              <h3 class="section-label">Sales pitch</h3>
+              <BaseButton
+                v-if="item.status === 'accepted'"
+                variant="primary"
+                size="sm"
+                :icon="Sparkles"
+                :loading="pitchLoading"
+                :disabled="selectedIds.size === 0"
+                @click="generate"
+              >
+                {{ pitch ? 'Regenerate' : 'Generate pitch' }}
               </BaseButton>
             </div>
-            <p class="pitch-text">{{ pitch.text }}</p>
-          </div>
-          <p v-else class="muted">
-            Select the references you want above, then generate. Only selected references are used.
-          </p>
-        </section>
-      </template>
-    </div>
+            <p v-if="item.status !== 'accepted'" class="muted small">
+              Accept this company to generate a pitch from the selected references.
+            </p>
+            <p v-else-if="pitchError" class="notice score-bad">{{ pitchError }}</p>
+            <div v-else-if="pitch" class="pitch">
+              <div class="pitch-bar">
+                <span class="muted small">
+                  Built from {{ pitch.entity_ids.length }} references ·
+                  {{ timeAgo(pitch.generated_at) }}
+                </span>
+                <BaseButton
+                  size="sm"
+                  variant="ghost"
+                  :icon="copied ? Check : Copy"
+                  @click="copyPitch"
+                >
+                  {{ copied ? 'Copied' : 'Copy' }}
+                </BaseButton>
+              </div>
+              <p class="pitch-text">{{ pitch.text }}</p>
+            </div>
+            <p v-else class="muted small">
+              Select the references you want, then generate. Only selected references are used.
+            </p>
+          </section>
+        </div>
+      </div>
+    </template>
   </BaseOverlay>
 </template>
 
@@ -320,27 +328,27 @@ async function copyPitch() {
   gap: 1rem;
   align-items: center;
 }
+.head-text {
+  flex: 1;
+  min-width: 0;
+}
 .head h2 {
-  font-size: 22px;
+  font-size: 24px;
 }
 .meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 0.35rem;
+  margin-top: 0.3rem;
   font-size: 13px;
-}
-
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
 }
 .actions {
   display: flex;
   gap: 0.5rem;
+  margin-right: 0.5rem;
 }
+
 .notice {
   display: flex;
   align-items: center;
@@ -353,53 +361,68 @@ async function copyPitch() {
   font-size: 13px;
 }
 
+.layout {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 2rem;
+}
+.col {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding-right: 0.5rem;
+}
+.col-side {
+  padding-left: 2rem;
+  border-left: 1px solid var(--border);
+}
+
 section > .section-label {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
 .section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
 .summary {
   line-height: 1.65;
 }
 
-.breakdown {
+.criteria {
   list-style: none;
   padding: 0;
   display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 0.75rem;
 }
-.row {
+.criteria li {
   display: flex;
-  justify-content: space-between;
-}
-.meter {
-  height: 6px;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.9rem 0.6rem;
   background: var(--surface-alt);
-  border-radius: 3px;
-  margin: 0.35rem 0;
-  overflow: hidden;
+  border-radius: var(--radius);
+  text-align: center;
 }
-.meter span {
-  display: block;
-  height: 100%;
-}
-.fill-good {
-  background: var(--good);
-}
-.fill-mid {
-  background: var(--mid);
-}
-.fill-bad {
-  background: var(--bad);
+.criteria strong {
+  font-size: 13px;
+  line-height: 1.25;
 }
 .rationale {
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.35;
   color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .refs {
@@ -409,7 +432,10 @@ section > .section-label {
   border-radius: var(--radius);
 }
 .ref {
-  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.6rem 0.4rem 0.75rem;
   border-left: 3px solid transparent;
 }
 .ref + .ref {
@@ -420,112 +446,83 @@ section > .section-label {
   background: var(--surface-alt);
 }
 .ref label {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
+  align-items: center;
+  gap: 0.6rem;
   cursor: pointer;
 }
 .ref input {
   flex: none;
-  width: 17px;
-  height: 17px;
-  margin-top: 2px;
+  width: 16px;
+  height: 16px;
   accent-color: var(--bern-red);
   cursor: pointer;
 }
 .rank {
   flex: none;
-  width: 1.4rem;
+  width: 1.3rem;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-.ref-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.ref-title {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  text-align: right;
 }
 .type-icon {
   flex: none;
   color: var(--text-muted);
 }
-.affiliation {
-  font-size: 13px;
-  color: var(--text-muted);
+.ref-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ref-line,
+.why {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ref-line {
+  font-size: 14px;
 }
 .why {
-  font-size: 13px;
-  margin-top: 0.25rem;
+  font-size: 12px;
+  color: var(--text-muted);
 }
-.expertise {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.4rem;
-}
-.ref-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0.35rem 0 0 calc(17px + 1.4rem + 1.5rem);
-}
-.links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-.rating {
-  display: flex;
-  gap: 0.25rem;
-}
-.rating button {
+.icon-btn {
+  flex: none;
   display: grid;
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
 }
-.rating button:hover:not(:disabled) {
-  border-color: var(--text);
+.icon-btn:hover:not(:disabled) {
+  background: var(--surface);
   color: var(--text);
 }
-.rating button:disabled {
-  cursor: default;
-  opacity: 0.45;
+a.icon-btn:hover {
+  color: var(--bern-red);
 }
-.rating button.on {
+.icon-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.icon-btn.on {
   opacity: 1;
   background: var(--text);
-  border-color: var(--text);
   color: #fff;
-}
-.links a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 13px;
-  color: var(--bern-red);
-  text-decoration: none;
-}
-.links a:hover {
-  text-decoration: underline;
 }
 .more {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  margin-top: 0.75rem;
+  margin-top: 0.6rem;
   padding: 0;
   border: 0;
   background: none;
@@ -554,5 +551,25 @@ section > .section-label {
   padding: 1rem;
   white-space: pre-wrap;
   line-height: 1.65;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .col {
+    overflow: visible;
+    padding-right: 0;
+  }
+  .col-side {
+    padding: 1.75rem 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .head {
+    flex-wrap: wrap;
+  }
 }
 </style>

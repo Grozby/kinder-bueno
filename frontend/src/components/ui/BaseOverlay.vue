@@ -1,12 +1,19 @@
 <script setup lang="ts">
 // A panel over the page: slides in from the right (`side="right"`) or opens as a centred dialog.
 // Closes on Esc and on a backdrop click, and gives focus back to where it was on close.
+// With `height`, a centred dialog keeps that height and its content handles its own scrolling.
 import { X } from '@lucide/vue'
 import { nextTick, onBeforeUnmount, useTemplateRef, watch } from 'vue'
 
 const props = withDefaults(
-  defineProps<{ open: boolean; side?: 'right' | 'center'; title?: string; width?: string }>(),
-  { side: 'right', width: '600px' },
+  defineProps<{
+    open: boolean
+    side?: 'right' | 'center'
+    title?: string
+    width?: string
+    height?: string
+  }>(),
+  { side: 'right', width: '600px', height: undefined },
 )
 const emit = defineEmits<{ close: [] }>()
 
@@ -51,7 +58,8 @@ onBeforeUnmount(() => {
           aria-modal="true"
           :aria-label="title"
           tabindex="-1"
-          :style="{ '--panel-width': width }"
+          :class="{ fixed: height }"
+          :style="{ '--panel-width': width, '--panel-height': height }"
         >
           <header class="panel-head">
             <div class="panel-title">
@@ -99,6 +107,12 @@ onBeforeUnmount(() => {
 .side-right .panel {
   height: 100%;
   border-left: 1px solid var(--border);
+}
+.side-center .panel.fixed {
+  height: min(var(--panel-height), calc(100vh - 2rem));
+}
+.panel.fixed .panel-body {
+  overflow: hidden;
 }
 .side-center .panel {
   max-height: calc(100vh - 2rem);
