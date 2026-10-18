@@ -90,6 +90,9 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
 - *Why 8B and not 70B?* We measured both on the same 100 pages. 70B was slower (15 vs ~10 min) and not
   better: recall@10 43% vs 46%, judged precision 46% vs 63%. Every fact still has to pass the quote check, and
   switching is one setting (`EXTRACT_MODEL`).
+- *Why is recall 60% and not 80%?* Every gold expert is in the database; the misses are people ranked 11th to
+  40th behind their own lab, and one head whose member page is not crawled. A cross-encoder reranker adds 1 to
+  3 experts but takes 7–11 s per search on a CPU, so it is off; the next gain is crawling profile pages (#75).
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
   We report it as a signal, not as proof (judge agreement with the gold set: 73%).

@@ -902,6 +902,13 @@ Judged precision fell 63% → 48%, but judge gold agreement fell too (90% → 60
 
 Lab topics, #70, and gold set update, #60 (2026-10-18): `resolve` moves topic claims that the extractor credited to the umbrella ("ARTORG Center …", named only in the page title) on a lab's own pages to that lab (158 claims). The right labs now surface (AI in Health and Nutrition for glucose, Cardiovascular Engineering for cardio), which first lowered recall against the old gold set (59% → 46%) while judged precision rose (48% → 66%). The owner then confirmed three labs as gold entities (Cardiovascular Engineering, AI in Health and Nutrition, Artificial Intelligence in Medical Imaging) and replaced "implant materials" with "heart valve prostheses" (#60). Result: **recall@10 60%, lay-term 61%**, unit_topics fill 97%, traceability 100%, judged precision 60%, judge gold agreement 73%.
 
+Search tuning, #99 (2026-10-18), on the 9 gold queries (recall@10 60% before):
+- `BEST_CHUNKS` 1 / 2 / 3: **60%** / 52% / 54%. Kept at 1.
+- `MIN_SIM` does not change recall: it only decides "no reliable result". Best chunk similarity is 0.57–0.74 for the gold queries and 0.32–0.47 for 8 off-topic ones ("quantum cryptography", "tax law for startups", "opera singing", …). Raised 0.45 → **0.50**: "tax law for startups" (0.47) now gets no result instead of weak hits; a keyword hit still overrides (as for "volcano monitoring").
+- Cross-encoder rerank (`bge-reranker-v2-m3`) of the top N fused chunks before entity scoring, blended with the RRF score: 61–65% over N 20/30/50, blend 0.3–1.0, input 128/256/512 tokens (+1 to +3 gold entities; with 9 queries the best cell is partly noise). Latency per search: ~1.5 s on an M-series Mac, **6.7 s for 20 chunks and 10–11 s for 30** on the Docker CPU, against ~3–4 s for a whole search today. Not enabled.
+- Fairness cap by the lab member page (`listed_in`) instead of the first `member_of`: no change.
+- Remaining misses are people whose lab ranks but who sit at places 11–40 (Züger, Stettler, Mougiakakou, Eugster, Aebischer), and Stefan Weber, who appears only as "Dozent" on the Neuro Robotics page because his own chair's member page is not crawled (#75). The lever left is data (person profile pages, #75), not ranking constants.
+
 ### 10.3 Eval judge (`judge.py`) — [PoC]
 
 The gold set only gives recall. The eval judge gives a precision number without more human labels.
