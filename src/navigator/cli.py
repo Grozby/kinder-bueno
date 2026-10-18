@@ -62,5 +62,45 @@ def stats() -> None:
         typer.echo(f"{source_id:<10}{pages:>8}{chunks:>8}{entities:>10}{claims:>8}")
 
 
+@app.command()
+def embed(source: str | None = typer.Option(None, help="Source id. Default: all sources.")) -> None:
+    """Chunk pages, embed the chunks and replace the stored chunks of each source."""
+    import time
+
+    from navigator import chunks_db
+    from navigator.chunk import chunk_page
+    from navigator.embed import embed_documents
+
+    settings = get_settings()
+    sources = load_sources(settings.sources_file)
+    selected = [sources.get(source)] if source else sources.sources
+    with chunks_db.connect(settings.database_url) as conn:
+        for src in selected:
+            start = time.perf_counter()
+            rows = [
+                (page_id, i, text)
+                for page_id, title, page_text in chunks_db.pages(conn, src.id)
+                for i, text in enumerate(chunk_page(title, page_text))
+            ]
+            vectors = embed_documents([text for _, _, text in rows], show_progress=True)
+            chunks_db.replace_chunks(conn, src.id, [(*row, vec) for row, vec in zip(rows, vectors)])
+            typer.echo(f"{src.id}: stored {len(rows)} chunks in {time.perf_counter() - start:.1f}s")
+
+
+@app.command("search-chunks")
+def search_chunks(query: str, k: int = typer.Option(10, help="Number of chunks to show.")) -> None:
+    """Debug: show the top chunks for a query with page URL and score."""
+    from navigator import chunks_db
+    from navigator.search import search_chunks as run_search
+
+    settings = get_settings()
+    with chunks_db.connect(settings.database_url) as conn:
+        hits = run_search(conn, query)[:k]
+    for i, hit in enumerate(hits, start=1):
+        sim = f"{hit.similarity:.3f}" if hit.similarity is not None else "  -  "
+        snippet = " ".join(hit.text.split())[:120]
+        typer.echo(f"{i:>2}. rrf={hit.score:.4f} sim={sim} {hit.url}\n    {snippet}")
+
+
 if __name__ == "__main__":
     app()
