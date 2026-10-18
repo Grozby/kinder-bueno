@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from navigator import ingest
-from navigator.api import app, get_conn, get_ingest, get_seeds
+from navigator.api import app, get_conn, get_ingest, get_ingest_slot, get_seeds
 from navigator.crawl import CrawledPage
 from navigator.ingest import SourceError, add_source, check_url, run_ingest, source_config, source_id_for
 
@@ -15,21 +15,29 @@ TEXT = "Dr. Jane Doe leads the Sensor Lab and works on glucose sensors. " * 3
 
 @pytest.fixture
 def public_dns(monkeypatch):
-    """Every host resolves to a public address, except *.intranet.test."""
+    """Every *.test host resolves to a public address, except *.intranet.test. Other hosts resolve for real:
+    the ingest slot opens a connection to the test database."""
+    real = socket.getaddrinfo
+
     def fake(host, port, *args, **kwargs):
+        if not str(host).endswith(".test"):
+            return real(host, port, *args, **kwargs)
         ip = "10.0.0.5" if host.endswith("intranet.test") else "130.92.1.1"
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))]
     monkeypatch.setattr(socket, "getaddrinfo", fake)
 
 
 @pytest.fixture
-def slot():
-    """The ingest slot is free before and after each test."""
-    assert ingest.try_start()
-    ingest.finish()
-    yield
-    assert ingest.try_start(), "a test left the ingest slot taken"
-    ingest.finish()
+def slot(test_database_url):
+    """The ingest slot is free before and after each test; yields a function that takes it."""
+    def take():
+        taken = ingest.try_start(test_database_url)
+        assert taken is not None, "the ingest slot is taken"
+        return taken
+
+    ingest.finish(take())
+    yield take
+    ingest.finish(take())
 
 
 @pytest.mark.parametrize(("host", "taken", "expected"), [
@@ -132,8 +140,7 @@ def _ingest(test_conn, test_database_url, url="https://lab.test/"):
                                    "max_depth": 2}), url),
     )
     test_conn.commit()
-    assert ingest.try_start()
-    run_ingest(test_database_url, "lab")
+    run_ingest(ingest.try_start(test_database_url), "lab")
     return test_conn.execute("SELECT status, stage, error FROM source WHERE id = 'lab'").fetchone()
 
 
@@ -177,11 +184,12 @@ def test_judge_error_still_ready(test_conn, test_database_url, monkeypatch, slot
 # --- routes ---
 
 @pytest.fixture
-def client(test_conn, public_dns, slot):
+def client(test_conn, test_database_url, public_dns, slot):
     started = []
     app.dependency_overrides[get_conn] = lambda: test_conn
     app.dependency_overrides[get_seeds] = lambda: {}
-    app.dependency_overrides[get_ingest] = lambda: lambda source_id: (started.append(source_id), ingest.finish())
+    app.dependency_overrides[get_ingest_slot] = lambda: lambda: ingest.try_start(test_database_url)
+    app.dependency_overrides[get_ingest] = lambda: lambda taken, source_id: (started.append(source_id), ingest.finish(taken))
     yield TestClient(app), started
     app.dependency_overrides.clear()
 
@@ -208,15 +216,23 @@ def test_post_source_rejects_bad_urls_and_frees_the_slot(client):
     assert started == []
 
 
-def test_post_source_while_an_ingest_runs_is_409(client):
+def test_post_source_while_an_ingest_runs_is_409(client, slot):
     http, started = client
-    assert ingest.try_start()
+    running = slot()  # held on its own connection, as by another API worker
     try:
         res = http.post("/api/sources", json={"url": "https://lab.test/"})
         assert res.status_code == 409
     finally:
-        ingest.finish()
+        ingest.finish(running)
     assert started == []
+
+
+def test_slot_is_one_per_database_and_freed_when_its_connection_closes(test_database_url, slot):
+    first = slot()
+    assert ingest.try_start(test_database_url) is None  # any other connection: another worker or replica
+    first.close()  # the worker died: Postgres ends the session and frees the lock
+    second = slot()
+    ingest.finish(second)
 
 
 # --- re-crawl (#80) ---
@@ -241,8 +257,7 @@ def test_failed_recrawl_keeps_the_previous_data(test_conn, test_database_url, mo
     )
     _old_page(test_conn)
     _fake_pipeline(monkeypatch, [CrawledPage("https://lab.test/", "Lab", TEXT)], fail_at=fail_at)
-    assert ingest.try_start()
-    run_ingest(test_database_url, "lab")
+    run_ingest(slot(), "lab")
     status, error = test_conn.execute("SELECT status, error FROM source WHERE id = 'lab'").fetchone()
     assert status == "failed" and error.startswith(fail_at.split("_")[0])
     assert test_conn.execute("SELECT url FROM page WHERE source_id = 'lab'").fetchall() == [("https://lab.test/old",)]
@@ -271,8 +286,7 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
     assert ingest.start_recrawl(test_conn, sources, "artorg")
     test_conn.commit()
     assert test_conn.execute("SELECT status, stage FROM source WHERE id = 'artorg'").fetchone() == ("crawling", "crawl")
-    assert ingest.try_start()
-    run_ingest(test_database_url, "artorg")
+    run_ingest(slot(), "artorg")
     assert seen == {"exclude": [r"/team$"], "depth": sources.defaults.max_depth, "seeds": sources.get("artorg").seeds}
     assert test_conn.execute("SELECT status FROM source WHERE id = 'artorg'").fetchone() == ("ready",)
     # A page matching the stored exclude pattern (here: a seed-like page the fake crawler returned) is blocked
@@ -289,17 +303,17 @@ def test_start_recrawl_unknown_source(test_conn):
     assert not ingest.start_recrawl(test_conn, sources, "gone")
 
 
-def test_recrawl_route(client, test_conn):
+def test_recrawl_route(client, test_conn, test_database_url):
     http, started = client
     test_conn.execute("INSERT INTO source (id, name) VALUES ('artorg', 'ARTORG')")
     res = http.post("/api/sources/artorg/crawl")
     assert res.status_code == 200 and (res.json()["status"], res.json()["stage"]) == ("crawling", "crawl")
     assert started == ["artorg"]
     assert http.post("/api/sources/nope/crawl").status_code == 404
-    assert ingest.try_start()
+    running = ingest.try_start(test_database_url)
     try:
         assert http.post("/api/sources/artorg/crawl").status_code == 409
     finally:
-        ingest.finish()
+        ingest.finish(running)
     assert started == ["artorg"]
 

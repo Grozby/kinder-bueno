@@ -134,8 +134,10 @@ How to add a source is in the [README](../README.md#add-a-new-source).
 
 ## Limits of this version
 
-- One API process: chats and the background ingest are kept in its memory. Don't scale it to several workers or
-  replicas (#103).
+- Chats and the one-ingest-at-a-time slot are kept in Postgres (#103), so the API may run several workers
+  (`navigator serve --workers N`) or replicas on the same database. Each worker loads the models (~3 GB of
+  RAM). A case analysis or ingest still runs in the worker that started it: if that worker stops, the
+  source shows "interrupted" on the next ingest; a case analysis stays "pending" until it is uploaded again.
 - The chat in a case runs a new search for each message; it does not resolve "#1" or "more like" yet (#97).
 - Uploaded business models are company data. How they are stored is described under
   [Data protection](../README.md#data-protection).

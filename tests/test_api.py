@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from conftest import onehot
 from navigator.api import (
-    ChatSessions, app, get_conn, get_embed, get_expand, get_explain, get_page_rules, get_seeds, get_sessions,
+    app, get_conn, get_embed, get_expand, get_explain, get_page_rules, get_seeds,
 )
 from navigator.expand import Expansion
 from navigator.pages import SourceRules, guess_kind
@@ -28,8 +28,6 @@ def client(test_conn, graph):
     app.dependency_overrides[get_explain] = lambda: lambda q, results: {}  # explanations failed: template
     app.dependency_overrides[get_seeds] = lambda: {"artorg": "https://artorg.example/"}  # dcb is not validated
     app.dependency_overrides[get_page_rules] = lambda: {"artorg": SourceRules(exclude=[r"/alice$"], priority=[r"/lab"])}
-    sessions = ChatSessions()  # fresh chat state per test
-    app.dependency_overrides[get_sessions] = lambda: sessions
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -308,11 +306,16 @@ def test_chat_rejects_unknown_type(client):
     assert chat(client, "glucose", filters={"source": None, "type": "robot"}).status_code == 422
 
 
-def test_chat_sessions_drop_the_oldest():
-    sessions = ChatSessions(size=2)
-    sessions.get("a").query = "glucose"
-    sessions.get("b")
-    sessions.get("a")  # a is used again: b is now the oldest
-    sessions.get("c")
-    assert sessions.get("a").query == "glucose"
-    assert sessions.get("b").query is None  # dropped, starts empty
+def test_standalone_chat_is_stored_and_old_sessions_are_dropped(client, test_conn, graph):
+    """#103: the session lives in chat_turn, so another worker (here: the same app) continues it."""
+    chat(client, "insulin", session_id="search-1")
+    body = chat(client, "", session_id="search-1", filters={"source": None, "type": "unit"}).json()
+    assert body["reply"] == "Showing 2 results for 'insulin' (type: unit)."
+    test_conn.execute("UPDATE chat_turn SET created_at = now() - interval '31 days'")
+    chat(client, "glucose", session_id="search-2")  # a standalone turn prunes standalone turns past 30 days
+    chat(client, "glucose", session_id="case-1")
+    sessions = [r[0] for r in test_conn.execute("SELECT session_id FROM chat_turn ORDER BY id")]
+    assert sessions == ["search-2", "case-1"]
+    test_conn.execute("UPDATE chat_turn SET created_at = now() - interval '31 days'")
+    chat(client, "glucose", session_id="search-3")
+    assert "case-1" in {r[0] for r in test_conn.execute("SELECT session_id FROM chat_turn")}  # cases keep theirs

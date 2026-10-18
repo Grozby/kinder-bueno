@@ -84,7 +84,7 @@ Ethical rules from the challenge, and how we meet them:
 | Embeddings | `BAAI/bge-m3` (1024 dimensions, multilingual), runs locally on CPU via `sentence-transformers`. The gateway has no embedding model. |
 | Keyword search | Postgres full-text search, `simple` config (mixed German/English text) |
 | UI | Vue 3 + Vite + TypeScript, PrimeVue 5, Pinia, vue-router, in `frontend/` (scaffold already in the repo). *Pending teammate review.* |
-| Backend API | FastAPI + uvicorn on port 8000, **one worker** (the chat state lives in process memory). The Vite dev server proxies `/api` to it. |
+| Backend API | FastAPI + uvicorn on port 8000; one worker by default, more with `--workers` (chat state and the ingest slot are in Postgres, #103). The Vite dev server proxies `/api` to it. |
 | LLM judge [PoC] | Same model, `apertus-v1-5-70b`, temperature 0. It judges its own extractions, so it is **biased** (self-preference). Accepted for the PoC; say so in the pitch. No human calibration now (see section 16). |
 | Chat state [PoC] | LangGraph `StateGraph` + `MemorySaver` checkpointer, `thread_id` = browser `session_id`. Later: swap to `PostgresSaver` (same Postgres). |
 | Crawl size | **100 pages total** to start. Configurable. Scale up later. |
@@ -702,7 +702,7 @@ class Result(BaseModel):
 
 ### 8.9 HTTP API (`api.py`, FastAPI)
 
-`navigator serve` starts `uvicorn navigator.api:app` on port 8000 with **one worker**. All routes are under `/api`. Pydantic models from 8.8 are the response types, so FastAPI documents them at `/docs`.
+`navigator serve` starts `uvicorn navigator.api:app` on port 8000 with one worker (`--workers N` for more, #103). All routes are under `/api`. Pydantic models from 8.8 are the response types, so FastAPI documents them at `/docs`.
 
 | Route | Request | Response |
 |---|---|---|
@@ -956,7 +956,7 @@ First run (2026-10-18): **judged precision@10 47%** over 9 queries, judge gold a
 | `navigator extract --source ID` | extract + verify + resolve + judge only (pages already stored) |
 | `navigator judge [--source ID]` | [PoC] re-run section 7.8 on stored claims |
 | `navigator search "query" [--source ID] [--type T] [--limit N] [--json] [--no-explain]` | ranked results like `GET /api/search`, as text or JSON (debugging, demos without the UI) |
-| `navigator serve [--host H] [--port P]` | start the API (section 8.9), one worker |
+| `navigator serve [--host H] [--port P] [--workers N]` | start the API (section 8.9) |
 | `navigator eval [--no-judge]` | run section 10.2 (with the eval judge unless `--no-judge`) |
 | `navigator stats` | counts per source, incl. judge verdicts and feedback |
 
@@ -1023,7 +1023,7 @@ Fallback if behind at hour 5, in this order: (1) drop the chat [PoC] (keep the s
 | [PoC] Judge agrees with itself (same model) | almost 0% `unsupported` | say it in the pitch; spot-check 10 claims by hand if time allows; it is still a filter for obvious errors |
 | [PoC] Judge too strict | many good `expertise` claims `unsupported`, recall@10 drops | compare recall@10 with `JUDGE_ENABLED=false`; loosen the "partial" rule in the prompt; or hide nothing and only mark |
 | [PoC] Tool-call drift | agent calls the wrong tool, bad `result_number`, or loops | 3-round cap + fallback to plain search (8.10); add 2 examples to the system prompt |
-| [PoC] Chat state lost | server restart or more than one worker | expected for the PoC (`MemorySaver`); run one worker; later `PostgresSaver` |
+| [PoC] Chat state lost | server restart or more than one worker | fixed in #103: every chat turn is stored in `chat_turn` |
 | [PoC] Frontend/backend contract drift | UI breaks on new fields | `src/api/types.ts` mirrors 8.8; check `/docs` (FastAPI OpenAPI) |
 
 ---

@@ -161,8 +161,8 @@ CREATE TABLE IF NOT EXISTS case_note (
 );
 CREATE INDEX IF NOT EXISTS case_note_case_idx ON case_note(case_id, id);
 
--- Chat turns of the case drawer (session "case-<id>", #81), so the history survives a reload. The results are
--- stored as ids, scores and "why" sentences, and rebuilt from the current claims when read.
+-- Chat turns (#81; every session since #103): the case drawer's history survives a reload, and any API worker can
+-- answer the next message. The results are stored as ids, scores and "why" sentences, and rebuilt when read.
 CREATE TABLE IF NOT EXISTS chat_turn (
   id          serial PRIMARY KEY,
   session_id  text NOT NULL,

@@ -2,11 +2,8 @@
 
 import logging
 import secrets
-import threading
-from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from typing import Annotated
 
 import anyio
@@ -153,37 +150,6 @@ def get_analyze(request: Request) -> Callable[[str], None]:
     return run
 
 
-@dataclass
-class ChatSession:
-    query: str | None = None
-    filters: ChatFilters = field(default_factory=ChatFilters)
-    results: list[Result] = field(default_factory=list)  # for "#2" / "her" in the agent follow-up (plan 8.10)
-
-
-class ChatSessions:
-    """Chat state in process memory (one worker, plan 8.9): lost on restart. The oldest are dropped past `size`."""
-
-    def __init__(self, size: int = 1000) -> None:
-        self.size = size
-        self._sessions: OrderedDict[str, ChatSession] = OrderedDict()
-        self._lock = threading.Lock()  # sync routes run in a thread pool
-
-    def get(self, session_id: str) -> ChatSession:
-        with self._lock:
-            session = self._sessions.pop(session_id, None) or ChatSession()
-            self._sessions[session_id] = session
-            while len(self._sessions) > self.size:
-                self._sessions.popitem(last=False)
-            return session
-
-
-chat_sessions = ChatSessions()
-
-
-def get_sessions() -> ChatSessions:
-    return chat_sessions
-
-
 def get_write_pitch(request: Request) -> Callable[[tuple, list[Result]], str]:
     """The pitch writer: (company, industry, summary, needs) and the references -> checked text or template.
     Runs on the explain LLM (EXPLAIN_MODEL), which is the fast one while the gateway is slow."""
@@ -213,7 +179,6 @@ Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
 Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
 Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_explain)]
 Analyze = Annotated[Callable[[str], None], Depends(get_analyze)]
-Sessions = Annotated[ChatSessions, Depends(get_sessions)]
 WritePitch = Annotated[Callable[[tuple, list[Result]], str], Depends(get_write_pitch)]
 MakeDocuments = Annotated[Callable[[str], None], Depends(get_make_documents)]
 
@@ -265,28 +230,25 @@ def chat_reply(n: int, query: str, filters: ChatFilters) -> str:
 
 
 @app.post("/api/chat")
-def chat(conn: Conn, embed: Embed, expand: Expand, explain: Explain, sessions: Sessions, body: ChatRequest) -> ChatResponse:
+def chat(conn: Conn, embed: Embed, expand: Expand, explain: Explain, body: ChatRequest) -> ChatResponse:
     """Plain refinement chat (#50): each message is a new search with the session's filters; a blank
-    message with new `filters` re-runs the last query. The LangGraph agent (plan 8.10) is a follow-up."""
-    session = sessions.get(body.session_id)
-    stored = body.session_id.startswith(case_state.SESSION_PREFIX)  # case drawer chats are kept in the DB (#81)
-    if stored and session.query is None and (last := case_state.last_query(conn, body.session_id)):
-        session.query, session.filters = last  # after an API restart
-    query = body.message.strip() or session.query
+    message with new `filters` re-runs the last query. The LangGraph agent (plan 8.10) is a follow-up.
+    Every turn is stored in `chat_turn` (#103), so any worker can answer the next message, and a restart
+    loses nothing."""
+    last = case_state.last_query(conn, body.session_id)
+    query = body.message.strip() or (last[0] if last else None)
     if query is None:
         raise HTTPException(status_code=422, detail="Type a search first")
-    filters = body.filters or session.filters
+    filters = body.filters or (last[1] if last else ChatFilters())
     found = run_search(
         conn, embed, expand, explain, query,
         [filters.source] if filters.source else [], [filters.type] if filters.type else [],
     )
-    session.query, session.filters, session.results = query, filters, found.results
     response = ChatResponse(
         reply=chat_reply(len(found.results), query, filters), results=found.results, filters=filters,
         expansion=found.expansion, no_result=found.no_result,
     )
-    if stored:
-        case_state.save_turn(conn, body.session_id, body.message, query, response)
+    case_state.save_turn(conn, body.session_id, body.message, query, response)
     return response
 
 
@@ -408,49 +370,64 @@ def get_source(conn: Conn, seeds: Seeds, source_id: str) -> Source:
     return found[0]
 
 
-def get_ingest() -> Callable[[str], None]:
-    """The background ingest of a new (#55) or re-crawled (#80) source, on its own connection."""
-    return lambda source_id: ingest.run_ingest(get_settings().database_url, source_id)
+def get_ingest() -> Callable[[psycopg.Connection, str], None]:
+    """The background ingest of a new (#55) or re-crawled (#80) source, on the ingest slot's connection."""
+    return ingest.run_ingest
+
+
+def get_ingest_slot() -> Callable[[], psycopg.Connection | None]:
+    """Takes the ingest slot (`ingest.try_start`). Called inside the route, not as a dependency: a request that
+    fails validation must not take it."""
+    return lambda: ingest.try_start(get_settings().database_url)
+
+
+IngestSlot = Annotated[Callable[[], psycopg.Connection | None], Depends(get_ingest_slot)]
+
+
+def take_ingest_slot(try_start: Callable[[], psycopg.Connection | None]) -> psycopg.Connection:
+    """One ingest at a time, across workers: 409 while one runs."""
+    slot = try_start()
+    if slot is None:
+        raise HTTPException(status_code=409, detail="Another source is being ingested; try again when it is ready")
+    return slot
 
 
 @app.post("/api/sources")
-def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewSource,
-               run: Annotated[Callable[[str], None], Depends(get_ingest)]) -> Source:
+def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewSource, try_start: IngestSlot,
+               run: Annotated[Callable[[psycopg.Connection, str], None], Depends(get_ingest)]) -> Source:
     """Add a website and ingest it in the background (crawl, embed, extract, resolve, judge). Returns at once
     with status "crawling"; poll GET /api/sources/{id}. One ingest at a time: 409 while one runs."""
-    if not ingest.try_start():
-        raise HTTPException(status_code=409, detail="Another source is being ingested; try again when it is ready")
+    slot = take_ingest_slot(try_start)
     try:
         source_id = ingest.add_source(conn, body.url, body.name, body.max_depth, body.max_pages, body.follow_outbound)
     except ingest.SourceError as exc:
-        ingest.finish()
+        ingest.finish(slot)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
-        ingest.finish()
+        ingest.finish(slot)
         raise
     conn.commit()  # the background ingest reads the source on another connection
-    background.add_task(run, source_id)
+    background.add_task(run, slot, source_id)
     return _sources(conn, seeds, source_id)[0]
 
 
 @app.post("/api/sources/{source_id}/crawl")
-def recrawl_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, source_id: str,
-                   run: Annotated[Callable[[str], None], Depends(get_ingest)]) -> Source:
+def recrawl_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, source_id: str, try_start: IngestSlot,
+                   run: Annotated[Callable[[psycopg.Connection, str], None], Depends(get_ingest)]) -> Source:
     """Re-crawl a source with its current rules (#79) and ingest it in the background, as POST /api/sources.
     Returns at once with status "crawling". Until the new data is swapped in, and if the run fails, the
     source keeps its previous pages and facts. 409 while another ingest runs."""
-    if not ingest.try_start():
-        raise HTTPException(status_code=409, detail="Another source is being ingested; try again when it is ready")
+    slot = take_ingest_slot(try_start)
     try:
         found = ingest.start_recrawl(conn, load_sources(get_settings().sources_file), source_id)
     except Exception:
-        ingest.finish()
+        ingest.finish(slot)
         raise
     if not found:
-        ingest.finish()
+        ingest.finish(slot)
         raise HTTPException(status_code=404, detail="Source not found")
     conn.commit()  # the background ingest reads the source on another connection
-    background.add_task(run, source_id)
+    background.add_task(run, slot, source_id)
     return _sources(conn, seeds, source_id)[0]
 
 

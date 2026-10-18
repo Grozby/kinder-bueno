@@ -6,13 +6,11 @@ from test_analysis import new_case, run
 from test_api import fake_embed
 
 from navigator.api import (
-    ChatSessions,
     app,
     get_conn,
     get_embed,
     get_expand,
     get_explain,
-    get_sessions,
 )
 from navigator.expand import Expansion
 
@@ -26,8 +24,6 @@ def client(test_conn, graph):
     # A checked sentence for Bob only, so the stored "why" can be told apart from the template
     app.dependency_overrides[get_explain] = lambda: lambda q, results: {
         r.entity_id: f"Works on glucose sensors [{glucose}]." for r in results if r.name == "Bob Beispiel"}
-    sessions = ChatSessions()
-    app.dependency_overrides[get_sessions] = lambda: sessions
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -97,21 +93,21 @@ def test_chat_history_is_stored_for_case_sessions(client, test_conn, graph):
     case_id = new_case(test_conn)
     first = chat(client, case_id, "glucose")
     chat(client, case_id, "", filters={"source": "dcb", "type": None})  # re-runs "glucose" on dcb
-    client.post("/api/chat", json={"session_id": "search-1", "message": "insulin"})  # not a case: not stored
+    client.post("/api/chat", json={"session_id": "search-1", "message": "insulin"})  # another session
 
     turns = client.get(f"/api/cases/{case_id}/chat").json()
     assert [t["message"] for t in turns] == ["glucose", ""]
     assert turns[0]["response"] == first
     assert [r["name"] for r in turns[1]["response"]["results"]] == ["Bob Beispiel"]
     assert turns[1]["response"]["filters"] == {"source": "dcb", "type": None}
-    assert test_conn.execute("SELECT count(*) FROM chat_turn").fetchone()[0] == 2
+    assert test_conn.execute("SELECT count(*) FROM chat_turn WHERE session_id LIKE 'case-%'").fetchone()[0] == 2
     assert client.get("/api/cases/nope/chat").status_code == 404
 
 
 def test_chat_session_restored_after_restart(client, test_conn, graph):
     case_id = new_case(test_conn)
     chat(client, case_id, "glucose", filters={"source": "dcb", "type": None})
-    app.dependency_overrides[get_sessions] = lambda: ChatSessions()  # API restarted: memory is empty
+    # Nothing is kept in memory: a restart or another worker reads the session from chat_turn (#103)
     body = chat(client, case_id, "", filters={"source": None, "type": "person"})
     assert body["reply"].startswith("Showing 2 results for 'glucose'")
 

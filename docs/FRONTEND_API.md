@@ -155,8 +155,9 @@ shared_needs: string[], shared_references: int}`. Only cases uploaded **before**
     `message` with `filters` re-runs the last query (`422` if the session has none yet).
   - `reply` is a template: `"Showing <n> results for '<query>' (source: dcb, type: person)."`.
     The response also has `filters` (the ones the server used) and `expansion`.
-  - Sessions live in the API's memory: they are lost when the API restarts, except case sessions
-    (`case-<id>`), which are stored (see "Cases").
+  - Every session's turns are stored in Postgres (#103), so a restart or another API worker keeps the
+    context. Standalone sessions are dropped after 30 days; case sessions (`case-<id>`) stay with their
+    case (see "Cases").
 - `POST /api/feedback` with `{session_id, query, entity_id, claim_id?, rating, comment?}`.
   `query` is the company name.
   - `rating` is `"up"` or `"down"` for the 👍/👎 buttons on a reference.
