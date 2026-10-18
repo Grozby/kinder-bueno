@@ -121,9 +121,11 @@ three phrasings (site wording, lay term, synonym) and 5–7 expected entities. 9
 - **Judged precision fell from 60% to 49%** with the last ranking change (#130), which raised recall from 60%
   to 64%. 77 of the 88 judged results were the same as in the run before; on those, the judge changed 9
   verdicts, 7 of them to "not relevant" (for example "Chair for Image-guided Therapy" for "surgical robots").
-  Of the 11 new results, it judged 2 relevant, against 5 of the 9 that left. About a third of the drop is the
-  ranking, about two thirds the judge. The judge uses the extractor's model family and agrees with the human
-  gold set on only 61% of gold hits, so it is a signal, not a measurement.
+  Of the 11 new results, it judged 2 relevant, against 5 of the 9 that left. The judge rates all 10 results of a
+  query in one call at temperature 0: on identical input it is deterministic (0 of 87 verdicts differ over three
+  runs), but the same results in reverse order change 14 of 86 verdicts. A ranking change therefore also changes
+  verdicts on results that stayed. The judge uses the extractor's model family and agrees with the human gold set
+  on only 61% of gold hits, so it is a signal, not a measurement.
 
 **Case eval** (4 fictional business models in `docs/examples`, expected matches in `eval/cases.yaml`):
 
@@ -213,7 +215,9 @@ Bern (suppliers, manufacturers, advisors), with a different extraction prompt an
 - **Recall is 64%, short of the 80% target.** The lever left is data: profile and facility pages (#75), with
   the resolver duplicates fixed first. Ranking constants were swept and are near their best on this gold set (#99).
 - **The gold set is small:** 9 queries in 3 use cases. A difference of ±2 points is noise.
-- **The LLM judge is a proof of concept:** 61–73% agreement with the gold set and unstable between runs.
+- **The LLM judge is a proof of concept:** 61–73% agreement with the gold set, and its verdicts depend on the
+  order of the results it is shown (16% change when the order is reversed). Judging each result on its own would
+  remove that, at 10 times the calls.
 - **Personal expertise** needs profile pages (#75).
 - **Open:** deleting a case and its data (#134), documentation updates (#100, #104), published Docker images
   (#101).

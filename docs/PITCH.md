@@ -30,7 +30,8 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
      98% of people show **their lab's topics**, labelled as the lab's and linked to the lab page. Personal
      expertise is 0%: the pages state topics for labs, not for each person, and we don't pretend otherwise.
    - Precision (LLM judge, PoC): 49% of the top-10 results judged relevant (60% before the last ranking
-     change, #130; on 77 unchanged results the judge flipped 9 verdicts). It agrees with the human gold set on
+     change, #130). The judge sees all 10 results at once, and its verdicts depend on their order: reversing it
+     changes 16% of them. It agrees with the human gold set on
      only 61% of gold hits, so treat this as a signal, not a measurement.
 5. **Sovereign and cheap to run.** Apertus (Swiss open LLM), local bge-m3 embeddings, Postgres, one
    `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
@@ -98,7 +99,7 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
   pages) reaches 58% today: the resolver keeps a few duplicates there, which are the next fix.
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
-  We report it as a signal, not as proof (judge agreement with the gold set: 61–73% between runs).
+  We report it as a signal, not as proof (judge agreement with the gold set: 61–73%).
 - *How is the fit score computed?* Five fixed criteria: research fit (40%, share of needs covered), expert
   pool, research units, infrastructure and running projects. Each counts only references whose verified
   topic claims match a need. It measures fit within our sources, not all of Canton Bern.
