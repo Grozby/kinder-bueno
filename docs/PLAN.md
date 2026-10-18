@@ -948,7 +948,7 @@ First run (2026-10-18): **judged precision@10 47%** over 9 queries, judge gold a
 | `navigator search-chunks "query" [--k N]` | top chunks with page URL and score (debugging, sections 8.2–8.4 step 1) |
 | `navigator extract --source ID` | extract + verify + resolve + judge only (pages already stored) |
 | `navigator judge [--source ID]` | [PoC] re-run section 7.8 on stored claims |
-| `navigator search "query"` | print results as JSON (for debugging) |
+| `navigator search "query" [--source ID] [--type T] [--limit N] [--json] [--no-explain]` | ranked results like `GET /api/search`, as text or JSON (debugging, demos without the UI) |
 | `navigator serve [--host H] [--port P]` | start the API (section 8.9), one worker |
 | `navigator eval [--no-judge]` | run section 10.2 (with the eval judge unless `--no-judge`) |
 | `navigator stats` | counts per source, incl. judge verdicts and feedback |
