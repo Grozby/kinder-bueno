@@ -147,6 +147,20 @@ CREATE TABLE IF NOT EXISTS case_document (
   PRIMARY KEY (case_id, kind)
 );
 
+-- Reviewer score, notes and similar cases (#108). review: {score, reason, author, reviewed_at}, next to the AI
+-- score, never replacing it. profile: bge-m3 embedding of summary + needs, set by the analysis.
+ALTER TABLE "case" ADD COLUMN IF NOT EXISTS review jsonb;
+ALTER TABLE "case" ADD COLUMN IF NOT EXISTS profile vector(1024);
+-- Internal notes: never sent to the pitch, the documents or any LLM prompt that writes public text.
+CREATE TABLE IF NOT EXISTS case_note (
+  id          bigserial PRIMARY KEY,
+  case_id     text NOT NULL REFERENCES "case"(id) ON DELETE CASCADE,
+  author      text NOT NULL,
+  text        text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS case_note_case_idx ON case_note(case_id, id);
+
 -- Chat turns of the case drawer (session "case-<id>", #81), so the history survives a reload. The results are
 -- stored as ids, scores and "why" sentences, and rebuilt from the current claims when read.
 CREATE TABLE IF NOT EXISTS chat_turn (

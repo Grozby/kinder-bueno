@@ -1,9 +1,9 @@
 """API data models (plan 8.8, 8.9). `frontend/src/api/types.ts` mirrors them: keep both in sync."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 EntityType = Literal["person", "unit", "project", "infrastructure"]
 Rating = Literal["up", "down", "wrong_fact"]
@@ -151,6 +151,49 @@ class ScoreItem(BaseModel):
     rationale: str
 
 
+NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class Review(BaseModel):
+    """The reviewer's own fit score (#108): next to the AI score, never replacing it."""
+    score: int                  # 0-100
+    reason: str
+    author: str
+    reviewed_at: datetime
+
+
+class ReviewInput(BaseModel):
+    score: float                # clamped to 0-100
+    reason: NonBlank            # required: 422 when empty
+    author: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] = ""
+
+
+class NoteInput(BaseModel):
+    author: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] = ""
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=5000)]
+
+
+class CaseNote(BaseModel):
+    """An internal note on a case (#108); never part of a pitch or document."""
+    id: str
+    author: str
+    text: str
+    created_at: datetime
+
+
+class SimilarCase(BaseModel):
+    """An earlier case close to this one (#108): same company or PDF, or similar summary and needs."""
+    case_id: str
+    company_name: str
+    status: CaseStatus
+    score: int | None           # the AI score
+    review: Review | None
+    similarity: float           # 0-1, cosine of the summary + needs embeddings
+    duplicate: bool             # same normalised company name or same PDF
+    shared_needs: list[str]
+    shared_references: int      # references both cases have in their top 25
+
+
 class Case(BaseModel):
     """An uploaded business model PDF and its analysis (docs/FRONTEND_API.md "Cases")."""
     id: str
@@ -163,6 +206,9 @@ class Case(BaseModel):
     score: int | None           # 0-100; None until analysed (#53)
     score_breakdown: list[ScoreItem]
     summary: str | None
+    review: Review | None = None
+    notes_count: int = 0
+    similar_cases: list[SimilarCase] = []  # best first, at most 3
 
 
 class CaseStatusUpdate(BaseModel):

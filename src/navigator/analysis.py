@@ -301,6 +301,7 @@ def analyze(
              "needs": [m.need for m in matches.get(r.entity_id, [])], "why": why.get(r.entity_id)}
             for r in results
         ]
+        profile = embed("\n".join([info.summary or "", *info.needs]))  # for similar cases (#108)
     except Exception:
         log.exception("case analysis failed: %s", case_id)
         conn.execute("""UPDATE "case" SET analysis_status = 'failed' WHERE id = %s""", (case_id,))
@@ -308,9 +309,9 @@ def analyze(
         return
     conn.execute(
         """UPDATE "case" SET analysis_status = 'done', company_name = coalesce(%s, company_name), industry = %s,
-           summary = %s, needs = %s, refs = %s, score = %s, score_breakdown = %s WHERE id = %s""",
+           summary = %s, needs = %s, refs = %s, score = %s, score_breakdown = %s, profile = %s WHERE id = %s""",
         (info.company_name, info.industry, info.summary, Jsonb(info.needs), Jsonb(stored), score,
-         Jsonb([r.model_dump() for r in rows]), case_id),
+         Jsonb([r.model_dump() for r in rows]), profile, case_id),
     )
     conn.commit()
     log.info("case %s analysed: %d needs, %d references, score %d", case_id, len(info.needs), len(stored), score)

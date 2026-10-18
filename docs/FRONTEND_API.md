@@ -102,8 +102,7 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
 ## Review, notes and similar cases
 
 The reviewer can give a case their own score and write notes; the card links to earlier cases that
-look alike. Not served yet; the mock answers. `Case` gains three fields (the UI treats a missing
-field as empty, so the current backend keeps working):
+look alike. Served since #108. `Case` has three more fields (the UI treats a missing field as empty):
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -125,13 +124,15 @@ field as empty, so the current backend keeps working):
 
 **`SimilarCase`**: `{case_id, company_name, status, score, review, similarity 0–1, duplicate,
 shared_needs: string[], shared_references: int}`. Only cases uploaded **before** this one (the ones
-"already worked on"), any status, rejected included. Suggested computation, at analysis time:
+"already worked on"), any status, rejected included. Computed when the case is read, so `status` and
+`review` are current:
 
-- `similarity`: cosine of bge-m3 embeddings of `summary` + `needs` (the model search already loads);
-  keep ≥ 0.6.
-- `duplicate`: same normalised company name or same PDF hash; listed first.
-- `shared_needs`: needs both cases have (exact or near-equal query), `shared_references`: entity ids
-  both cases have in their top 25 `refs`. These explain the match in the UI.
+- `similarity`: cosine of the bge-m3 embeddings of `summary` + `needs`, stored by the analysis; kept
+  when ≥ 0.6. Cases analysed before #108 have no embedding: they only show up as duplicates (`0`).
+- `duplicate`: same company name (lowercased, without punctuation and legal form: AG, GmbH, SA, …) or
+  the same PDF text; listed first.
+- `shared_needs`: needs both cases have (same text, ignoring case and spaces); `shared_references`:
+  entity ids both cases have in their top 25 `refs`. These explain the match in the UI.
 
 ## Chat and feedback (section 8.9)
 
