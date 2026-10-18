@@ -14,3 +14,6 @@ wheels/
 .vscode/
 *.swp
 *.swo
+
+# Secrets
+.env
