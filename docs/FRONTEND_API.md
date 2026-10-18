@@ -147,6 +147,13 @@ shared_needs: string[], shared_references: int}`. Only cases uploaded **before**
 
 ## Chat and feedback (section 8.9)
 
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| POST | `/api/chat` | `{session_id, message, filters?}` | `ChatResponse`: `{reply, results, filters, expansion, no_result}` |
+| POST | `/api/feedback` | `{session_id, query, entity_id, claim_id?, rating, comment?}` | `{ok: true}` |
+| GET | `/api/search?q=…&type=…&source=…` | – | `{results, expansion, no_result}` (debugging and eval; not used by the UI) |
+| GET | `/api/stats` | – | `{sources: [{source, pages, chunks, entities, shown_claims}], feedback: {up, down, wrong_fact}}` (the Docker healthcheck) |
+
 - `POST /api/chat` with `{session_id, message, filters?}`; the frontend reads `reply`, `results`, `no_result`.
   - The chat agent (plan 8.10, #97): Apertus picks a tool for each message. The response shape is unchanged.
     - **search:** a new topic, e.g. "glucose sensors".
@@ -171,8 +178,8 @@ shared_needs: string[], shared_references: int}`. Only cases uploaded **before**
 - `POST /api/feedback` with `{session_id, query, entity_id, claim_id?, rating, comment?}`.
   `query` is the company name.
   - `rating` is `"up"` or `"down"` for the 👍/👎 buttons on a reference.
-  - `rating: "wrong_fact"` with a `claim_id` flags one evidence row (plan 9, "wrong fact" button).
-    The UI does not have this button yet.
+  - `rating: "wrong_fact"` with a `claim_id` flags one evidence row (plan 9): the flag on an evidence
+    row in the case drawer.
   - `404` if the entity does not exist or `claim_id` belongs to another entity.
 - Chat filters are single values (`ChatFilters`: `source` and `type`, each one value or `null`).
   `GET /api/search` (debugging and eval, not used by the UI) takes several:
