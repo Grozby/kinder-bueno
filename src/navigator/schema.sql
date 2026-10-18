@@ -133,3 +133,23 @@ CREATE TABLE IF NOT EXISTS "case" (
 );
 CREATE INDEX IF NOT EXISTS case_uploaded_idx ON "case"(uploaded_at DESC);
 ALTER TABLE "case" ADD COLUMN IF NOT EXISTS pitch jsonb;
+
+-- Sources added from the UI (POST /api/sources, #55). Sources from config/sources.yaml keep config NULL and
+-- status 'ready'. ALTER so existing databases get the columns too.
+ALTER TABLE source ADD COLUMN IF NOT EXISTS config   jsonb;  -- {"source": SourceConfig, "max_depth": n}
+ALTER TABLE source ADD COLUMN IF NOT EXISTS root_url text;
+ALTER TABLE source ADD COLUMN IF NOT EXISTS status   text NOT NULL DEFAULT 'ready'
+  CHECK (status IN ('ready','crawling','failed'));
+ALTER TABLE source ADD COLUMN IF NOT EXISTS stage    text;   -- while crawling: crawl, embed, extract, resolve, judge
+ALTER TABLE source ADD COLUMN IF NOT EXISTS error    text;   -- why the last ingest failed
+
+-- Every URL the last crawl met, with the page that linked to it: the crawl graph (#55).
+CREATE TABLE IF NOT EXISTS crawl_url (
+  id         serial PRIMARY KEY,
+  source_id  text NOT NULL REFERENCES source(id) ON DELETE CASCADE,
+  url        text NOT NULL,
+  parent     text,
+  depth      int NOT NULL,
+  status     text NOT NULL CHECK (status IN ('queued','crawled','skipped','failed')),
+  UNIQUE (source_id, url)
+);

@@ -6,6 +6,7 @@ import logging
 import re
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
@@ -18,6 +19,11 @@ from navigator.sources import CrawlDefaults, SourceConfig
 log = logging.getLogger(__name__)
 
 MIN_TEXT_CHARS = 100  # pages with less text are only used for their links
+
+# Called for every URL the crawler meets: (url, parent, depth, status). Status is "queued" when the URL
+# is queued, then "crawled" (stored), "skipped" (robots.txt, not HTML, too little text, duplicate) or
+# "failed" (network error, non-200). It draws the live crawl graph (FRONTEND_API "Sources", #55).
+OnUrl = Callable[[str, str | None, int, str], None]
 
 
 @dataclass
@@ -94,15 +100,19 @@ async def crawl_source(
     defaults: CrawlDefaults,
     max_pages: int | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
+    on_url: OnUrl | None = None,
 ) -> list[CrawledPage]:
     """Crawl one source. Seeds are always fetched; other URLs must pass the source's LinkFilter."""
     limit = max_pages or source.max_pages
     link_filter = LinkFilter(source)
     throttle = HostThrottle(defaults.delay_seconds)
+    report = on_url or (lambda url, parent, depth, status: None)
 
     seeds = list(dict.fromkeys(source.seeds))
-    priority: deque[tuple[str, int]] = deque((url, 0) for url in seeds)
-    normal: deque[tuple[str, int]] = deque()
+    priority: deque[tuple[str, int, str | None]] = deque((url, 0, None) for url in seeds)
+    normal: deque[tuple[str, int, str | None]] = deque()
+    for url in seeds:
+        report(url, None, 0, "queued")
     seen: set[str] = set(seeds)
     text_hashes: set[str] = set()
     pages: list[CrawledPage] = []
@@ -116,9 +126,10 @@ async def crawl_source(
         robots = RobotsCache(client, defaults.user_agent)
 
         while len(pages) < limit and (priority or normal):
-            url, depth = (priority or normal).popleft()
+            url, depth, parent = (priority or normal).popleft()
             if not await robots.allowed(url):
                 log.info("[%s] robots.txt disallows %s", source.id, url)
+                report(url, parent, depth, "skipped")
                 continue
 
             await throttle.wait(url)
@@ -126,15 +137,21 @@ async def crawl_source(
                 resp = await client.get(url)
             except httpx.HTTPError as e:
                 log.warning("[%s] fetch failed %s: %s", source.id, url, e)
+                report(url, parent, depth, "failed")
                 continue
             log.info("[%s] %s %s", source.id, resp.status_code, url)
 
             final_url = str(resp.url)
             if final_url != url:
                 if final_url in seen or (url not in seeds and not link_filter.accepts(final_url)):
+                    report(url, parent, depth, "skipped")
                     continue
                 seen.add(final_url)
-            if resp.status_code != 200 or "text/html" not in resp.headers.get("content-type", ""):
+            if resp.status_code != 200:
+                report(url, parent, depth, "failed")
+                continue
+            if "text/html" not in resp.headers.get("content-type", ""):
+                report(url, parent, depth, "skipped")
                 continue
 
             page = clean_html(resp.text, final_url)
@@ -142,13 +159,17 @@ async def crawl_source(
             if len(page.text) >= MIN_TEXT_CHARS and digest not in text_hashes:
                 text_hashes.add(digest)
                 pages.append(CrawledPage(url=final_url, title=page.title, text=page.text))
+                report(url, parent, depth, "crawled")
+            else:
+                report(url, parent, depth, "skipped")
 
             if depth >= defaults.max_depth:
                 continue
             for link in page.links:
                 if link not in seen and link_filter.accepts(link):
                     seen.add(link)
-                    (priority if link_filter.is_priority(link) else normal).append((link, depth + 1))
+                    (priority if link_filter.is_priority(link) else normal).append((link, depth + 1, url))
+                    report(link, url, depth + 1, "queued")
 
     log.info("[%s] stored %d pages", source.id, len(pages))
     return pages

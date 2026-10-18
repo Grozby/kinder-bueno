@@ -107,8 +107,8 @@ PageStatus = Literal["queued", "crawled", "skipped", "failed"]
 
 class CrawledPage(BaseModel):
     url: str
-    parent: str | None          # page that linked here; not stored yet (#55), so None
-    depth: int                  # not stored yet (#55), so 0
+    parent: str | None          # page that linked here; None for a seed, or a source crawled before #55
+    depth: int
     status: PageStatus
 
 
@@ -116,14 +116,25 @@ class Source(BaseModel):
     """A crawled website (docs/FRONTEND_API.md "Sources")."""
     id: str
     name: str
-    root_url: str               # first seed in config/sources.yaml
+    root_url: str               # first seed in config/sources.yaml, or the URL it was added with
     validated: bool             # listed in config/sources.yaml
     status: SourceStatus
+    stage: str | None = None    # while crawling: crawl, embed, extract, resolve or judge
+    error: str | None = None    # why the ingest failed
     pages: int
     entities: int               # entities with at least one shown claim, as in /api/stats
     verified_claims: int        # shown claims, as SourceStats.shown_claims
     last_crawled_at: datetime | None
-    discovered: list[CrawledPage]  # a sample of the stored pages, for the graph
+    discovered: list[CrawledPage]  # a sample of the crawl tree, for the graph
+
+
+class NewSource(BaseModel):
+    """POST /api/sources: a website to crawl and ingest in the background (#55)."""
+    url: str = Field(min_length=8, max_length=2000)
+    name: str | None = Field(None, max_length=200)
+    max_depth: int = Field(2, ge=0, le=5)
+    max_pages: int = Field(50, ge=1)    # capped on the server
+    follow_outbound: bool = False       # also follow links to other hosts
 
 
 CaseStatus = Literal["new", "in_review", "accepted", "rejected"]

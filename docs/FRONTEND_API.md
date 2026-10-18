@@ -101,13 +101,29 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 { "url": "https://…", "name": "optional", "max_depth": 2, "max_pages": 50, "follow_outbound": false }
 ```
 
-- `follow_outbound: true` means the crawler may also follow links to other hosts.
+- `follow_outbound: true` means the crawler may also follow links to other hosts (host names only).
 - While `status` is `crawling`, the frontend polls `GET /api/sources/{id}` every second and draws
-  `discovered` (`{url, parent, depth, status}`) as a live graph. A sample of up to ~60 pages is enough.
+  `discovered` (`{url, parent, depth, status}`) as a live graph: the first 60 URLs the crawler met, in
+  crawl order. `queued` URLs left when the page cap is reached end as `skipped`.
 - `pages`, `entities`, `verified_claims` map to the counts from `navigator stats` / `GET /api/stats`.
-- Served since #51 (read-only): `status` is always `"ready"`; `validated` means the source is in
-  `config/sources.yaml`, and `root_url` is its first seed. `discovered` is up to 60 stored pages with
-  `parent: null`, `depth: 0`, `status: "crawled"`: the crawler does not record the tree yet (#55).
+- `validated` means the source is in `config/sources.yaml`, and `root_url` is its first seed. Sources
+  crawled before #55 have no recorded tree: `discovered` is then their stored pages as seeds.
+
+`POST /api/sources` (#55) stores the source (`validated: false`) and returns at once with
+`status: "crawling"`. The ingest then runs in the background, and `stage` says which step is running:
+`crawl` → `embed` → `extract` → `resolve` → `judge`, then `status: "ready"` (minutes: extraction and the
+judge call the LLM, and the judge re-checks every source because resolve rebuilds all claims).
+
+- Server caps: 50 pages, depth 4, robots.txt and a 1 s delay per host. One ingest at a time: `409` while
+  one runs.
+- `422` for a URL that is not http(s), not a public host name, or resolves to a private address.
+- Id from the host (`www.example.unibe.ch` → `example_unibe`, then `_2` …). Adding the same site again
+  after a failure reuses the failed source.
+- `status: "failed"` with `error` (`"<stage>: <message>"`): its pages are deleted, the crawl graph stays.
+  A judge error leaves the source `ready`, with `error` set.
+- Its crawl rules are stored in `source.config` (the database), not in `config/sources.yaml`.
+- **Shared backend:** a new source is written to the backend's database, so every teammate sees it, and
+  it changes the eval numbers. Try it on a separate stack first.
 
 ## Resources: ranked pages and crawl rules
 

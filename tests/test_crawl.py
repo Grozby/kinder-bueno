@@ -126,3 +126,26 @@ def test_crawl_survives_errors_and_non_html():
 
     pages = asyncio.run(crawl_source(TEST_SOURCE, FAST, transport=httpx.MockTransport(handler)))
     assert [p.url for p in pages] == ["https://lab.test/"]
+
+
+def test_crawl_reports_every_url_with_parent_depth_and_status():
+    site = {
+        "https://lab.test/": _page('<a href="/a">A</a><a href="/team/">Team</a><a href="/secret/">S</a>'
+                                   '<a href="/gone">G</a>'),
+        "https://lab.test/a": _page('<a href="/short">short</a>'),
+        "https://lab.test/team/": _page(""),
+        "https://lab.test/short": "<html><body>tiny</body></html>",
+    }
+    events: list[tuple] = []
+    asyncio.run(crawl_source(TEST_SOURCE, FAST, transport=_site(site, "User-agent: *\nDisallow: /secret/"),
+                             on_url=lambda *e: events.append(e)))
+    final = {url: (parent, depth, status) for url, parent, depth, status in events}
+    assert events[0] == ("https://lab.test/", None, 0, "queued")
+    assert final == {
+        "https://lab.test/": (None, 0, "crawled"),
+        "https://lab.test/team/": ("https://lab.test/", 1, "crawled"),
+        "https://lab.test/a": ("https://lab.test/", 1, "crawled"),
+        "https://lab.test/secret/": ("https://lab.test/", 1, "skipped"),  # robots.txt
+        "https://lab.test/gone": ("https://lab.test/", 1, "failed"),  # 404
+        "https://lab.test/short": ("https://lab.test/a", 2, "skipped"),  # too little text
+    }
