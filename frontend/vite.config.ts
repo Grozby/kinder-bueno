@@ -24,6 +24,8 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: env.BACKEND_URL || 'http://localhost:8000',
           changeOrigin: true,
+          // Token for a shared backend (its API_TOKEN), so the browser never needs it
+          headers: env.BACKEND_TOKEN ? { Authorization: `Bearer ${env.BACKEND_TOKEN}` } : {},
         },
       },
     },

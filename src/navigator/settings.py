@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     judge_enabled: bool = True
     embed_model: str = "BAAI/bge-m3"
     database_url: str = "postgresql://navigator:navigator@localhost:5432/navigator"
+    api_token: str = ""  # when set, /api requires `Authorization: Bearer <token>`
     sources_file: Path = PROJECT_ROOT / "config" / "sources.yaml"
 
 
