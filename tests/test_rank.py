@@ -74,11 +74,13 @@ def test_section_scores_credit_the_deepest_owner():
     assert section_scores(hits, homes, weight=0.5) == {1: pytest.approx(0.2), 2: pytest.approx(0.1)}
 
 
-def test_topic_score_is_the_best_matching_topic():
-    vecs = {"robotics": np.array([1.0, 0.0]), "nutrition": np.array([0.0, 1.0]), "imaging": np.array([0.6, 0.8])}
-    claims = [(1, "robotics"), (1, "nutrition"), (2, "imaging")]
+def test_topic_score_is_the_mean_of_the_best_two_topics():
+    """One matching topic among unrelated ones counts half: a single generic claim ("monitoring") is not enough."""
+    vecs = {"robotics": np.array([1.0, 0.0]), "nutrition": np.array([0.0, 1.0]), "imaging": np.array([0.6, 0.8]),
+            "surgery": np.array([0.8, 0.6])}
+    claims = [(1, "robotics"), (1, "nutrition"), (2, "imaging"), (3, "robotics"), (3, "surgery"), (3, "nutrition")]
     sims = topic_scores(claims, [np.array([1.0, 0.0])], vecs.__getitem__)
-    assert sims == {1: pytest.approx(1.0), 2: pytest.approx(0.6)}
+    assert sims == {1: pytest.approx(0.5), 2: pytest.approx(0.6), 3: pytest.approx(0.9)}
 
 
 def test_topic_vectors_are_cached_per_embedding_function():
@@ -110,7 +112,8 @@ def test_fairness_cap_allows_three_per_unit():
     assert [e for e, _ in fairness_cap(ranked, unit_of, limit=4)] == [1, 2, 3, 5]
 
 
-def test_rank_orders_by_relevance(test_conn, graph):
+def test_rank_orders_by_relevance(test_conn, graph, monkeypatch):
+    monkeypatch.setattr("navigator.rank.TOPIC_WEIGHT", 0.0)  # chunk evidence only: this embed matches every topic
     ranking = rank_entities(test_conn, "glucose", embed=lambda q: onehot({3: 0.8, 1: 0.6}))
     ids = [e for e, _ in ranking.ranked]
     assert ranking.no_result is False
@@ -155,12 +158,13 @@ def test_unit_from_member_of_first_then_listed_in(test_conn, graph):
 
 
 def test_unit_found_through_its_own_topics(test_conn, graph, monkeypatch):
-    # The query matches Bob's page (p3), where the lab has no claim; the lab's expertise claim matches the query.
-    test_conn.execute(
-        "INSERT INTO claim (entity_id, field, value, quote, page_id, verified) "
-        "VALUES (%s, 'expertise', 'zebrafish genetics', 'q', %s, true)",
-        (graph["lab"], graph["p2"]),
-    )
+    # The query matches Bob's page (p3), where the lab has no claim; the lab's expertise claims match the query.
+    for topic in ["zebrafish genetics", "zebrafish models"]:
+        test_conn.execute(
+            "INSERT INTO claim (entity_id, field, value, quote, page_id, verified) "
+            "VALUES (%s, 'expertise', %s, 'q', %s, true)",
+            (graph["lab"], topic, graph["p2"]),
+        )
 
     def embed(text: str):
         if text == "zebrafish genetics":
@@ -173,6 +177,25 @@ def test_unit_found_through_its_own_topics(test_conn, graph, monkeypatch):
     assert ranked()[0] == graph["lab"]
     monkeypatch.setattr("navigator.rank.TOPIC_WEIGHT", 0.0)
     assert ranked()[-1] == graph["lab"]  # without topics it only has a weak page link
+
+
+def test_person_own_topics_count_less_than_a_units(test_conn, graph):
+    """Profile pages give people topics of their own (#75); with the same topics, the lab still ranks first."""
+    for ent in ["lab", "bob"]:
+        for topic in ["zebrafish genetics", "zebrafish models"]:
+            test_conn.execute(
+                "INSERT INTO claim (entity_id, field, value, quote, page_id, verified) "
+                "VALUES (%s, 'expertise', %s, 'q', %s, true)",
+                (graph[ent], topic, graph["p3"]),
+            )
+
+    def embed(text: str):
+        if text == "zebrafish genetics":
+            return onehot({3: 0.6, 7: 0.8})  # the query, also close to Bob's page
+        return onehot({7: 1.0}) if "zebrafish" in text else onehot({1: 1.0})
+
+    scores = dict(rank_entities(test_conn, "zebrafish genetics", embed=embed).ranked)
+    assert scores[graph["lab"]] > scores[graph["bob"]] > 0
 
 
 def test_each_query_string_is_embedded_once(test_conn, graph):

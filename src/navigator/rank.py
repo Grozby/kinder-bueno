@@ -18,14 +18,18 @@ MAX_RESULTS = 10
 MAX_PER_UNIT = 3      # fairness cap (8.5)
 MIN_SIM = 0.50        # below this, and with no keyword hit, there is no reliable result (8.7). #99: gold queries
                       # 0.57-0.74, off-topic ones 0.32-0.47
-# Tuned on the eval set (#29, recall@10 14% -> 46%; #59, 46% -> 59%; #99 sweep in PLAN.md 10.2). Re-run `navigator eval` after changing any of these.
+# Tuned on the eval set (#29, recall@10 14% -> 46%; #59, 46% -> 59%; #99 sweep and #75 topic match in PLAN.md 10.2).
+# Re-run `navigator eval` after changing any of these.
 BEST_CHUNKS = 1       # plan 8.4 said the best 3: that favours entities on long pages with many matching chunks
 PAGE_ONLY_WEIGHT = 0.25
 USE_IDF = True        # an entity with claims on many pages ("ARTORG Center") is linked to every query on them
 INHERIT = 0.5         # a person gets this share of their unit's score (people have almost no topic claims)
 SENIOR_BOOST = 0.3    # heads and professors first among a unit's members
-TOPIC_WEIGHT = 0.3    # entities whose own topic claims (expertise, description) match the query (#59)
+TOPIC_WEIGHT = 0.4    # entities whose own topic claims (expertise, description) match the query (#59)
 TOPIC_MIN = 0.5       # cosine similarity below this adds nothing
+PERSON_TOPIC = 0.25   # share of the topic bonus for a person's own topics (#75): they don't beat lab evidence
+TOPIC_ALONE = 0.5     # share of the topic bonus for an entity without chunk evidence
+TOPIC_TOPK = 2        # mean of an entity's best k topic similarities: one generic claim ("monitoring") is not enough
 TOPIC_FIELDS = ("expertise", "description")
 TOPICS_PER_PAGE = 8   # an entity's first topic claims per page: 8B sometimes loops into long generic lists
 SECTION_WEIGHT = 1.0  # a unit with a member page owns the pages under its home folder (#59), as if named there
@@ -182,13 +186,13 @@ def _once(embed: Callable[[str], np.ndarray]) -> Callable[[str], np.ndarray]:
 def topic_scores(
     claims: list[tuple[int, str]], query_vecs: list[np.ndarray], vec_of: Callable[[str], np.ndarray]
 ) -> dict[int, float]:
-    """Best cosine similarity between each entity's topic claims (entity id, value) and any query vector."""
-    out: dict[int, float] = {}
+    """Per entity, the mean of its best TOPIC_TOPK topic claims (entity id, value), each scored by its best cosine
+    similarity to any query vector."""
+    per: dict[int, list[float]] = {}
     for entity_id, value in claims:
         v = vec_of(value)
-        sim = max(float(np.dot(v, q)) for q in query_vecs)
-        out[entity_id] = max(out.get(entity_id, -1.0), sim)
-    return out
+        per.setdefault(entity_id, []).append(max(float(np.dot(v, q)) for q in query_vecs))
+    return {e: float(np.mean(sorted(sims, reverse=True)[:TOPIC_TOPK])) for e, sims in per.items()}
 
 
 def _topic_claims(conn: psycopg.Connection, types: list[str], sources: list[str]) -> list[tuple[int, str]]:
@@ -301,9 +305,15 @@ def rank_entities(
         query_vecs = [embed_query_once(q) for q in queries]
         sims = topic_scores(topic_claims, query_vecs, _topic_vec_of(embed, [v for _, v in topic_claims]))
         topic_idf = _idf_weights(conn, list(sims)) if USE_IDF else {}
+        people = {r[0] for r in conn.execute("SELECT id FROM entity WHERE id = ANY(%s) AND type = 'person'",
+                                             (list(sims),))}
         for entity_id, sim in sims.items():
             if sim > TOPIC_MIN:
                 bonus = TOPIC_WEIGHT * (sim - TOPIC_MIN) * topic_idf.get(entity_id, 1.0)
+                if entity_id in people:
+                    bonus *= PERSON_TOPIC
+                if not scores.get(entity_id):
+                    bonus *= TOPIC_ALONE
                 scores[entity_id] = scores.get(entity_id, 0.0) + bonus
     if SECTION_WEIGHT:
         for unit, s in section_scores(hits, _homes(conn, sources), SECTION_WEIGHT).items():
