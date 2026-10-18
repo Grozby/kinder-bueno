@@ -45,11 +45,12 @@ With `--expand` it first prints the English and German search terms from Apertus
 
 ```bash
 uv run navigator eval             # 9 gold queries (eval/gold.yaml) through the /api/search pipeline
-uv run navigator eval --no-expand # without query expansion (no gateway needed)
+uv run navigator eval --no-expand --no-judge  # no gateway needed
 ```
 
-Prints the plan 10.2 metrics (recall@10, phrasing overlap, traceability, field fill, coverage, drop rate)
-and saves them to `eval/report.md`. Re-run it after every change to extraction, resolve or ranking.
+Prints the plan 10.2 metrics (recall@10, phrasing overlap, traceability, field fill, coverage, drop rate,
+judged precision@10) and saves them to `eval/report.md`. The eval judge's verdicts and reasons go to
+`eval/judge_log.jsonl` for spot checks. Re-run it after every change to extraction, resolve or ranking.
 
 ## Tests
 

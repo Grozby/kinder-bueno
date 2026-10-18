@@ -82,6 +82,30 @@ def test_report_has_per_query_rows_and_metrics():
     runs["glucose sensors"] = [_result("Lilian Witthauer"), _result("Diabetes Center Berne", type="unit")]
     db = {"coverage": [("dcb", 30, 127, 352)], "raw": {True: 3, False: 1}, "verdicts": [], "feedback": []}
     text = report(gold, runs, {q: Expansion() for q in queries}, db, conn=None)
-    assert "| glucose | glucose sensors | 2 | Diabetes Center Berne, Lilian Witthauer | 40% | 0 |" in text
+    assert "| glucose | glucose sensors | 2 | Diabetes Center Berne, Lilian Witthauer | 40% | – | 0 |" in text
+    assert "judged precision" not in text  # judge off
     assert "| extraction drop rate (unverified raw claims) | 25% (1 / 4) | report |" in text
     assert "| dcb | 30 | 127 | 352 |" in text
+
+
+def test_report_with_judge_verdicts():
+    from navigator.eval_judge import Verdict
+
+    gold = load_gold(PROJECT_ROOT / "eval" / "gold.yaml")
+    queries = [q for uc in gold for q in uc.queries]
+    runs = {q: [] for q in queries}
+    runs["glucose sensors"] = [
+        _result("Lilian Witthauer", entity_id=1),
+        _result("Diabetes Center Berne", type="unit", entity_id=2),
+        _result("Some Startup", type="unit", entity_id=3),
+    ]
+    runs["surgical robots"] = [_result("Manuela Eugster", entity_id=4)]
+    verdicts = {q: None for q in queries}
+    verdicts["glucose sensors"] = {1: Verdict(True, "x"), 2: Verdict(False, "x"), 3: Verdict(False, "x")}
+    db = {"coverage": [], "raw": {}, "verdicts": [], "feedback": []}
+    text = report(gold, runs, {q: Expansion() for q in queries}, db, conn=None, verdicts=verdicts)
+    assert "| 40% | 1/3 | 0 |" in text  # glucose sensors: one of three judged relevant
+    assert "| surgery | surgical robots | 1 | Manuela Eugster | 17% | not judged | 0 |" in text
+    assert "| judged precision@10 [PoC] (mean of 1 judged queries) | 33% | report |" in text
+    # gold hits Witthauer (relevant) and Diabetes Center Berne (not relevant): 1 of 2
+    assert "| judge gold agreement [PoC] (gold hits judged relevant) | 50% (1 / 2) | judge not reliable |" in text

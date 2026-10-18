@@ -922,6 +922,9 @@ Results:
 
 Save every verdict with its reason to `eval/judge_log.jsonl`, so a human can spot-check it later (section 16).
 
+As built (`eval_judge.py`, not `judge.py`, so it does not collide with the claim judge in 7.8): the prompt above plus one line asking for the bare id as the key (Apertus sometimes copies "4 ARTORG Center" as the key; the parser also accepts a leading id). Max 8 evidence rows per result (a big unit has 120+), quotes cut to 200 characters, 90 s timeout per query, calls in parallel. `navigator eval --no-judge` skips it.
+First run (2026-10-18): **judged precision@10 47%** over 9 queries, judge gold agreement 100% (6 / 6). Results vary between runs because the expansion terms vary, and the result lists change with them.
+
 ---
 
 ## 11. CLI (`cli.py`, typer)
