@@ -3,6 +3,7 @@ import { LoaderCircle, TriangleAlert } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 import type { CaseStatus } from '@/api'
+import AnalysisOverlay from '@/components/AnalysisOverlay.vue'
 import BernBear from '@/components/BernBear.vue'
 import CaseCard from '@/components/CaseCard.vue'
 import CaseDrawer from '@/components/CaseDrawer.vue'
@@ -22,6 +23,9 @@ const COLUMNS: Array<{ status: CaseStatus; title: string; hint: string }> = [
 
 const openId = ref<string | null>(null)
 const openCase = computed(() => store.cases.find((c) => c.id === openId.value) ?? null)
+// The upload whose analysis is shown in the centred pop-up (the last one when several are dropped)
+const analysingId = ref<string | null>(null)
+const analysingCase = computed(() => store.cases.find((c) => c.id === analysingId.value) ?? null)
 const dragging = ref(false)
 const overColumn = ref<CaseStatus | null>(null)
 const overBear = ref(false)
@@ -82,7 +86,8 @@ function openFromRejected(id: string) {
 async function upload(files: File[]) {
   for (const f of files) {
     try {
-      await store.upload(f)
+      const c = await store.upload(f)
+      analysingId.value = c.id
     } catch (e) {
       notify(`Upload of ${f.name} failed: ${(e as Error).message}`)
     }
@@ -245,6 +250,12 @@ function onBearDrop(e: DragEvent) {
       @close="openId = null"
       @move="(s) => openCase && move(openCase.id, s)"
       @reject="rejectFromDrawer"
+    />
+
+    <AnalysisOverlay
+      :item="analysingCase"
+      @close="analysingId = null"
+      @open="(id) => ((analysingId = null), (openId = id))"
     />
   </div>
 </template>
