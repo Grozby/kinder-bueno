@@ -29,6 +29,14 @@ def test_search_filters(client, graph):
     assert [r["name"] for r in units] == ["Diabetes Lab"]
 
 
+def test_search_multiple_filter_values(client, graph):
+    params = {"q": "glucose insulin", "type": ["person", "unit"], "source": ["artorg", "dcb"]}
+    names = {r["name"] for r in client.get("/api/search", params=params).json()["results"]}
+    assert names == {"Alice Muster", "Bob Beispiel", "Diabetes Lab"}
+    params = {"q": "glucose insulin", "type": ["unit"], "source": ["dcb"]}
+    assert client.get("/api/search", params=params).json()["no_result"] is True
+
+
 def test_search_no_result(client):
     body = client.get("/api/search", params={"q": "zebrafish"}).json()
     assert body == {"results": [], "expansion": None, "no_result": True}

@@ -51,7 +51,7 @@ async def internal_error(request: Request, exc: Exception) -> JSONResponse:
 
 
 def _temporary_rank(
-    conn: psycopg.Connection, q: str, source: str | None, type: EntityType | None
+    conn: psycopg.Connection, q: str, source: list[str], type: list[EntityType]
 ) -> list[tuple[int, float]]:
     """TEMPORARY ranker until search.py lands: entities ranked by how many shown claims match a query word."""
     words = [w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") for w in q.lower().split()]
@@ -66,14 +66,14 @@ def _temporary_rank(
         WHERE {shown("c")}
           AND c.value ILIKE ANY(%(patterns)s)
           AND e.type = ANY(%(types)s)
-          AND (%(source)s::text IS NULL OR p.source_id = %(source)s)
+          AND (cardinality(%(source)s::text[]) = 0 OR p.source_id = ANY(%(source)s))
         GROUP BY c.entity_id
         ORDER BY hits DESC, c.entity_id
         LIMIT %(limit)s
         """,
         {
             "patterns": [f"%{w}%" for w in words],
-            "types": [type] if type else DEFAULT_TYPES,
+            "types": type or DEFAULT_TYPES,
             "source": source,
             "limit": MAX_RESULTS,
         },
@@ -85,10 +85,11 @@ def _temporary_rank(
 def search(
     conn: Conn,
     q: Annotated[str, Query(min_length=1)],
-    source: str | None = None,
-    type: EntityType | None = None,
+    source: Annotated[list[str], Query()] = [],
+    type: Annotated[list[EntityType], Query()] = [],
 ) -> SearchResponse:
-    """Stateless search: ranked results with evidence."""
+    """Stateless search. Filters repeat like the UI checkboxes: `?type=person&type=unit&source=dcb`.
+    No source = all sources; no type = person and unit."""
     results = build_results(conn, _temporary_rank(conn, q, source, type))
     return SearchResponse(results=results, expansion=None, no_result=not results)
 
