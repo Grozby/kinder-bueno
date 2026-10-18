@@ -173,3 +173,14 @@ def test_unit_found_through_its_own_topics(test_conn, graph, monkeypatch):
     assert ranked()[0] == graph["lab"]
     monkeypatch.setattr("navigator.rank.TOPIC_WEIGHT", 0.0)
     assert ranked()[-1] == graph["lab"]  # without topics it only has a weak page link
+
+
+def test_each_query_string_is_embedded_once(test_conn, graph):
+    calls = []
+
+    def embed(text: str):
+        calls.append(text)
+        return onehot({3: 0.8, 1: 0.6})
+
+    rank_entities(test_conn, "glucose", extra_terms=["CGM"], embed=embed)
+    assert calls.count("glucose") == 1 and calls.count("glucose, CGM") == 1  # chunk search and topic match share

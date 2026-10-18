@@ -165,6 +165,19 @@ def _embed_query(text: str) -> np.ndarray:
 _topic_vecs: dict[Callable | None, dict[str, np.ndarray]] = {}
 
 
+def _once(embed: Callable[[str], np.ndarray]) -> Callable[[str], np.ndarray]:
+    """`embed` that computes each text once: chunk search and topic match embed the same query strings
+    (~0.4 s each on the CPU-only Docker image)."""
+    vecs: dict[str, np.ndarray] = {}
+
+    def embed_once(text: str) -> np.ndarray:
+        if text not in vecs:
+            vecs[text] = embed(text)
+        return vecs[text]
+
+    return embed_once
+
+
 def topic_scores(
     claims: list[tuple[int, str]], query_vecs: list[np.ndarray], vec_of: Callable[[str], np.ndarray]
 ) -> dict[int, float]:
@@ -270,7 +283,8 @@ def rank_entities(
     embed: Callable[[str], np.ndarray] | None = None,
 ) -> Ranking:
     """Ranked entity ids for a query. `conn` needs pgvector registered (chunks_db.connect)."""
-    hits = search_chunks(conn, query, extra_terms, embed=embed, max_per_page=None)
+    embed_query_once = _once(embed or _embed_query)
+    hits = search_chunks(conn, query, extra_terms, embed=embed_query_once, max_per_page=None)
     best_sim = max((h.similarity for h in hits if h.similarity is not None), default=0.0)
     if best_sim < MIN_SIM and not keyword_search(conn, query, extra_terms, limit=1):
         return Ranking([], no_result=True)
@@ -283,7 +297,7 @@ def rank_entities(
     if TOPIC_WEIGHT:
         topic_claims = _topic_claims(conn, sorted({*types, "unit"}), sources)
         queries = [query] + ([f"{query}, {', '.join(extra_terms[:4])}"] if extra_terms else [])
-        query_vecs = [(embed or _embed_query)(q) for q in queries]
+        query_vecs = [embed_query_once(q) for q in queries]
         sims = topic_scores(topic_claims, query_vecs, _topic_vec_of(embed, [v for _, v in topic_claims]))
         topic_idf = _idf_weights(conn, list(sims)) if USE_IDF else {}
         for entity_id, sim in sims.items():
