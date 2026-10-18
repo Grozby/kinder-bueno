@@ -104,3 +104,31 @@ class Source(BaseModel):
     verified_claims: int        # shown claims, as SourceStats.shown_claims
     last_crawled_at: datetime | None
     discovered: list[CrawledPage]  # a sample of the stored pages, for the graph
+
+
+CaseStatus = Literal["new", "in_review", "accepted", "rejected"]
+AnalysisStatus = Literal["pending", "done", "failed"]
+
+
+class ScoreItem(BaseModel):
+    criterion: str
+    score: int                  # 0-100
+    rationale: str
+
+
+class Case(BaseModel):
+    """An uploaded business model PDF and its analysis (docs/FRONTEND_API.md "Cases")."""
+    id: str
+    company_name: str
+    file_name: str
+    uploaded_at: datetime
+    status: CaseStatus
+    analysis_status: AnalysisStatus
+    industry: str | None
+    score: int | None           # 0-100; None until analysed (#53)
+    score_breakdown: list[ScoreItem]
+    summary: str | None
+
+
+class CaseStatusUpdate(BaseModel):
+    status: CaseStatus

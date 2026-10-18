@@ -9,15 +9,17 @@ from typing import Annotated
 import anyio
 import numpy as np
 import psycopg
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import chunks_db
+from navigator import cases, chunks_db
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
 from navigator.llm import LLM
 from navigator.models import (
+    Case,
+    CaseStatusUpdate,
     CrawledPage,
     EntityType,
     Expansion,
@@ -94,11 +96,25 @@ def get_seeds() -> dict[str, str]:
     return {s.id: s.seeds[0] for s in load_sources(get_settings().sources_file).sources}
 
 
+def get_analyze() -> Callable[[str], None]:
+    """The case analysis, run after the upload response on its own connection (the request's is closed by then)."""
+
+    def run(case_id: str) -> None:
+        try:
+            with chunks_db.connect(get_settings().database_url) as conn:
+                cases.analyze(conn, case_id)
+        except Exception:
+            log.exception("case analysis failed: %s", case_id)
+
+    return run
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 Seeds = Annotated[dict[str, str], Depends(get_seeds)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
 Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
 Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_explain)]
+Analyze = Annotated[Callable[[str], None], Depends(get_analyze)]
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -240,3 +256,42 @@ def get_source(conn: Conn, seeds: Seeds, source_id: str) -> Source:
     if not found:
         raise HTTPException(status_code=404, detail="Source not found")
     return found[0]
+
+
+@app.post("/api/cases")
+def upload_case(conn: Conn, analyze: Analyze, background: BackgroundTasks, file: UploadFile) -> Case:
+    """Store a business model PDF's text and return the case at once; the analysis runs in the background."""
+    data = file.file.read(cases.MAX_PDF_BYTES + 1)
+    if len(data) > cases.MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF larger than 10 MB")
+    try:
+        text = cases.pdf_text(data)
+    except cases.PdfError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    case = cases.create_case(conn, file.filename or "upload.pdf", text)
+    conn.commit()  # the background analysis reads it on another connection
+    background.add_task(analyze, case.id)
+    return case
+
+
+@app.get("/api/cases")
+def list_cases(conn: Conn) -> list[Case]:
+    """Newest first."""
+    return cases.list_cases(conn)
+
+
+@app.get("/api/cases/{case_id}")
+def get_case(conn: Conn, case_id: str) -> Case:
+    case = cases.get_case(conn, case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
+@app.patch("/api/cases/{case_id}")
+def update_case(conn: Conn, case_id: str, body: CaseStatusUpdate) -> Case:
+    """Move the case to another board column."""
+    case = cases.set_status(conn, case_id, body.status)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case

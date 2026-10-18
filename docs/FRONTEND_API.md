@@ -39,6 +39,12 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 - `score` and each `score_breakdown[].score` are 0–100. `summary` is a short text for the user.
 - `entity_ids` can include entities added from the chat, not only the top 25.
   The pitch MUST only use facts from these entities (traceability rule, section 1).
+- Upload errors: `413` above 10 MB; `422` if the file is not a PDF, cannot be read, or has no text
+  (a scanned PDF). Only the PDF's text is stored, never the file.
+- Until the analysis lands (#53), `company_name` comes from the file name
+  (`glucora-business-model.pdf` → "Glucora Business Model"), `analysis_status` turns `done` right away,
+  and `score`, `industry` and `summary` stay `null`.
+- `references` and `pitch` are not served yet (#53, #54).
 
 ## Chat and feedback (section 8.9)
 
