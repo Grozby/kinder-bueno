@@ -47,7 +47,7 @@ from navigator.models import (
     SourceStats,
     StatsResponse,
 )
-from navigator.rank import rank_entities
+from navigator.rank import rank_entities, warm_topic_vectors
 from navigator.results import build_results, shown
 from navigator.settings import get_settings
 from navigator.sources import load_sources
@@ -63,6 +63,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     get_model()
     settings = get_settings()
+    try:  # topic vectors for ranking (#59): embedded once here, not inside a search's transaction
+        with chunks_db.connect(settings.database_url) as conn:
+            log.info("topic vectors embedded: %d", warm_topic_vectors(conn))
+    except psycopg.Error as e:
+        log.warning("topic vectors not embedded at startup (%s); the first search will do it", e)
     app.state.llm = LLM(settings)
     app.state.explain_llm = LLM(settings, settings.explain_model)  # its own model: 8B while the gateway is slow
     yield
