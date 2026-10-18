@@ -33,6 +33,7 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 | PATCH | `/api/cases/{id}` | `{"status": "new" \| "in_review" \| "accepted" \| "rejected"}` | `Case` |
 | GET | `/api/cases/{id}/references?limit=25` | – | `Result[]` (section 8.8), best first |
 | POST | `/api/cases/{id}/pitch` | `{"entity_ids": [1, 2, …]}` | `{text, entity_ids, generated_at}` |
+| GET | `/api/cases/{id}/pitch` | – | the last pitch, `404` if none yet |
 
 - Upload returns at once. The analysis runs in the background; the frontend polls
   `GET /api/cases/{id}` every 1.5 s until `analysis_status` is `done` or `failed`.
@@ -44,7 +45,12 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 - Until the analysis lands (#53), `company_name` comes from the file name
   (`glucora-business-model.pdf` → "Glucora Business Model"), `analysis_status` turns `done` right away,
   and `score`, `industry` and `summary` stay `null`.
-- `references` and `pitch` are not served yet (#53, #54).
+- `references` is not served yet (#53).
+- Pitch (#54): plain text, paragraphs separated by a blank line. Every sentence about a reference cites
+  claim ids like `[9606]`, all from the selected entities' evidence; sentences that fail the check are
+  removed. If none is left, or the gateway fails or takes over 30 s, the text is a template that lists the
+  references and their cited topics. Takes ~10–15 s. `404` for an unknown case or entity id, `422` for an
+  empty list. The last pitch is stored on the case; the drawer loads it with `GET` when it opens.
 
 ## Chat and feedback (section 8.9)
 
