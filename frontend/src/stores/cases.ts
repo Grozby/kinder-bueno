@@ -8,6 +8,7 @@ import {
   type CaseStatus,
   type ChatResponse,
   type Pitch,
+  type CaseDocuments,
   type Rating,
   type Result,
 } from '@/api'
@@ -15,6 +16,7 @@ import {
 export const DEFAULT_REFERENCES = 10
 export const MAX_REFERENCES = 25
 const POLL_MS = 1500
+const DOCUMENTS_POLL_MS = 2000 // the report and slides take about a minute
 
 export interface ChatTurn {
   message: string
@@ -39,6 +41,7 @@ export const useCasesStore = defineStore('cases', () => {
   const references = ref<Record<string, Result[]>>({})
   const selected = ref<Record<string, number[]>>({})
   const pitches = ref<Record<string, Pitch>>({})
+  const documents = ref<Record<string, CaseDocuments>>({})
   const chats = ref<Record<string, ChatTurn[]>>({})
   const ratings = ref<Record<string, Record<number, Rating>>>({})
   const flagged = ref<Record<string, number[]>>({})
@@ -204,6 +207,24 @@ export const useCasesStore = defineStore('cases', () => {
     return pitch
   }
 
+  // Partner report and slides (#96): made in the background, so poll until the job is no longer pending
+  async function pollDocuments(id: string) {
+    while (documents.value[id]?.status === 'pending') {
+      await new Promise((resolve) => setTimeout(resolve, DOCUMENTS_POLL_MS))
+      documents.value[id] = await backend.getDocuments(id)
+    }
+  }
+
+  async function loadDocuments(id: string) {
+    documents.value[id] = await backend.getDocuments(id)
+    await pollDocuments(id) // a job started before a reload
+  }
+
+  async function generateDocuments(id: string) {
+    documents.value[id] = await backend.generateDocuments(id)
+    await pollDocuments(id)
+  }
+
   // The reviewer's own score and notes; the author is the name given in this browser
   async function setReview(id: string, score: number, reason: string, author: string) {
     upsert(await backend.setReview(id, { score, reason, author }))
@@ -243,6 +264,7 @@ export const useCasesStore = defineStore('cases', () => {
     references,
     selected,
     pitches,
+    documents,
     chats,
     ratings,
     flagged,
@@ -259,6 +281,8 @@ export const useCasesStore = defineStore('cases', () => {
     flagFact,
     loadPitch,
     generatePitch,
+    loadDocuments,
+    generateDocuments,
     setReview,
     clearReview,
     loadNotes,

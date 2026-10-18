@@ -3,11 +3,14 @@
 LLM output varies, so the tests check shapes and the traceability rules, not exact names.
 """
 
+import io
 import re
 import time
 
 import httpx
 import pytest
+from docx import Document
+from pptx import Presentation
 
 from navigator.settings import PROJECT_ROOT
 
@@ -152,6 +155,23 @@ def test_case_flow(stack, api, db):
     assert cited(pitch["text"]) <= {e["claim_id"] for r in selected for e in r["evidence"]}, "pitch cites other facts"
     assert api.get(f"/api/cases/{case_id}/pitch").json() == pitch
     assert api.post(f"/api/cases/{case_id}/pitch", json={"entity_ids": [-1]}).status_code == 404
+
+    # Partner report and slides (#96), from the stored selection, in the background
+    assert api.put(f"/api/cases/{case_id}/selection", json={"entity_ids": [r["entity_id"] for r in selected]}).is_success
+    docs = api.post(f"/api/cases/{case_id}/documents").json()
+    deadline = time.monotonic() + ANALYSIS_TIMEOUT
+    while docs["status"] == "pending":
+        assert time.monotonic() < deadline, "documents still pending"
+        time.sleep(2)
+        docs = api.get(f"/api/cases/{case_id}/documents").json()
+    assert docs["status"] == "done", docs
+    report = Document(io.BytesIO(api.get(f"/api/cases/{case_id}/documents/report").content))
+    text = "\n".join(p.text for p in report.paragraphs)
+    assert all(r["name"] in text for r in selected) and "5. Sources" in text
+    links = {r.target_ref for r in report.part.rels.values() if r.is_external}
+    assert {e["url"] for r in selected for e in r["evidence"]} >= links and links
+    slides = Presentation(io.BytesIO(api.get(f"/api/cases/{case_id}/documents/slides").content))
+    assert len(slides.slides) >= 6 + len(selected)
 
     # The case survives an API restart (#52): it is in Postgres, not in memory
     stack.compose("restart", "app")

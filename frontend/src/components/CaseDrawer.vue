@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Case details as a centred pop-up: analysis and references on the left,
-// chat refinement and sales pitch on the right. Each column scrolls on its own.
+// chat refinement, sales pitch, and partner report and slides on the right. Each column scrolls on its own.
 import {
   BadgeCheck,
   Building2,
@@ -10,8 +10,10 @@ import {
   ListChecks,
   Copy,
   ExternalLink,
+  FileText,
   FolderKanban,
   LoaderCircle,
+  Presentation,
   RotateCcw,
   Search,
   Server,
@@ -24,7 +26,14 @@ import {
 } from '@lucide/vue'
 import { computed, ref, watch, type Component } from 'vue'
 
-import type { Case, CaseStatus, EntityType, Rating } from '@/api'
+import {
+  backend,
+  type Case,
+  type CaseStatus,
+  type DocumentKind,
+  type EntityType,
+  type Rating,
+} from '@/api'
 import { DEFAULT_REFERENCES, MAX_REFERENCES, useCasesStore } from '@/stores/cases'
 import { hostOf, timeAgo } from '@/utils/format'
 import CaseAssessment from './CaseAssessment.vue'
@@ -62,6 +71,10 @@ const visibleRefs = computed(() =>
     : refs.value.filter((r, i) => i < DEFAULT_REFERENCES || selectedIds.value.has(r.entity_id)),
 )
 const pitch = computed(() => (props.item ? store.pitches[props.item.id] : undefined))
+const docs = computed(() => (props.item ? store.documents[props.item.id] : undefined))
+const docsStarting = ref(false)
+const docsError = ref<string | null>(null)
+const docUrl = (kind: DocumentKind) => (props.item ? backend.documentUrl(props.item.id, kind) : '')
 const ratings = computed(() => (props.item ? (store.ratings[props.item.id] ?? {}) : {}))
 const flagged = computed(() => (props.item ? (store.flagged[props.item.id] ?? []) : []))
 
@@ -98,7 +111,9 @@ watch(
     showAll.value = false
     openEvidence.value = new Set()
     pitchError.value = null
+    docsError.value = null
     if (id) store.loadPitch(id).catch(() => {}) // no stored pitch is fine: the button generates one
+    if (id) store.loadDocuments(id).catch(() => {}) // none yet is fine too
     if (!id || analysis !== 'done') return
     refsLoading.value = true
     refsError.value = null
@@ -123,6 +138,19 @@ async function generate() {
     pitchError.value = (e as Error).message
   } finally {
     pitchLoading.value = false
+  }
+}
+
+async function makeDocuments() {
+  if (!props.item) return
+  docsStarting.value = true
+  docsError.value = null
+  try {
+    await store.generateDocuments(props.item.id)
+  } catch (e) {
+    docsError.value = (e as Error).message
+  } finally {
+    docsStarting.value = false
   }
 }
 
@@ -375,6 +403,51 @@ async function copyPitch() {
               </div>
               <p class="pitch-text">{{ pitch.text }}</p>
             </div>
+          </section>
+
+          <section>
+            <div class="section-head">
+              <h3 class="section-label">Report and slides</h3>
+              <BaseButton
+                v-if="item.status === 'accepted'"
+                size="sm"
+                :icon="FileText"
+                :loading="docsStarting || docs?.status === 'pending'"
+                :disabled="selectedIds.size === 0"
+                @click="makeDocuments"
+              >
+                {{ docs?.status === 'done' ? 'Regenerate' : 'Generate' }}
+              </BaseButton>
+            </div>
+            <p v-if="item.status !== 'accepted'" class="muted small">
+              Accept this company to make a partner report and slides from the selected references.
+            </p>
+            <p v-else-if="docsError" class="notice text-error">{{ docsError }}</p>
+            <p v-else-if="docs?.status === 'pending'" class="muted small">
+              Writing the report and slides from {{ docs.entity_ids.length }} references. This takes
+              about a minute.
+            </p>
+            <p v-else-if="docs?.status === 'failed'" class="notice text-error">{{ docs.error }}</p>
+            <div v-else-if="docs?.status === 'done'" class="docs">
+              <span class="muted small">
+                Built from {{ docs.entity_ids.length }} references ·
+                {{ docs.generated_at ? timeAgo(docs.generated_at) : '' }}
+              </span>
+              <div class="doc-links">
+                <a class="doc-link" :href="docUrl('report')" download>
+                  <FileText :size="16" />
+                  <span>Partner report <span class="muted">(.docx)</span></span>
+                </a>
+                <a class="doc-link" :href="docUrl('slides')" download>
+                  <Presentation :size="16" />
+                  <span>Slides for the partners <span class="muted">(.pptx)</span></span>
+                </a>
+              </div>
+            </div>
+            <p v-else class="muted small">
+              A Word report (summary, partners and their sources, with links) and PowerPoint slides
+              that introduce the company to the partners. Made from the selected references.
+            </p>
           </section>
         </div>
       </div>
@@ -632,6 +705,30 @@ a.icon-btn:hover {
   padding: 0.4rem 0.5rem 0.4rem 1rem;
   border-bottom: 1px solid var(--border-soft);
   background: var(--surface-alt);
+}
+.docs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.doc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  color: inherit;
+  text-decoration: none;
+}
+.doc-link:hover {
+  border-color: var(--bern-red);
 }
 .pitch-text {
   padding: 1rem;

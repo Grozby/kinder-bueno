@@ -134,6 +134,19 @@ export interface Pitch {
   generated_at: string
 }
 
+// Partner report (.docx) and slides (.pptx) of an accepted case (#96), made in the background
+// from the selected references: POST starts the job, poll GET until it is no longer pending.
+export type DocumentsStatus = 'none' | 'pending' | 'done' | 'failed'
+export type DocumentKind = 'report' | 'slides'
+
+export interface CaseDocuments {
+  status: DocumentsStatus
+  entity_ids: number[]
+  started_at: string | null
+  generated_at: string | null
+  error: string | null
+}
+
 // --- Case drawer state kept by the backend (#81) ---
 
 // The references chosen for the pitch; the first 10 matching ones until the user changes it

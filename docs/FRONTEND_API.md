@@ -23,7 +23,8 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
 3. The user **refines** the references with the chat (`/api/chat`, one `session_id` per case:
    `case-<case id>`). Chat results can be added to the case; added ones are selected.
 4. The user moves the card to "In review", then "Accepted" — or rejects it.
-5. For an accepted case, the user generates a **sales pitch** from the selected references.
+5. For an accepted case, the user generates a **sales pitch** from the selected references, and a **partner
+   report** (.docx) and **slides** (.pptx) for the research partners.
 
 ## Cases
 
@@ -36,6 +37,10 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
 | GET | `/api/cases/{id}/references?limit=25` | – | `Result[]` (section 8.8), best first |
 | POST | `/api/cases/{id}/pitch` | `{"entity_ids": [1, 2, …]}` | `{text, entity_ids, generated_at}` |
 | GET | `/api/cases/{id}/pitch` | – | the last pitch, `404` if none yet |
+| POST | `/api/cases/{id}/documents` | – | `CaseDocuments` with `status: "pending"` |
+| GET | `/api/cases/{id}/documents` | – | `CaseDocuments`: `{status, entity_ids, started_at, generated_at, error}` |
+| GET | `/api/cases/{id}/documents/report` | – | the report, `.docx` (attachment) |
+| GET | `/api/cases/{id}/documents/slides` | – | the slides, `.pptx` (attachment) |
 | POST | `/api/cases/{id}/references` | `{"entity_id": n}` | `Result` with `added: true` |
 | DELETE | `/api/cases/{id}/references/{entity_id}` | – | `{entity_ids}`, the selection |
 | GET | `/api/cases/{id}/selection` | – | `{entity_ids}` |
@@ -71,6 +76,18 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
   removed. If none is left, or the gateway fails or takes over 30 s, the text is a template that lists the
   references and their cited topics. Takes ~10–15 s. `404` for an unknown case or entity id, `422` for an
   empty list. The last pitch is stored on the case; the drawer loads it with `GET` when it opens.
+- Report and slides (#96): made from the stored selection, in the background (~1 min); poll
+  `GET …/documents` until `status` is `done` or `failed` (`none` before the first run).
+  - `POST` needs an accepted case (`409` otherwise) and a non-empty selection (`422`). While a job runs, it returns
+    that job instead of starting another. A job pending for over 15 min shows as `failed` (the API restarted).
+  - Report: summary, the company, the Canton Bern fit (score and breakdown), one section per partner (role,
+    unit, contact, why it matches, a profile, up to 6 evidence rows with quotes) and the sources: every page with
+    its institution, title, crawl date and link. The summary and the profiles are written by Apertus and checked
+    like the pitch; citations become numbers of the sources list (`[3]`). About 10 pages with 10 partners.
+  - Slides, for the research partners: title, the company, its needs, the partners matched, one slide per
+    partner (topics, matched need, contact, source URLs; quotes and URLs in the speaker notes), next steps
+    and sources. Bullets are stored claim values, no LLM text.
+  - The files are stored as generated. Download links work through the Vite proxy like every `/api` call.
 - Drawer state (#81): the backend keeps it, so a reload or a teammate sees the same.
   - Selection: the references chosen for the pitch. Until the first `PUT` it is the first 10 references
     that match a need ("Found for" ones are not preselected, #110); `[]` is a valid selection. Entities gone since a re-ingest are left out. `404` for unknown entity ids.

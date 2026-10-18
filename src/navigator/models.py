@@ -249,3 +249,16 @@ class CaseFeedback(BaseModel):
     """The feedback given in the case's chat session (#81): the last 👍/👎 per entity and the flagged claims."""
     ratings: dict[int, Literal["up", "down"]]
     flagged: list[int]          # claim ids rated "wrong_fact"
+
+
+DocumentsJob = Literal["none", "pending", "done", "failed"]
+DocumentKind = Literal["report", "slides"]
+
+
+class CaseDocuments(BaseModel):
+    """Partner report (.docx) and slides (.pptx) of an accepted case (#96), made in the background."""
+    status: DocumentsJob
+    entity_ids: list[int] = []  # the selected references they were made from
+    started_at: datetime | None = None
+    generated_at: datetime | None = None
+    error: str | None = None
