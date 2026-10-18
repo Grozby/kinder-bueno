@@ -11,6 +11,7 @@ from collections import Counter
 from navigator.crawl import crawl_source
 from navigator.extract import extract_pages
 from navigator.llm import LLM
+from navigator.resolve import resolve as run_resolve
 from navigator.settings import get_settings
 from navigator.sources import load_sources
 
@@ -62,9 +63,12 @@ def extract(
     url_like: str | None = typer.Option(
         None, help="Only pages whose URL matches this SQL LIKE pattern, e.g. '%/aihn/group_members/%'."
     ),
+    resolve_after: bool = typer.Option(
+        True, "--resolve/--no-resolve", help="Run resolve afterwards (rebuilds entities, claims, relations)."
+    ),
 ) -> None:
-    """Extract claims and relations with Apertus, verify quotes, store raw results.
-    Only the selected pages' raw rows are replaced."""
+    """Extract claims and relations with Apertus, verify quotes, store raw results, then resolve.
+    Only the selected pages' raw rows are replaced; resolve rebuilds from all raw rows."""
     settings = get_settings()
     with db.connect(settings.database_url) as conn:
         pages = db.pages_for_extraction(conn, source, limit, url_like)
@@ -75,7 +79,12 @@ def extract(
         typer.echo(f"Extracting {len(pages)} pages with {model} (concurrency {settings.llm_concurrency})...")
         results = asyncio.run(extract_pages(LLM(settings, settings.extract_model), pages))
         db.replace_raw_extractions(conn, results)
-    _print_extraction_report(results)
+        _print_extraction_report(results)
+        if resolve_after:
+            # Resolve rebuilds the claim table, so judge verdicts are reset: run the judge after it.
+            typer.echo("Resolving...")
+            for name, n in sorted(run_resolve(conn).items()):
+                typer.echo(f"  {name:<26}{n:>6}")
 
 
 def _print_extraction_report(results: list) -> None:
