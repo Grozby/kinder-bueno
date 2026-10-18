@@ -12,7 +12,13 @@ def shown(alias: str) -> str:
     return f"{alias}.verified AND {alias}.judge_verdict IS DISTINCT FROM 'unsupported'"
 
 
-REL_FIELDS = {"member_of": "affiliations", "part_of": "affiliations", "works_on": "projects", "provides": "infrastructure"}
+REL_FIELDS = {
+    "member_of": "affiliations",
+    "listed_in": "affiliations",  # listed on the unit's member page (#23)
+    "part_of": "affiliations",
+    "works_on": "projects",
+    "provides": "infrastructure",
+}
 
 
 def _unique(values: list[str]) -> list[str]:
