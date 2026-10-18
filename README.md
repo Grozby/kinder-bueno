@@ -156,6 +156,8 @@ Keep `priority_patterns` narrow and anchored to the site root: they decide what 
   its quote and source URL. Nothing is added from other places.
 - A re-crawl replaces a source's pages, and everything extracted from them is deleted with them (database cascade).
 - Every result card links to its source pages, so each fact can be checked at the source.
+- Uploaded business model PDFs are company data: only their text is stored (table `"case"`), never the file,
+  and it is only sent to the Apertus gateway for the case analysis.
 - Designed for the Swiss nDSG and the GDPR where it applies. No user accounts: feedback is stored with an
   anonymous session id. Its optional free-text comment is stored as typed, so it should not ask for personal data.
 

@@ -112,3 +112,22 @@ CREATE TABLE IF NOT EXISTS feedback (
   comment     text,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Business model PDFs uploaded on the board (FRONTEND_API "Cases", #52). Company data, not public data:
+-- only the PDF's text is stored, never the file. "case" is a reserved word, so always quote it.
+CREATE TABLE IF NOT EXISTS "case" (
+  id              text PRIMARY KEY,
+  company_name    text NOT NULL,
+  file_name       text NOT NULL,
+  uploaded_at     timestamptz NOT NULL DEFAULT now(),
+  status          text NOT NULL DEFAULT 'new' CHECK (status IN ('new','in_review','accepted','rejected')),
+  analysis_status text NOT NULL DEFAULT 'pending' CHECK (analysis_status IN ('pending','done','failed')),
+  industry        text,
+  score           int CHECK (score BETWEEN 0 AND 100),
+  score_breakdown jsonb NOT NULL DEFAULT '[]',  -- [{criterion, score, rationale}]
+  summary         text,
+  pdf_text        text NOT NULL,
+  needs           jsonb NOT NULL DEFAULT '[]',  -- analysis output (#53): search queries
+  refs            jsonb NOT NULL DEFAULT '[]'   -- analysis output (#53): [{entity_id, needs}], best first
+);
+CREATE INDEX IF NOT EXISTS case_uploaded_idx ON "case"(uploaded_at DESC);
