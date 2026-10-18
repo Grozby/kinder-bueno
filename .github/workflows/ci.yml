@@ -1,0 +1,61 @@
+# Checks on every PR and push to main (#101). No secrets, no LLM gateway: the tests fake the model calls.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      # Matches the default DATABASE_URL in settings.py; conftest.py creates a test database of its own
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: navigator
+          POSTGRES_PASSWORD: navigator
+          POSTGRES_DB: navigator
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U navigator"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # Syntax errors and pyflakes only: main is not clean under ruff's wider default set yet
+      - name: Lint
+        run: uvx ruff@0.17.1 check --select E9,F .
+      - name: Install
+        run: uv sync --locked
+      # -rs lists skips: a "Postgres not running" skip here means the service is broken, not that tests passed
+      - name: Test
+        run: uv run pytest -rs
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # The npm lint script runs with --fix; CI checks without changing files
+      - name: Lint
+        run: npx oxlint . && npx eslint .
+      - name: Type-check and build
+        run: npm run build
