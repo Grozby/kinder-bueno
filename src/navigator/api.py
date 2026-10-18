@@ -5,14 +5,19 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
+import anyio
 import numpy as np
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from navigator import chunks_db
+from navigator.expand import Expansion as TermExpansion
+from navigator.expand import expand_query
+from navigator.llm import LLM
 from navigator.models import (
     EntityType,
+    Expansion,
     FeedbackCounts,
     FeedbackRequest,
     FeedbackResponse,
@@ -29,10 +34,12 @@ log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Load the embedding model at startup, not on the first search (plan 8.9)."""
+    """Load the embedding model at startup, not on the first search (plan 8.9). One LLM client for the
+    whole process: it is bound to this event loop."""
     from navigator.embed import get_model
 
     get_model()
+    app.state.llm = LLM(get_settings())
     yield
 
 
@@ -51,8 +58,15 @@ def get_embed() -> Callable[[str], np.ndarray]:
     return embed_query
 
 
+def get_expand(request: Request) -> Callable[[str], TermExpansion]:
+    """Query expansion (plan 8.1). Sync routes run in a worker thread, so the coroutine runs on the main loop."""
+    llm = request.app.state.llm
+    return lambda q: anyio.from_thread.run(expand_query, llm, q)
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
+Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -71,15 +85,18 @@ async def internal_error(request: Request, exc: Exception) -> JSONResponse:
 def search(
     conn: Conn,
     embed: Embed,
+    expand: Expand,
     q: Annotated[str, Query(min_length=1)],
     source: Annotated[list[str], Query()] = [],
     type: Annotated[list[EntityType], Query()] = [],
 ) -> SearchResponse:
     """Stateless search. Filters repeat like the UI checkboxes: `?type=person&type=unit&source=dcb`.
     No source = all sources; no type = person and unit."""
-    ranking = rank_entities(conn, q, sources=source, types=type, embed=embed)
+    terms = expand(q)
+    ranking = rank_entities(conn, q, sources=source, types=type, extra_terms=terms.terms, embed=embed)
     results = build_results(conn, ranking.ranked)
-    return SearchResponse(results=results, expansion=None, no_result=not results)
+    expansion = Expansion(en=terms.en, de=terms.de) if terms.terms else None
+    return SearchResponse(results=results, expansion=expansion, no_result=not results)
 
 
 @app.get("/api/stats")
