@@ -34,6 +34,7 @@ export interface Evidence {
   url: string
   judge_verdict: 'supported' | 'partial' | null
   judge_reason: string | null
+  via_unit: string | null // set when the row is a topic of the person's unit, not their own claim (#44)
 }
 
 // An expert, unit, project or infrastructure in Bern. Used both as a case reference
@@ -45,7 +46,8 @@ export interface Result {
   role: string[]
   contact: string[]
   affiliations: string[]
-  expertise: string[]
+  expertise: string[] // the entity's own expertise claims
+  unit_topics: string[] // persons: topics of their member_of / listed_in units, NOT personal expertise (#44)
   projects: string[]
   infrastructure: string[]
   why: string

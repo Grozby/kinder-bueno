@@ -17,6 +17,7 @@ class Evidence(BaseModel):
     url: str
     judge_verdict: JudgeVerdict | None  # [PoC] None: not judged
     judge_reason: str | None    # [PoC]
+    via_unit: str | None = None  # set when the row is a topic of the person's unit, not the person's own claim (#44)
 
 
 class Result(BaseModel):
@@ -26,7 +27,8 @@ class Result(BaseModel):
     role: list[str]
     contact: list[str]          # emails, phones
     affiliations: list[str]     # unit names via member_of / part_of
-    expertise: list[str]
+    expertise: list[str]        # the entity's own expertise claims
+    unit_topics: list[str] = []  # persons: expertise of their member_of / listed_in units, NOT personal (#44)
     projects: list[str]
     infrastructure: list[str]
     why: str
