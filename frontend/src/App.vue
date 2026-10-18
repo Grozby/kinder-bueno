@@ -125,7 +125,7 @@ onMounted(() => {
   font-size: 19px;
 }
 .brand-text span {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 
@@ -173,7 +173,7 @@ nav a.router-link-exact-active {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -203,7 +203,7 @@ nav a.router-link-exact-active {
   background: var(--surface);
   color: var(--text-muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -221,7 +221,7 @@ nav a.router-link-exact-active {
   background: var(--text);
   color: #fff;
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 main {

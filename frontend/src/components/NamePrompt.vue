@@ -96,7 +96,7 @@ h2 {
   font-size: 22px;
 }
 .muted {
-  font-size: 14px;
+  font-size: 16px;
 }
 .input {
   text-align: center;

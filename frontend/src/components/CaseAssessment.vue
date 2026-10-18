@@ -220,10 +220,10 @@ function addNote() {
   gap: 1rem;
 }
 .small {
-  font-size: 13px;
+  font-size: 15px;
 }
 .field-label {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -243,14 +243,14 @@ function addNote() {
   flex-wrap: wrap;
   gap: 0.2rem 0.5rem;
   align-items: baseline;
-  font-size: 14px;
+  font-size: 16px;
 }
 .review-head .muted {
-  font-size: 13px;
+  font-size: 15px;
 }
 .reason {
   margin-top: 0.2rem;
-  font-size: 14px;
+  font-size: 16px;
   font-style: italic;
 }
 .compare {
@@ -258,7 +258,7 @@ function addNote() {
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.35rem;
-  font-size: 13px;
+  font-size: 15px;
 }
 .review-actions {
   display: flex;
@@ -320,7 +320,7 @@ textarea.input[aria-invalid='true'] {
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.5rem;
-  font-size: 15px;
+  font-size: 17px;
 }
 .note-form {
   display: flex;
@@ -363,10 +363,10 @@ li {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 13px;
+  font-size: 15px;
 }
 .note-text {
-  font-size: 14px;
+  font-size: 16px;
   white-space: pre-wrap;
 }
 .delete {

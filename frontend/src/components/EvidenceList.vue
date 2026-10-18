@@ -71,7 +71,7 @@ const groups = computed(() => {
 
 <style scoped>
 .small {
-  font-size: 12px;
+  font-size: 14px;
 }
 .empty {
   padding: 0.25rem 0 0.25rem 2.9rem;
@@ -79,7 +79,7 @@ const groups = computed(() => {
 .evidence {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 14px;
 }
 .evidence tr + tr,
 .evidence tbody + tbody tr:first-child {
@@ -88,7 +88,7 @@ const groups = computed(() => {
 .group th {
   padding-top: 0.6rem;
   color: var(--text);
-  font-size: 11px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -118,7 +118,7 @@ const groups = computed(() => {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
   cursor: help;
 }
 .link,

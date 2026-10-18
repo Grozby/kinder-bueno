@@ -289,7 +289,7 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
   cursor: pointer;
 }
 .chips button:hover:not(.on) {
@@ -309,17 +309,17 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
   width: auto;
   height: 32px;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 16px;
 }
 .toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 14px;
+  font-size: 16px;
 }
 .count {
   margin-left: auto;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .load-error {
@@ -345,7 +345,7 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 16px;
 }
 th {
   position: sticky;
@@ -355,7 +355,7 @@ th {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   text-align: left;
-  font-size: 12.5px;
+  font-size: 14.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -416,7 +416,7 @@ tbody tr:focus-visible {
 }
 .page a {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   text-decoration: none;
 }

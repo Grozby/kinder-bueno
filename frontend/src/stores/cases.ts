@@ -128,7 +128,11 @@ export const useCasesStore = defineStore('cases', () => {
     ])
     references.value[id] = refs
     selected.value[id] = selection.entity_ids
-    chats.value[id] ??= turns.map((t) => ({ message: t.message, response: t.response, error: null }))
+    chats.value[id] ??= turns.map((t) => ({
+      message: t.message,
+      response: t.response,
+      error: null,
+    }))
     ratings.value[id] = { ...feedback.ratings, ...ratings.value[id] }
     flagged.value[id] = [...new Set([...feedback.flagged, ...(flagged.value[id] ?? [])])]
   }

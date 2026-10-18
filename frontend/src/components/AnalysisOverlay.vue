@@ -288,14 +288,14 @@ onBeforeUnmount(() => {
 }
 .score span {
   margin-top: 0.35rem;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .eyebrow {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -311,7 +311,7 @@ h2 {
 .file {
   margin-top: 0.2rem;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 14.5px;
   color: var(--text-muted);
 }
 
@@ -323,7 +323,7 @@ h2 {
   margin: 1.5rem auto 0;
   padding: 0;
   text-align: left;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-faint);
 }
 .steps li {

@@ -404,7 +404,7 @@ async function copyPitch() {
   gap: 0.15rem;
 }
 .rings figcaption {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -419,7 +419,7 @@ async function copyPitch() {
   align-items: center;
   gap: 0.4rem;
   margin-top: 0.3rem;
-  font-size: 13px;
+  font-size: 15px;
 }
 .actions {
   display: flex;
@@ -436,7 +436,7 @@ async function copyPitch() {
   border-radius: var(--radius);
 }
 .small {
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .layout {
@@ -490,11 +490,11 @@ section > .section-label {
   text-align: center;
 }
 .criteria strong {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.25;
 }
 .rationale {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.35;
   color: var(--text-muted);
   display: -webkit-box;
@@ -547,7 +547,7 @@ section > .section-label {
   flex: none;
   width: 1.3rem;
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -567,10 +567,10 @@ section > .section-label {
   white-space: nowrap;
 }
 .ref-line {
-  font-size: 14px;
+  font-size: 16px;
 }
 .why {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 .icon-btn {

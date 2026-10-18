@@ -188,7 +188,7 @@ onMounted(async () => {
   border-radius: var(--radius);
   background: var(--mid-tint);
   color: var(--text);
-  font-size: 14px;
+  font-size: 16px;
 }
 .stale span {
   flex: 1;
@@ -206,11 +206,11 @@ onMounted(async () => {
   background: var(--surface-alt);
 }
 h4 {
-  font-size: 15px;
+  font-size: 17px;
 }
 .hint {
   margin-bottom: 0.6rem;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 ul {
@@ -232,19 +232,19 @@ li {
 }
 li.none {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 15px;
   padding: 0.35rem 0.6rem;
 }
 code {
   flex: 1;
   min-width: 0;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 14px;
   word-break: break-all;
 }
 .hits {
   flex: none;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -275,7 +275,7 @@ code {
 .add .input {
   height: 34px;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 14.5px;
 }
 .add .input[aria-invalid='true'] {
   border-color: var(--bad);

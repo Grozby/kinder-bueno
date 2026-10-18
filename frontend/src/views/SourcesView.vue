@@ -385,9 +385,12 @@ onMounted(() => {
         </div>
         <div class="info">
           <span v-if="s.status === 'crawling'" class="tag tag-mid">
-            <LoaderCircle class="spin" :size="12" /> {{ STAGE_LABEL[s.stage ?? 'crawl'] ?? 'Crawling' }}
+            <LoaderCircle class="spin" :size="12" />
+            {{ STAGE_LABEL[s.stage ?? 'crawl'] ?? 'Crawling' }}
           </span>
-          <span v-else-if="s.status === 'failed'" class="tag tag-bad" :title="s.error ?? undefined">Failed</span>
+          <span v-else-if="s.status === 'failed'" class="tag tag-bad" :title="s.error ?? undefined"
+            >Failed</span
+          >
           <span v-else-if="s.validated" class="tag tag-good"
             ><BadgeCheck :size="13" /> Validated</span
           >
@@ -613,7 +616,7 @@ h1 {
   gap: 0.5rem;
 }
 .kpis dt {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-muted);
 }
 .kpis dd {
@@ -651,7 +654,7 @@ h1 {
   grid-column: 1 / -1;
 }
 .field-label {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
 }
 .field.toggle {
@@ -662,7 +665,7 @@ h1 {
 }
 .field.toggle small {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
 }
 .segmented {
   display: flex;
@@ -764,7 +767,7 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--bern-red);
   text-decoration: none;
 }
@@ -777,7 +780,7 @@ dl {
   margin-top: 0.5rem;
 }
 dt {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 dd {
@@ -802,7 +805,7 @@ dd {
 }
 .when {
   margin-top: 0.4rem;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-faint);
 }
 
@@ -819,7 +822,7 @@ dd {
   justify-content: center;
   gap: 1rem;
   margin-top: 0.5rem;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 .lg {
@@ -855,7 +858,7 @@ dd {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 14.5px;
 }
 .pages li {
   display: flex;
@@ -905,7 +908,7 @@ dd {
 }
 .mono {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 15px;
 }
 .input[aria-invalid='true'] {
   border-color: var(--bad);
@@ -918,7 +921,7 @@ dd {
   overflow-y: auto;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 16px;
 }
 .hits li {
   display: flex;
@@ -935,7 +938,7 @@ dd {
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 14px;
 }
 .similar .submit {
   display: flex;

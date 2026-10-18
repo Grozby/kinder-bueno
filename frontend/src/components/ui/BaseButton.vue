@@ -58,12 +58,12 @@ withDefaults(
 .btn-md {
   height: 38px;
   padding: 0 1rem;
-  font-size: 14px;
+  font-size: 16px;
 }
 .btn-sm {
   height: 30px;
   padding: 0 0.7rem;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .btn-primary {

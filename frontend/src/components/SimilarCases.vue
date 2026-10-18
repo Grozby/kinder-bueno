@@ -89,10 +89,10 @@ li + li {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  font-size: 14px;
+  font-size: 16px;
 }
 .small {
-  font-size: 12.5px;
+  font-size: 14.5px;
 }
 .review {
   font-style: italic;

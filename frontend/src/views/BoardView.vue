@@ -195,7 +195,6 @@ function onBearDrop(e: DragEvent) {
               @open="openId = c.id"
               @open-case="(id) => (openId = id)"
               @move="(s) => move(c.id, s)"
-              @reject="(el) => reject(c.id, el)"
             />
           </TransitionGroup>
           <div v-if="!store.byStatus[col.status].length" class="empty">
@@ -287,7 +286,7 @@ h1 {
 .lead {
   max-width: 62ch;
   margin-top: 0.35rem;
-  font-size: 16px;
+  font-size: 17px;
   color: var(--text-muted);
 }
 .upload {
@@ -313,7 +312,7 @@ h1 {
   gap: 0.5rem;
 }
 .kpis dt {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-muted);
 }
 .kpis dd {
@@ -392,7 +391,7 @@ h1 {
 }
 .hint {
   margin-left: calc(10px + 0.55rem);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 .count {
@@ -404,7 +403,7 @@ h1 {
   border-radius: 999px;
   background: var(--text);
   color: #fff;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -430,7 +429,7 @@ h1 {
   border: 2px dashed #d4d4d4;
   border-radius: var(--radius-lg);
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .rejected-list {
@@ -453,7 +452,7 @@ h1 {
   border: 2px dashed var(--border-strong);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   transition: border-color 0.15s;
 }

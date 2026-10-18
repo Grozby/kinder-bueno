@@ -1,16 +1,6 @@
 <script setup lang="ts">
-import {
-  BadgeCheck,
-  Copy,
-  FileText,
-  History,
-  MessageSquare,
-  RotateCcw,
-  Search,
-  TriangleAlert,
-  X,
-} from '@lucide/vue'
-import { computed, useTemplateRef, type Component } from 'vue'
+import { FileText, History, MessageSquare, RotateCcw, TriangleAlert } from '@lucide/vue'
+import { computed } from 'vue'
 
 import type { Case, CaseStatus } from '@/api'
 import { scoreBand, timeAgo } from '@/utils/format'
@@ -21,17 +11,9 @@ const props = defineProps<{ item: Case }>()
 const emit = defineEmits<{
   open: []
   move: [status: CaseStatus]
-  reject: [el: HTMLElement]
   openCase: [id: string]
 }>()
 
-const root = useTemplateRef<HTMLElement>('root')
-
-const NEXT: Partial<Record<CaseStatus, { status: CaseStatus; label: string; icon: Component }>> = {
-  new: { status: 'in_review', label: 'Review', icon: Search },
-  in_review: { status: 'accepted', label: 'Accept', icon: BadgeCheck },
-}
-const next = computed(() => NEXT[props.item.status])
 const similar = computed(() => props.item.similar_cases?.[0])
 const similarLabel = computed(() =>
   similar.value
@@ -55,7 +37,6 @@ function onDragStart(e: DragEvent) {
 
 <template>
   <article
-    ref="root"
     class="card"
     :data-case-id="item.id"
     draggable="true"
@@ -67,7 +48,14 @@ function onDragStart(e: DragEvent) {
     <header>
       <div class="title">
         <h3>{{ item.company_name }}</h3>
-        <p class="file"><FileText :size="13" /> {{ item.file_name }}</p>
+        <p class="file">
+          <FileText :size="14" />
+          <span class="file-name">{{ item.file_name }}</span>
+          <span>· {{ timeAgo(item.uploaded_at) }}</span>
+          <span v-if="item.notes_count" class="notes" :title="`${item.notes_count} notes`">
+            · <MessageSquare :size="14" /> {{ item.notes_count }}
+          </span>
+        </p>
       </div>
       <!-- The reviewer's score leads once there is one; the AI score stays visible -->
       <figure
@@ -93,45 +81,26 @@ function onDragStart(e: DragEvent) {
       </li>
     </ul>
 
-    <footer>
+    <!-- Cards move by drag and drop; only a discarded card needs a button to come back -->
+    <footer v-if="item.industry || similar || item.status === 'rejected'">
       <span v-if="item.industry" class="tag">{{ item.industry }}</span>
-      <span class="when">{{ timeAgo(item.uploaded_at) }}</span>
-      <span v-if="item.notes_count" class="notes" :title="`${item.notes_count} notes`">
-        <MessageSquare :size="13" /> {{ item.notes_count }}
-      </span>
-      <!-- An accessory: the full list is in the case pop-up -->
       <button
         v-if="similar"
         class="similar"
         :class="{ duplicate: similar.duplicate }"
         :title="similarLabel"
-        :aria-label="similarLabel"
         @click.stop="emit('openCase', similar.case_id)"
       >
-        <Copy v-if="similar.duplicate" :size="13" />
-        <History v-else :size="13" />
+        <History :size="14" />
+        <span>{{ similar.duplicate ? 'Duplicate of' : 'Like' }} {{ similar.company_name }}</span>
       </button>
-      <span class="spacer" />
-      <template v-if="item.status !== 'rejected'">
-        <button
-          class="reject"
-          title="Reject"
-          aria-label="Reject"
-          @click.stop="root && emit('reject', root)"
-        >
-          <X :size="16" />
-        </button>
-        <BaseButton
-          v-if="next"
-          size="sm"
-          :icon="next.icon"
-          :disabled="pending"
-          @click.stop="emit('move', next.status)"
-        >
-          {{ next.label }}
-        </BaseButton>
-      </template>
-      <BaseButton v-else size="sm" :icon="RotateCcw" @click.stop="emit('move', 'new')">
+      <BaseButton
+        v-if="item.status === 'rejected'"
+        class="restore"
+        size="sm"
+        :icon="RotateCcw"
+        @click.stop="emit('move', 'new')"
+      >
         Restore
       </BaseButton>
     </footer>
@@ -175,7 +144,7 @@ header {
   min-width: 0;
 }
 h3 {
-  font-size: 16px;
+  font-size: 17px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -185,24 +154,31 @@ h3 {
   align-items: center;
   gap: 0.3rem;
   margin-top: 0.15rem;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
-  overflow: hidden;
   white-space: nowrap;
+}
+.file svg {
+  flex: none;
+}
+.file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .state {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 13px;
+  font-size: 15px;
 }
 .criteria {
   list-style: none;
   padding: 0;
   display: grid;
   gap: 0.3rem;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 .criteria li {
@@ -219,7 +195,7 @@ h3 {
 }
 .num {
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -247,73 +223,63 @@ h3 {
   gap: 0.15rem;
 }
 .rings figcaption {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
+.notes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* One row: the industry tag, then the similar earlier case as a quiet link */
+footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-soft);
+}
+footer .tag {
+  flex: none;
+}
 .similar {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: transparent;
+  background: none;
   color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
   cursor: pointer;
+}
+.similar svg {
+  flex: none;
+}
+.similar span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .similar.duplicate {
   color: var(--mid);
 }
 .similar:hover {
-  background: var(--surface-alt);
   color: var(--bern-red);
+  text-decoration: underline;
 }
 .similar:focus-visible {
   outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
-.notes {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border-soft);
-}
-.when {
-  font-size: 13px;
-  color: var(--text-faint);
-}
-.spacer {
-  flex: 1;
-}
-.reject {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--surface-alt);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    background-color 0.15s,
-    color 0.15s;
-}
-.reject:hover {
-  background: var(--bern-red-tint);
-  color: var(--bern-red);
-}
-.reject:focus-visible {
-  outline: 2px solid var(--focus);
+.restore {
+  margin-left: auto;
 }
 </style>

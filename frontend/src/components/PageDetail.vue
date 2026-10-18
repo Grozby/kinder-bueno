@@ -238,7 +238,7 @@ const byEntity = computed(() => {
   max-width: 100%;
   margin-top: 0.15rem;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 14.5px;
   color: var(--bern-red);
   text-decoration: none;
   overflow: hidden;
@@ -299,7 +299,7 @@ const byEntity = computed(() => {
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   background: var(--surface-alt);
-  font-size: 14px;
+  font-size: 16px;
 }
 .notice svg {
   flex: none;
@@ -307,13 +307,13 @@ const byEntity = computed(() => {
 }
 code {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 14.5px;
   word-break: break-all;
 }
 
 .weights {
   margin: -0.3rem 0 0.75rem;
-  font-size: 13px;
+  font-size: 15px;
 }
 .criteria {
   list-style: none;
@@ -330,10 +330,10 @@ code {
   background: var(--surface-alt);
 }
 .criteria strong {
-  font-size: 15px;
+  font-size: 17px;
 }
 .criteria p {
-  font-size: 13.5px;
+  font-size: 15.5px;
   color: var(--text-muted);
 }
 
@@ -343,7 +343,7 @@ code {
   gap: 0.75rem 1rem;
 }
 .numbers dt {
-  font-size: 12.5px;
+  font-size: 14.5px;
   color: var(--text-muted);
 }
 .numbers dd {
@@ -361,7 +361,7 @@ code {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.4rem;
-  font-size: 15px;
+  font-size: 17px;
 }
 .entity ul {
   list-style: none;
@@ -379,12 +379,12 @@ code {
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
-  font-size: 14px;
+  font-size: 16px;
 }
 .field {
   flex: none;
   min-width: 6.5rem;
-  font-size: 12.5px;
+  font-size: 14.5px;
   color: var(--text-muted);
   text-transform: capitalize;
 }
@@ -398,7 +398,7 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 12.5px;
+  font-size: 14.5px;
   color: var(--text-muted);
 }
 .verdict.supported {
@@ -412,7 +412,7 @@ code {
 }
 blockquote {
   margin: 0.25rem 0 0 7.1rem;
-  font-size: 13px;
+  font-size: 15px;
   font-style: italic;
   color: var(--text-muted);
 }

@@ -123,10 +123,10 @@ async function send(message = draft.value.trim()) {
   gap: 1.25rem;
 }
 .intro {
-  font-size: 14px;
+  font-size: 16px;
 }
 .small {
-  font-size: 13px;
+  font-size: 15px;
 }
 .turn {
   display: flex;
@@ -169,7 +169,7 @@ async function send(message = draft.value.trim()) {
   flex-direction: column;
 }
 .result-main a {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--bern-red);
   text-decoration: none;
 }
@@ -190,7 +190,7 @@ async function send(message = draft.value.trim()) {
   background: var(--surface);
   color: var(--text-muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 15px;
   cursor: pointer;
 }
 .examples button:hover:not(:disabled) {
