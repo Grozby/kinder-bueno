@@ -3,7 +3,28 @@
 Find researchers, units, projects and infrastructure in the Bern research ecosystem, with every fact
 linked to a quote on a public page. The build plan is in [`docs/PLAN.md`](docs/PLAN.md).
 
-## Setup
+## Run with Docker
+
+Everything runs in containers: Postgres, the Python pipeline and API, and the Vue UI. Nothing connects to
+cantonal networks. The only outside calls are the crawled public sites and the Apertus gateway.
+
+```bash
+cp .env.example .env                                       # then set KEERA_API_KEY
+docker compose up -d db                                    # Postgres 16 + pgvector
+docker compose run --rm app uv run navigator ingest        # init-db → crawl → embed → extract → resolve
+docker compose up -d app frontend                          # API + UI
+```
+
+- UI: http://localhost:5173 · API docs: http://localhost:8000/docs
+- `ingest` on 100 pages takes about 15–20 min. The first run also downloads bge-m3 (~2.3 GB) into the
+  `hf_cache` volume. The app image is ~2 GB (CPU-only torch).
+- Extraction uses `apertus-v1-5-8b` by default (`EXTRACT_MODEL`): 70B is too slow on the shared gateway.
+  Override with `EXTRACT_MODEL=apertus-v1-5-70b docker compose run ...`.
+- Host ports can be changed with `DB_PORT`, `API_PORT` and `UI_PORT`, e.g. to run a second stack with its
+  own data: `DB_PORT=55432 API_PORT=18000 UI_PORT=15173 docker compose -p navclean up -d`.
+- Single steps also work in the container: `docker compose run --rm app uv run navigator <command>`.
+
+## Local development setup
 
 ```bash
 cp .env.example .env          # then set KEERA_API_KEY
@@ -17,10 +38,17 @@ uv run navigator init-db      # schema + sources from config/sources.yaml
 Run the steps in this order, for all sources or one source with `--source ID`:
 
 ```bash
+uv run navigator ingest       # all of the steps below, in order
 uv run navigator crawl        # crawl + clean pages into `page`
 uv run navigator embed        # chunk + embed pages into `chunk` (bge-m3, ~2.3 GB download on first run)
-uv run navigator stats        # pages and chunks per source
+uv run navigator extract      # Apertus extracts facts with quotes, quotes are verified, then resolve
+uv run navigator stats        # pages, chunks, entities and claims per source
 ```
+
+- `extract --url-like '%/aihn/group_members/%'` re-extracts single pages. `--no-resolve` skips resolve.
+- `reverify` re-runs the verification rules on the stored extractions (no LLM calls, ~3 s), then resolves.
+  Use it after changing a check.
+- `resolve` rebuilds entities, claims and relations from the verified extractions.
 
 **After every `crawl`, run `embed` again for the same source.** `crawl` replaces a source's pages, and
 deleting a page also deletes its chunks, so a re-crawled source has no chunks and does not show up in
