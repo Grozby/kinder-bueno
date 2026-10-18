@@ -8,6 +8,7 @@ import psycopg
 
 TOP_N = 50
 RRF_K = 60
+MAX_PER_PAGE = 2
 
 
 @dataclass
@@ -80,14 +81,30 @@ def rrf(ranked_lists: list[list[int]], k: int = RRF_K) -> list[tuple[int, float]
     return sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
 
 
+def cap_per_page(hits: list[ChunkHit], max_per_page: int) -> list[ChunkHit]:
+    """Keep at most `max_per_page` hits per page, in order, so one long page cannot fill the list."""
+    kept: dict[int, int] = {}
+    capped = []
+    for hit in hits:
+        if kept.get(hit.page_id, 0) < max_per_page:
+            kept[hit.page_id] = kept.get(hit.page_id, 0) + 1
+            capped.append(hit)
+    return capped
+
+
 def search_chunks(
     conn: psycopg.Connection,
     query: str,
     extra_terms: list[str] = [],
     embed: Callable[[str], np.ndarray] | None = None,
     limit: int = TOP_N,
+    max_per_page: int | None = MAX_PER_PAGE,
 ) -> list[ChunkHit]:
-    """Fused chunk ranking for `query` plus optional expansion terms. `conn` needs pgvector registered."""
+    """Fused chunk ranking for `query` plus optional expansion terms. `conn` needs pgvector registered.
+
+    `max_per_page` caps the chunks of one page (a long list page otherwise fills the top);
+    pass None to get every chunk, e.g. to link chunks to entities (plan 8.4 step 2).
+    """
     if embed is None:
         from navigator.embed import embed_query  # imported lazily: loads torch
 
@@ -101,15 +118,18 @@ def search_chunks(
         for cid, sim in semantic:
             similarity[cid] = max(sim, similarity.get(cid, -1.0))
 
-    fused = rrf(lists)[:limit]
+    fused = rrf(lists)
     rows = conn.execute(
         "SELECT c.id, c.page_id, p.url, c.text FROM chunk c JOIN page p ON p.id = c.page_id "
         "WHERE c.id = ANY(%s)",
         ([cid for cid, _ in fused],),
     ).fetchall()
     by_id = {r[0]: r for r in rows}
-    return [
+    hits = [
         ChunkHit(cid, by_id[cid][1], by_id[cid][2], by_id[cid][3], score, similarity.get(cid))
         for cid, score in fused
         if cid in by_id
     ]
+    if max_per_page is not None:
+        hits = cap_per_page(hits, max_per_page)
+    return hits[:limit]
