@@ -1,6 +1,7 @@
 # Case eval (#73): example business models (fictional companies, docs/examples) with the entities the case
 # analysis should count as matches. Run with `navigator case-eval`; the report goes to eval/case_report.md.
 #
+# pdf: relative to this file.
 # needs: pinned from an Apertus read on 2026-10-18, so matching changes are measured on the same input.
 #   Remove them to have Apertus read the PDF again (the report then shows the new needs).
 # must_match: entities whose shown claims serve a need. Includes some the data cannot match today (a person
@@ -15,7 +16,7 @@
 
 cases:
   - id: glucora
-    pdf: docs/examples/glucora-business-model.pdf
+    pdf: ../docs/examples/glucora-business-model.pdf
     score: [55, 90]
     needs:
       - clinical validation of sensor accuracy
@@ -47,7 +48,7 @@ cases:
       - {name: "Kuangyu Shi", type: person}
 
   - id: repolar
-    pdf: docs/examples/repolar-business-model.pdf
+    pdf: ../docs/examples/repolar-business-model.pdf
     score: [55, 90]
     needs:
       - transgenic animal models of arrhythmia
@@ -73,7 +74,7 @@ cases:
       - {name: "Rubin Lab", type: unit}
 
   - id: precisa
-    pdf: docs/examples/precisa-business-model.pdf
+    pdf: ../docs/examples/precisa-business-model.pdf
     score: [55, 90]
     needs:
       - image-guided surgical navigation
@@ -104,7 +105,7 @@ cases:
       - {name: "Lilian Witthauer", type: person}
 
   - id: vinora
-    pdf: docs/examples/vinora-business-model.pdf
+    pdf: ../docs/examples/vinora-business-model.pdf
     score: [0, 30]
     needs:
       - plant pathology downy mildew grapevines

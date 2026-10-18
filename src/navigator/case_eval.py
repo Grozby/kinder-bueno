@@ -41,7 +41,7 @@ def load_cases(path: Path) -> list[GoldCase]:
 
     return [
         GoldCase(
-            id=c["id"], pdf=c["pdf"], score=tuple(c["score"]), needs=c.get("needs") or [],
+            id=c["id"], pdf=str(path.parent / c["pdf"]), score=tuple(c["score"]), needs=c.get("needs") or [],
             must_match=entities(c.get("must_match")), must_not_match=entities(c.get("must_not_match")),
         )
         for c in yaml.safe_load(path.read_text())["cases"]

@@ -32,6 +32,7 @@ from navigator.llm import LLM
 from navigator.models import Result, ScoreItem
 from navigator.rank import MAX_PER_UNIT, _units, fairness_cap, rank_entities
 from navigator.results import build_results
+from navigator.settings import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +43,6 @@ MAX_NEED_LEN = 80
 MAX_REFERENCES = 25
 ALL_TYPES = ["person", "unit", "project", "infrastructure"]
 RRF_K = 10            # small: each need's ranking has at most 10 entries
-RERANK_MODEL = "BAAI/bge-reranker-v2-m3"  # same family as bge-m3, multilingual, runs locally (~2 GB)
 PRE_SIM = 0.45        # bge-m3 cosine below which a (need, claim) pair is not sent to the reranker
 # Tuned on the case eval (#73): loose matches ("clinical studies" for "cochlear implantation clinical trials")
 # score up to 0.24, most expected ones 0.13-1.0. 0.10 kept 16 of 20 expected matches and let 6 loose ones in;
@@ -142,7 +142,8 @@ class Match:
 def _reranker():
     from sentence_transformers import CrossEncoder
 
-    return CrossEncoder(RERANK_MODEL, max_length=128)
+    # RERANK_MODEL, default bge-reranker-v2-m3: same family as bge-m3, multilingual, runs locally (~2 GB)
+    return CrossEncoder(get_settings().rerank_model, max_length=128)
 
 
 def rerank(pairs: list[tuple[str, str]]) -> np.ndarray:
