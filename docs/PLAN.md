@@ -429,16 +429,18 @@ Entities with no verified claims left after a re-ingest SHOULD be deleted by a c
    - <link text or "email">: <email>
    ```
    This makes emails quotable and verifiable.
-4. Normalise whitespace (collapse spaces, keep paragraph breaks).
+4. Normalise whitespace: collapse spaces, one visible block per line. The output has almost no blank lines (7 of 100 pages), so later steps split on single line breaks.
 5. Title: the `<title>` tag, without the site suffix.
 
 The cleaned text is stored in `page.text`. It is the ground truth for quote checks.
 
 ### 7.4 Chunk and embed (`chunk.py`, `embed.py`)
 
-- Split `page.text` on paragraph breaks. Pack paragraphs into chunks of about 1,200 characters, with 200 characters of overlap. Prefix every chunk with the page title, like `"<title>\n\n<chunk text>"`, so short chunks keep their context.
+- Split `page.text` on line breaks (the cleaner writes one block per line, see 7.3). Split lines longer than 1,200 characters at word boundaries. Pack the lines into chunks of about 1,200 characters; each chunk starts with the last ~200 characters of the previous one (cut at a word boundary). Prefix every chunk with the page title, like `"<title>\n\n<chunk text>"`, so short chunks keep their context.
 - Embed with `SentenceTransformer("BAAI/bge-m3")`, `normalize_embeddings=True`, batch size 16. Store in `chunk.embedding`.
 - Load the model once per process (module-level cache). It is also used at query time.
+- Store with `chunks_db.replace_chunks` (delete the source's chunks, insert the new ones). Re-crawling a source deletes its pages and, by cascade, its chunks: run `navigator embed --source ID` again after `navigator crawl`.
+- Measured: 377 chunks for the 100 pages (artorg 92, dcb 211, unibe 74), embedded in ~20 s.
 
 ### 7.5 Extract (`extract.py`, `llm.py`)
 
@@ -612,13 +614,18 @@ Cache results in memory (dict) for the session. If the call fails, continue with
 ### 8.2 Keyword search
 
 ```sql
-SELECT id, page_id, ts_rank_cd(tsv, q) AS score
-FROM chunk, to_tsquery('simple', :tsquery) q
+SELECT id FROM chunk,
+  (SELECT plainto_tsquery('simple', :word1) || ... || phraseto_tsquery('simple', :term2) AS q) AS query
 WHERE tsv @@ q
-ORDER BY score DESC LIMIT 50;
+ORDER BY ts_rank_cd(tsv, q) DESC LIMIT 50;
 ```
 
-Build `:tsquery` as an OR of all terms (original + expansions). Multi-word terms become phrase queries with `<->`. Escape special characters. Simplest safe way: for each term, call `plainto_tsquery('simple', term)` (or `phraseto_tsquery` for multi-word terms) in SQL and combine with `||`.
+Build the tsquery in SQL (no manual escaping) as an OR (`||`) of:
+
+1. **The words of the original query**, each with `plainto_tsquery('simple', word)`. Tokenise with `to_tsvector('simple', query)` so words match `chunk.tsv`. Drop English and German stopwords: a word is a stopword if `ts_lexize('english_stem', word)` or `ts_lexize('german_stem', word)` returns `{}`. If only stopwords are left, keep them.
+2. **The expansion terms** (8.1): `phraseto_tsquery` for multi-word terms, `plainto_tsquery` for single words.
+
+Do NOT send the original query as one phrase or as an AND of its words. The `'simple'` config does not stem, and pages say "valves", "robotics", "sensor" where users type "valve", "robots", "sensors": phrase/AND found 0 chunks for 3 of 4 test queries. With OR, `ts_rank_cd` still ranks chunks with more of the words, closer together, first. Trade-off: a common word like "research" lifts general index pages; expansion terms sharpen this.
 
 ### 8.3 Semantic search
 
@@ -898,6 +905,8 @@ Save every verdict with its reason to `eval/judge_log.jsonl`, so a human can spo
 | `navigator init-db` | run `schema.sql`, upsert `source` rows from config |
 | `navigator ingest [--source ID] [--max-pages N]` | crawl → clean → chunk → embed → extract → verify → resolve → judge |
 | `navigator crawl --source ID` | crawl + clean only (for debugging) |
+| `navigator embed [--source ID]` | chunk + embed + store (section 7.4); run again after `crawl` |
+| `navigator search-chunks "query" [--k N]` | top chunks with page URL and score (debugging, sections 8.2–8.4 step 1) |
 | `navigator extract --source ID` | extract + verify + resolve + judge only (pages already stored) |
 | `navigator judge [--source ID]` | [PoC] re-run section 7.8 on stored claims |
 | `navigator search "query"` | print results as JSON (for debugging) |
@@ -959,9 +968,10 @@ Fallback if behind at hour 5, in this order: (1) drop the chat [PoC] (keep the s
 | Gateway rate limit | HTTP 429 | lower `LLM_CONCURRENCY` to 4 or 2; backoff already in place |
 | Apertus copies quotes inexactly | high drop rate (> 40%) | fuzzy fallback (7.6 step 3); shorten max quote length in prompt; show 2 good examples in prompt |
 | Apertus returns non-JSON | parse errors | JSON substring fallback; retry once; lower page part size to 6,000 characters |
-| bge-m3 slow on CPU | embedding > 10 min | fine for 100 pages; if needed, switch `EMBED_MODEL` to `intfloat/multilingual-e5-small` (384 dims — change `vector(1024)` to `vector(384)`) |
+| bge-m3 slow on CPU | embedding > 10 min | measured ~20 s for 377 chunks on a dev laptop; fine for 100 pages; if needed, switch `EMBED_MODEL` to `intfloat/multilingual-e5-small` (384 dims — change `vector(1024)` to `vector(384)`) |
 | Docker image build slow (torch) | build > 10 min | run pipeline on host with `uv run`, only `db` in Docker; fix image later |
 | 100 pages miss a use case | gold set has < 2 expected entities | add targeted seed URLs, re-ingest that source |
+| Keyword search misses word forms | `'simple'` config has no stemming ("valve" vs "valves") | OR the query words (8.2) instead of a phrase; expansion adds variants; semantic search covers the rest |
 | Pages are German only | few English matches | expansion already adds German terms; bge-m3 is multilingual |
 | Wrong person merge | two people shown as one | merge rules are strict on purpose; check `resolve` tests |
 | [PoC] Judge agrees with itself (same model) | almost 0% `unsupported` | say it in the pitch; spot-check 10 claims by hand if time allows; it is still a filter for obvious errors |
