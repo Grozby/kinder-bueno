@@ -1,4 +1,4 @@
-# Running the Navigator (v0.1.0)
+# Running the Navigator (v0.1.1)
 
 How to run the whole Navigator on your own machine: Postgres, the API and the UI, all in Docker. Follow the steps in
 order. Development setup is in the [README](../README.md#local-development-setup).
@@ -16,7 +16,7 @@ order. Development setup is in the [README](../README.md#local-development-setup
 ## 1. Get the code
 
 ```bash
-git clone --branch v0.1.0 https://github.com/Grozby/kinder-bueno.git
+git clone --branch v0.1.1 https://github.com/Grozby/kinder-bueno.git
 cd kinder-bueno
 mkdir -p checkpoints && cp /path/to/demo.dump checkpoints/demo.dump
 ```
@@ -44,6 +44,19 @@ Then set these three values:
 
 The UI's proxy adds `API_TOKEN` to every API call. You never type it, and the browser never sees it.
 
+### Optional: download the images instead of building them
+
+Every release is published as ready-made images for Intel/AMD and ARM (`ghcr.io/grozby/kinder-bueno-app` and
+`-frontend`, public, no login). Downloading them is faster and needs no build tools. To use them, change the
+`COMPOSE_FILE` line and add the version:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.handoff.yml:docker-compose.images.yml
+NAVIGATOR_VERSION=0.1.1
+```
+
+Then run `docker compose pull` instead of `docker compose build` in step 3.
+
 ## 3. Load the data and the models (once)
 
 `scripts/demo.sh setup` runs steps 3 and 4 in one go and prints the URL when the stack is healthy.
@@ -52,7 +65,7 @@ The commands it runs:
 ```bash
 docker compose up -d db                                     # Postgres 16 + pgvector
 docker compose run --rm restore                             # loads checkpoints/demo.dump
-docker compose build                                        # app and UI images, ~5–10 min
+docker compose build                                        # app and UI images, ~5–10 min (or `pull`, see step 2)
 docker compose run --rm app uv run navigator init-db        # brings the snapshot to the current schema
 docker compose run --rm app uv run navigator warm           # downloads bge-m3 and the reranker (~4.5 GB)
 ```
