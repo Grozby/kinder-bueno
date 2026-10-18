@@ -134,11 +134,13 @@ def get_analyze(request: Request) -> Callable[[str], None]:
     def run(case_id: str) -> None:
         try:
             with chunks_db.connect(get_settings().database_url) as conn:
+                conn.autocommit = True  # minutes of LLM calls: no transaction may stay open (it blocked init_db)
                 analysis.analyze(
                     conn, case_id,
                     read=lambda text: anyio.from_thread.run(analysis.read_case, llm, text),
                     embed=embed_query,
                     embed_many=embed_documents,
+                    rerank=analysis.rerank,
                     explain=lambda q, results: anyio.from_thread.run(explain_results, explain_llm, q, results),
                 )
         except Exception:

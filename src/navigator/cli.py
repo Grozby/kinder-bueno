@@ -319,7 +319,7 @@ def case_eval(
     from pathlib import Path
 
     from navigator import chunks_db
-    from navigator.analysis import read_case
+    from navigator.analysis import read_case, rerank
     from navigator.case_eval import evaluate_case, load_cases, report
     from navigator.embed import embed_documents, embed_query
 
@@ -327,7 +327,7 @@ def case_eval(
     with chunks_db.connect(settings.database_url) as conn:
         outcomes = [  # one LLM client per asyncio.run: the client is bound to its event loop
             evaluate_case(conn, case, lambda text: asyncio.run(read_case(LLM(settings), text)), embed_query,
-                          embed_documents)
+                          embed_documents, rerank)
             for case in load_cases(Path(gold))
         ]
     text = report(outcomes)

@@ -5,7 +5,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from pypdf import PdfWriter
-from test_analysis import fake_embed_many, fake_read, no_explain
+from test_analysis import fake_embed_many, fake_read, fake_rerank, no_explain
 from test_api import fake_embed
 
 from navigator import analysis, cases
@@ -19,7 +19,8 @@ GLUCORA = PROJECT_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
 def client(test_conn):
     app.dependency_overrides[get_conn] = lambda: test_conn
     app.dependency_overrides[get_analyze] = lambda: lambda case_id: analysis.analyze(
-        test_conn, case_id, read=fake_read, embed=fake_embed, embed_many=fake_embed_many, explain=no_explain)
+        test_conn, case_id, read=fake_read, embed=fake_embed, embed_many=fake_embed_many, rerank=fake_rerank,
+        explain=no_explain)
     yield TestClient(app)
     app.dependency_overrides.clear()
 

@@ -84,9 +84,10 @@ class Outcome:
 def evaluate_case(
     conn: psycopg.Connection, case: GoldCase, read: Callable[[str], CaseInfo],
     embed: Callable[[str], np.ndarray], embed_many: Callable[[list[str]], np.ndarray],
+    rerank: Callable[[list[tuple[str, str]]], np.ndarray],
 ) -> Outcome:
     needs = case.needs or read(pdf_text(Path(case.pdf).read_bytes())).needs
-    return Outcome(case, needs, score_needs(conn, needs, embed, embed_many))
+    return Outcome(case, needs, score_needs(conn, needs, embed, embed_many, rerank))
 
 
 def _share(part: int, whole: int) -> str:
@@ -112,10 +113,12 @@ def report(outcomes: list[Outcome]) -> str:
     must = sum(len(o.case.must_match) for o in outcomes)
     lines += [
         "",
-        f"**Total:** match recall {_share(sum(len(o.matched) for o in outcomes), must)}, "
-        f"in references {_share(sum(len(o.in_references) for o in outcomes), must)}, "
-        f"false matches {sum(len(o.false_matches) for o in outcomes)}, "
-        f"scores in range {sum(o.score_ok for o in outcomes)}/{len(outcomes)}.",
+        (
+            f"**Total:** match recall {_share(sum(len(o.matched) for o in outcomes), must)}, "
+            f"in references {_share(sum(len(o.in_references) for o in outcomes), must)}, "
+            f"false matches {sum(len(o.false_matches) for o in outcomes)}, "
+            f"scores in range {sum(o.score_ok for o in outcomes)}/{len(outcomes)}."
+        ),
     ]
     for o in outcomes:
         found = {e.name for e in o.in_references}
@@ -129,9 +132,9 @@ def report(outcomes: list[Outcome]) -> str:
                 for e in missed))
         if o.false_matches:
             lines.append("- False matches: " + "; ".join(e.name for e in o.false_matches))
-        lines += ["", "| Matched entity | Type | Need | Claim | Similarity |", "|---|---|---|---|---|"]
+        lines += ["", "| Matched entity | Type | Need | Claim | Reranker | Cosine |", "|---|---|---|---|---|---|"]
         for r in o.scored.results:
             for m in o.scored.matches.get(r.entity_id, []):
                 via = f" (via {m.via})" if m.via else ""
-                lines.append(f"| {r.name} | {r.type} | {m.need} | {m.value}{via} | {m.sim:.2f} |")
+                lines.append(f"| {r.name} | {r.type} | {m.need} | {m.value}{via} | {m.score:.2f} | {m.sim:.2f} |")
     return "\n".join(lines) + "\n"
