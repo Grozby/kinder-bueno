@@ -98,7 +98,10 @@ def test_search_without_a_match_says_so(api):
 
 def test_chat_refines_with_filters(api, db):
     first = api.post("/api/chat", json={"session_id": "it-chat", "message": QUERY}).json()
-    assert first["results"] and first["reply"].startswith(f"Showing {len(first['results'])} results for '{QUERY}'")
+    # The agent (#97) writes its own one-sentence reply; any claim it cites must be on the cards shown (plan 8.10)
+    assert first["results"] and first["reply"].strip()
+    assert cited(first["reply"]) <= {e["claim_id"] for r in first["results"] for e in r["evidence"]}
+    assert_traceable(db, first["results"])
     rerun = api.post("/api/chat", json={
         "session_id": "it-chat", "message": "", "filters": {"source": None, "type": "person"},
     }).json()
@@ -143,7 +146,7 @@ def test_case_flow(stack, api, db):
     assert_traceable(db, refs)
 
     chat = api.post("/api/chat", json={"session_id": f"case-{case_id}", "message": "insulin pump"}).json()
-    assert chat["reply"].startswith("Showing ")
+    assert chat["results"] and chat["reply"].strip()  # the agent writes its own reply (#97)
 
     for status in ["in_review", "accepted"]:
         assert api.patch(f"/api/cases/{case_id}", json={"status": status}).json()["status"] == status

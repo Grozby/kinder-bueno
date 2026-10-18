@@ -243,6 +243,9 @@ The integration tests (`tests/integration/`) start their own compose project, `n
 3. They run every route the UI calls through the real gateway and bge-m3: search, chat, feedback, sources, and the
    whole case flow (Glucora PDF upload → analysis → references → status → pitch → API restart). The Vite proxy
    with the token is checked too.
+4. They drive the board the way the browser does (`test_ui_flow.py`): the UI's calls in the UI's order, through
+   the frontend's proxy without a token, then a reload that must bring back the selection, chat, rating, review,
+   notes, pitch and documents. Internal notes must never appear in the pitch or the report.
 
 The checks follow the traceability rule: every evidence row is a shown claim with its stored quote, and every
 citation in a "why" sentence or a pitch belongs to the cards shown.
