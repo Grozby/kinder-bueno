@@ -116,7 +116,7 @@ export interface ChatResponse {
   no_result: boolean
 }
 
-// 'wrong_fact' flags one evidence row: send it with claim_id (plan 9, "wrong fact" button). Not in the UI yet.
+// 'wrong_fact' flags one evidence row, with claim_id (plan 9; the flag in the case drawer's evidence)
 export type Rating = 'up' | 'down' | 'wrong_fact'
 
 export interface FeedbackRequest {
