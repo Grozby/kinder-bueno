@@ -1,14 +1,17 @@
 # Pitch and demo script
 
-Numbers come from `eval/report.md` (9 gold queries, 100 pages; run after #44) and `navigator stats`. Re-run
-`uv run navigator eval` before presenting and update the numbers here.
+Numbers come from `eval/report.md` (9 gold queries, 100 pages; run after #76) and `navigator stats`. Re-run
+`uv run navigator eval` before presenting and update the numbers here. Demo timings were measured on the Docker
+setup on 2026-10-18 (rehearsal, #34).
 
 ## Slides (5 minutes)
 
 1. **The problem.** Expertise in Bern is spread over hundreds of faculty, institute, lab and centre pages, and
    people search with other words than the sites use ("glucose sensors" vs "continuous glucose monitoring").
 2. **What we built.** One search over ARTORG, Diabetes Center Berne and UniBE labs. It returns people and
-   units with role, affiliation, expertise, projects and infrastructure, and links every fact to its page.
+   units with role, affiliation, lab topics, projects and infrastructure, and links every fact to its page.
+   On top of it, a **case board**: upload a company's business model PDF, and Apertus reads its needs, scores
+   how well Bern's research fits, proposes 25 references, and writes a pitch that cites only verified facts.
 3. **The guarantee: no invented facts.**
    - Apertus must give a quote for every fact. The quote is matched against the stored page and saved as the
      exact page text, or the fact is rejected.
@@ -30,26 +33,45 @@ Numbers come from `eval/report.md` (9 gold queries, 100 pages; run after #44) an
    `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
    and, measured on the same pages, not better); quote verification is what makes the small model safe to use. A new site is
    one config block (`config/sources.yaml`).
-6. **Next.** Scale from 100 to ~2,000 pages (config only, crawling personal profile pages for person-level
-   expertise), recall from 60% towards 80%, and the same pipeline for company location reports: suppliers,
+6. **Next.** Scale from 100 to ~2,000 pages (config only; profile and facility pages for person-level
+   expertise), recall from 60% towards 80%, and widen the case board from research partners to suppliers,
    manufacturers and advisors in Canton Bern, with every claim sourced.
 
-## Demo (3 minutes)
+## Demo (4 minutes)
 
-Before the demo: `docker compose up -d app frontend` (wait until `app` is healthy: it loads bge-m3 at start),
-open http://localhost:5173, and run each query once to warm the query-expansion cache (Apertus calls).
+**Before the demo** (README "Demo"):
+- `docker compose run --rm restore` loads the snapshot (it replaces every case with the snapshot's; take the
+  snapshot from a board without a Glucora card, since the demo uploads Glucora live), then
+  `docker compose up -d app frontend`. The app is healthy after ~1 min: it loads bge-m3 and embeds the topic
+  claims for ranking.
+- Open http://localhost:5173 and send the three chat queries of step 4 once in any case: query expansion is
+  cached per process, so this saves ~2 s per query during the demo.
+- Keep `docs/examples/glucora-business-model.pdf` ready to drag in.
 
-1. **Lay term → experts.** Search `glucose sensors`. Show the "search terms used" panel (CGM, biosensing, German
-   terms) and a Diabetes Center Berne result.
-2. **Same experts, other words.** Search `continuous glucose monitoring`. The same top 5 comes back (checked:
-   Liom Health AG, UDEM, SmartStart Health, Melissa Holloway, DCB Research AG).
-3. **Traceability.** Open a result's evidence. Read one quote, click the source link, and find the same sentence
-   on the live page. The "wrong fact" button next to each row logs feedback without changing anything.
-4. **Affiliation and lab topics.** Search `surgical robots`. A person card (e.g. Manuela Eugster) shows her lab
-   from its member page, and "Topics of Neuro Robotics Group" with the lab page as source.
-5. **Honest "no result".** Search `quantum cryptography`: no reliable source is found, and nothing is made up.
-6. **Add a source** (optional, if time): show one block in `config/sources.yaml` and
-   `navigator ingest --source <id>`.
+1. **Upload a company** (~25 s). Drop the Glucora PDF on the board. The pop-up shows the analysis; the card
+   lands in "New" with **fit score 80**. Read the summary (needle-free wearable glucose sensor, Swiss R&D in
+   Bern) and the breakdown: "4 of 5 needs covered … Not covered: wearable biosensor signal processing". Say it:
+   the score only counts what our sources prove, and it shows the gap.
+2. **References.** Open the card: 25 references, the first 10 preselected. Point at the two kinds of "why":
+   "Matches 'closed-loop artificial pancreas systems': …" (a verified topic claim matches a need, so it counts
+   in the score) and "Found for '…'" (the search found it, but no claim matches, so it does not count).
+3. **Traceability.** Open Prof. Lilian Witthauer's evidence. Each row is a quote from a public page, e.g. her
+   role from dcberne.com/en/team/. Click the link and find the same text on the live page. The flag button on a
+   row reports a wrong fact; nothing is changed automatically.
+4. **Refine with chat.**
+   - `continuous glucose monitoring`, then `glucose sensors`: other words, same core (DCB Research AG, AI in
+     Health and Nutrition, University Clinic for Diabetology). Apertus expands each query with synonyms and
+     German terms (e.g. CGM, biosensors) before searching.
+   - `quantum cryptography`: "Showing 0 results": no reliable source, so nothing is made up.
+5. **Pitch** (~10 s). Deselect a weak reference (e.g. Acoustic Robotics Systems Lab: "Found for", no matching
+   claim), move the card to "Accepted", generate the pitch. Statements about references carry claim ids like
+   [11218] that point to the evidence rows; sentences about references that cite nothing, or cite facts outside the
+   selection, are removed.
+6. *(Optional)* **Sources** page: the crawl graph and ranked pages per source. Skip the crawl-rules tab: its
+   routes are not served yet (#79, #80).
+
+**If something is slow:** a search takes ~3–4 s (ranking ~1 s, plus Apertus calls for expansion and the
+"why" text); the gateway is shared with other teams. If it stalls, say so and switch to the next step.
 
 ## Questions to expect
 
@@ -58,6 +80,12 @@ open http://localhost:5173, and run each query once to warm the query-expansion 
   switching is one setting (`EXTRACT_MODEL`).
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
-  We report it as a signal, not as proof (judge agreement with the gold set: 80%).
+  We report it as a signal, not as proof (judge agreement with the gold set: 73%).
+- *How is the fit score computed?* Five fixed criteria: research fit (40%, share of needs covered), expert
+  pool, research units, infrastructure and running projects. Each counts only references whose verified
+  topic claims match a need. It measures fit within our sources, not all of Canton Bern.
+- *Can the pitch invent things?* A sentence that cites a fact outside the selected references, or names a
+  reference without citing it, is removed before the pitch is shown. Limit: a general sentence that names no
+  reference ("Bern offers the ecosystem you need") is kept and not checked.
 - *Personal data?* Only public pages, only facts written there, each linked to its source; replaced on every
   re-crawl. See "Data protection" in the README.
