@@ -3,6 +3,38 @@
 Find researchers, units, projects and infrastructure in the Bern research ecosystem, with every fact
 linked to a quote on a public page. The build plan is in [`docs/PLAN.md`](docs/PLAN.md).
 
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph Sources["Public pages (config/sources.yaml)"]
+        A1[ARTORG] --- A2[Diabetes Center Berne] --- A3[UniBE labs]
+    end
+    Sources --> C[crawl + clean<br/>robots.txt, emails decoded]
+    C --> P[(page)]
+    P --> E[chunk + embed<br/>bge-m3, local]
+    E --> CH[(chunk<br/>vector + full text)]
+    P --> X[extract<br/>Apertus: people prompt + topics prompt]
+    X --> V{verify quote<br/>exact page text?}
+    V -- no --> R0[rejected, kept for the report]
+    V -- yes --> RW[(raw_claim / raw_relation)]
+    RW --> RS[resolve<br/>merge people, listed_in]
+    RS --> G[(entity / claim / relation)]
+    Q[query] --> QE[expand<br/>Apertus synonyms DE/EN]
+    QE --> S[rank<br/>keyword + vector, fused]
+    CH --> S
+    G --> S
+    S --> API[FastAPI /api] --> UI[Vue UI]
+```
+
+- **Every fact is a literal slice of a public page.** The extractor must return a quote for each fact. The
+  quote is matched against the stored page text and saved as the exact page text, or the fact is rejected
+  (13% of extracted facts were rejected, including names the model made up).
+- **Sovereign:** Apertus (Swiss open LLM) for extraction, query expansion and explanations; bge-m3 embeddings run
+  locally; everything runs in Docker with no connection to cantonal networks.
+- **Two models:** extraction runs on `apertus-v1-5-8b` (`EXTRACT_MODEL`), because 70B was too slow on the
+  shared gateway; quote verification catches the small model's errors.
+
 ## Run with Docker
 
 Everything runs in containers: Postgres, the Python pipeline and API, and the Vue UI. Nothing connects to
@@ -89,6 +121,37 @@ uv run navigator serve --host 0.0.0.0
 
 The teammate runs only the frontend: `BACKEND_URL=http://<host-ip>:8000 BACKEND_TOKEN=<token> npm run dev`.
 Details and caveats in [`docs/SHARED_SERVER.md`](docs/SHARED_SERVER.md).
+
+## Add a new source
+
+No code change: one block in `config/sources.yaml`, then ingest that source.
+
+```yaml
+  - id: insel
+    name: "Example Institute"
+    seeds: [https://www.example.unibe.ch/research/index_eng.html]
+    allow_hosts: ["www.example.unibe.ch"]
+    include_patterns: ['index_eng\.html$']
+    exclude_patterns: ['/news', '/jobs/']
+    priority_patterns: ['^https://www\.example\.unibe\.ch/research/[a-z0-9_]+/index_eng\.html$']
+    max_pages: 30
+```
+
+```bash
+docker compose run --rm app uv run navigator ingest --source insel
+```
+
+Keep `priority_patterns` narrow and anchored to the site root: they decide what the page budget is spent on.
+
+## Data protection
+
+- Only public pages of the listed institutions are used. Copyright stays with them.
+- Only facts written on those pages are stored (names, roles, public contact data, research topics), each with
+  its quote and source URL. Nothing is added from other places.
+- A re-crawl replaces a source's pages, and everything extracted from them is deleted with them (database cascade).
+- Every result card links to its source pages, so each fact can be checked at the source.
+- Designed for the Swiss nDSG and the GDPR where it applies. No user accounts: feedback is stored with an
+  anonymous session id. Its optional free-text comment is stored as typed, so it should not ask for personal data.
 
 ## Tests
 
