@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { Archive, Database, LayoutGrid } from '@lucide/vue'
+import { Archive, Database, LayoutGrid, UserRound } from '@lucide/vue'
 import { onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 
 import { USE_MOCK } from '@/api'
 import BernBear from '@/components/BernBear.vue'
 import BernEater from '@/components/BernEater.vue'
+import NamePrompt from '@/components/NamePrompt.vue'
+import { askReviewerName, reviewerName } from '@/composables/reviewer'
 import { useCasesStore } from '@/stores/cases'
 
 const store = useCasesStore()
@@ -62,6 +64,15 @@ onMounted(() => {
           <span>Discarded</span>
           <span class="count">{{ store.byStatus.rejected.length }}</span>
         </button>
+        <button
+          v-if="reviewerName"
+          class="user"
+          title="Your name, shown with your scores and notes. Click to change."
+          @click="askReviewerName"
+        >
+          <UserRound :size="15" />
+          <span>{{ reviewerName }}</span>
+        </button>
       </div>
     </aside>
 
@@ -71,6 +82,7 @@ onMounted(() => {
   </div>
 
   <BernEater />
+  <NamePrompt />
 </template>
 
 <style scoped>
@@ -149,6 +161,38 @@ nav a.router-link-exact-active {
   align-items: center;
   gap: 0.5rem;
 }
+.user {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.user span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user svg {
+  flex: none;
+  color: var(--text-muted);
+}
+.user:hover {
+  background: var(--surface-alt);
+}
+.user:focus-visible {
+  outline: 2px solid var(--focus);
+}
 .discarded {
   display: inline-flex;
   align-items: center;
@@ -203,6 +247,7 @@ main {
   .brand-text,
   nav a span,
   .discarded > span:not(.count),
+  .user span,
   .demo {
     display: none;
   }

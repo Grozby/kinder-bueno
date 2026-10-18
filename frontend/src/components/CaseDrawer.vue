@@ -27,14 +27,21 @@ import { computed, ref, watch, type Component } from 'vue'
 import type { Case, CaseStatus, EntityType, Rating } from '@/api'
 import { DEFAULT_REFERENCES, MAX_REFERENCES, useCasesStore } from '@/stores/cases'
 import { hostOf, timeAgo } from '@/utils/format'
+import CaseAssessment from './CaseAssessment.vue'
 import CaseChat from './CaseChat.vue'
 import EvidenceList from './EvidenceList.vue'
 import ScoreRing from './ScoreRing.vue'
+import SimilarCases from './SimilarCases.vue'
 import BaseButton from './ui/BaseButton.vue'
 import BaseOverlay from './ui/BaseOverlay.vue'
 
 const props = defineProps<{ item: Case | null }>()
-const emit = defineEmits<{ close: []; move: [status: CaseStatus]; reject: [] }>()
+const emit = defineEmits<{
+  close: []
+  move: [status: CaseStatus]
+  reject: []
+  open: [id: string]
+}>()
 
 const store = useCasesStore()
 
@@ -138,7 +145,16 @@ async function copyPitch() {
   >
     <template #header>
       <div v-if="item" class="head">
-        <ScoreRing :score="item.score" :size="56" />
+        <div class="rings">
+          <figure>
+            <ScoreRing :score="item.score" :size="56" />
+            <figcaption>AI</figcaption>
+          </figure>
+          <figure v-if="item.review">
+            <ScoreRing :score="item.review.score" :size="56" />
+            <figcaption>Reviewer</figcaption>
+          </figure>
+        </div>
         <div class="head-text">
           <h2>{{ item.company_name }}</h2>
           <p class="meta">
@@ -193,6 +209,11 @@ async function copyPitch() {
           <section>
             <h3 class="section-label">Summary</h3>
             <p class="summary">{{ item.summary }}</p>
+          </section>
+
+          <section v-if="item.similar_cases?.length">
+            <h3 class="section-label">Similar cases already worked on</h3>
+            <SimilarCases :cases="item.similar_cases" @open="(id) => emit('open', id)" />
           </section>
 
           <section>
@@ -306,6 +327,11 @@ async function copyPitch() {
 
         <div class="col col-side">
           <section>
+            <h3 class="section-label">Your assessment</h3>
+            <CaseAssessment :item="item" />
+          </section>
+
+          <section>
             <h3 class="section-label">Refine with chat</h3>
             <CaseChat :case-id="item.id" />
           </section>
@@ -365,6 +391,24 @@ async function copyPitch() {
 .head-text {
   flex: 1;
   min-width: 0;
+}
+.rings {
+  display: flex;
+  gap: 0.6rem;
+}
+.rings figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+.rings figcaption {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 .head h2 {
   font-size: 24px;

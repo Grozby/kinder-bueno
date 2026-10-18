@@ -4,6 +4,7 @@ import type {
   Case,
   CaseChatTurn,
   CaseFeedback,
+  CaseNote,
   CaseStatus,
   ChatRequest,
   ChatResponse,
@@ -19,8 +20,11 @@ import type {
   Pitch,
   ResourcePage,
   Result,
+  Review,
+  ReviewInput,
   RuleKind,
   Selection,
+  SimilarCase,
   Source,
 } from './types'
 import { isValidPattern, matches } from '@/utils/patterns'
@@ -161,6 +165,7 @@ function toResult(i: number, why: string, score: number): Result {
 interface StoredCase {
   data: Case
   readyAt: number
+  notes: CaseNote[]
 }
 const cases = new Map<string, StoredCase>()
 
@@ -227,22 +232,79 @@ function analyse(c: Case): Case {
   }
 }
 
+// The needs a company in this industry typically states; shared ones explain a similarity
+const NEEDS: Record<string, string[]> = {
+  MedTech: ['surgical robotics', 'medical imaging', 'clinical validation', 'biomechanics'],
+  'Digital Health': [
+    'glucose monitoring',
+    'AI for nutrition',
+    'clinical validation',
+    'digital health',
+  ],
+  Biotech: ['translational medicine', 'biobank access', 'clinical research'],
+  'Precision Engineering': ['prototyping', 'biomechanics testing', 'medical devices'],
+  Diagnostics: ['medical imaging', 'clinical validation', 'biosensors'],
+}
+
+const normalName = (name: string) => name.toLowerCase().replace(/\b(ag|gmbh|sa|ltd)\b|[^a-z]/g, '')
+
+// Stand-in for the backend's comparison (embeddings of summary and needs, plus shared references):
+// the same company is a duplicate, the same industry is likely similar, the rest rarely is
+function similarCases(c: Case): SimilarCase[] {
+  if (c.analysis_status !== 'done') return []
+  const found: SimilarCase[] = []
+  for (const { data: other } of cases.values()) {
+    // Only cases uploaded before this one: they are the ones "already worked on"
+    if (other.analysis_status !== 'done' || other.uploaded_at >= c.uploaded_at) continue
+    const duplicate = normalName(other.company_name) === normalName(c.company_name)
+    const pair = [c.id, other.id].sort().join()
+    const r = rng(hash(pair))()
+    const similarity = duplicate ? 0.97 : other.industry === c.industry ? 0.6 + r * 0.32 : r * 0.5
+    if (similarity < 0.6) continue
+    const needs = NEEDS[c.industry ?? ''] ?? []
+    found.push({
+      case_id: other.id,
+      company_name: other.company_name,
+      status: other.status,
+      score: other.score,
+      review: other.review ?? null,
+      similarity: Math.round(similarity * 100) / 100,
+      duplicate,
+      shared_needs: needs.slice(0, duplicate ? needs.length : 1 + Math.floor(r * 3)),
+      shared_references: Math.round(similarity * 18),
+    })
+  }
+  return found.sort((a, b) => b.similarity - a.similarity).slice(0, 3)
+}
+
 function readCase(id: string): Case {
   const stored = cases.get(id)
   if (!stored) throw new Error('404 Not Found')
   if (stored.data.analysis_status === 'pending' && Date.now() >= stored.readyAt) {
     stored.data = analyse(stored.data)
   }
+  stored.data.notes_count = stored.notes.length
+  stored.data.similar_cases = similarCases(stored.data)
   return stored.data
 }
 
-function seedCase(fileName: string, status: CaseStatus, minutesAgo: number) {
+function seedCase(
+  fileName: string,
+  status: CaseStatus,
+  minutesAgo: number,
+  extra: {
+    industry?: string
+    review?: Omit<Review, 'reviewed_at'>
+    notes?: Array<[string, string]>
+  } = {},
+) {
   const id = crypto.randomUUID()
+  const uploadedAt = Date.now() - minutesAgo * 60_000
   const base: Case = {
     id,
     company_name: companyFromFile(fileName),
     file_name: fileName,
-    uploaded_at: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+    uploaded_at: new Date(uploadedAt).toISOString(),
     status,
     analysis_status: 'pending',
     industry: null,
@@ -250,16 +312,46 @@ function seedCase(fileName: string, status: CaseStatus, minutesAgo: number) {
     score_breakdown: [],
     summary: null,
   }
-  cases.set(id, { data: analyse(base), readyAt: 0 })
+  const data = analyse(base)
+  if (extra.industry) data.industry = extra.industry
+  // Reviews and notes are dated between the upload and now
+  const later = (share: number) =>
+    new Date(uploadedAt + (Date.now() - uploadedAt) * share).toISOString()
+  if (extra.review) data.review = { ...extra.review, reviewed_at: later(0.6) }
+  const notes = (extra.notes ?? []).map(([author, text], i) => ({
+    id: crypto.randomUUID(),
+    author,
+    text,
+    created_at: later(0.2 + i * 0.25),
+  }))
+  cases.set(id, { data, readyAt: 0, notes })
 }
 
-seedCase('helvetic-glucotech.pdf', 'new', 12)
-seedCase('aare-robotics.pdf', 'new', 40)
-seedCase('cardiosense-ag.pdf', 'in_review', 180)
-seedCase('alpine-bioprint.pdf', 'accepted', 2000)
-seedCase('nordsee-logistics.pdf', 'rejected', 300)
-seedCase('lakeside-fintech.pdf', 'rejected', 1500)
-seedCase('solaris-mining-tools.pdf', 'rejected', 4300)
+seedCase('helvetic-glucotech.pdf', 'new', 12, { industry: 'Digital Health' })
+seedCase('aare-robotics.pdf', 'new', 40, { industry: 'MedTech' })
+seedCase('cardiosense-ag.pdf', 'in_review', 180, {
+  industry: 'Diagnostics',
+  notes: [['M. Keller', 'Call with the CEO on Thursday; they want to decide on a site by spring.']],
+})
+seedCase('alpine-bioprint.pdf', 'accepted', 2000, { industry: 'Biotech' })
+seedCase('swiss-glucose-labs.pdf', 'accepted', 9000, {
+  industry: 'Digital Health',
+  review: {
+    score: 88,
+    reason: 'Know the founders from a previous role; strong team and a clear DCB fit.',
+    author: 'M. Keller',
+  },
+  notes: [
+    ['M. Keller', 'Introduced them to the DCB innovation team; first meeting went well.'],
+    ['L. Frei', 'They signed a lease in Bern for 2027. Good reference for similar start-ups.'],
+  ],
+})
+seedCase('nordsee-logistics.pdf', 'rejected', 300, {
+  industry: 'Logistics',
+  notes: [['L. Frei', 'Pure logistics, no link to our research ecosystem.']],
+})
+seedCase('lakeside-fintech.pdf', 'rejected', 1500, { industry: 'Fintech' })
+seedCase('solaris-mining-tools.pdf', 'rejected', 4300, { industry: 'Mining equipment' })
 
 // --- sources ---
 
@@ -656,7 +748,7 @@ export const mockBackend = {
       score_breakdown: [],
       summary: null,
     }
-    cases.set(id, { data, readyAt: Date.now() + ANALYSIS_MS })
+    cases.set(id, { data, readyAt: Date.now() + ANALYSIS_MS, notes: [] })
     return clone(data)
   },
   async setCaseStatus(id: string, status: CaseStatus): Promise<Case> {
@@ -664,6 +756,48 @@ export const mockBackend = {
     const c = readCase(id)
     c.status = status
     return clone(c)
+  },
+  async setReview(id: string, input: ReviewInput): Promise<Case> {
+    await wait(200)
+    if (!input.reason.trim()) throw new Error('422 A reason is required')
+    const c = readCase(id)
+    c.review = {
+      score: Math.min(100, Math.max(0, Math.round(input.score))),
+      reason: input.reason.trim(),
+      author: input.author,
+      reviewed_at: new Date().toISOString(),
+    }
+    return clone(c)
+  },
+  async clearReview(id: string): Promise<Case> {
+    await wait(150)
+    const c = readCase(id)
+    c.review = null
+    return clone(c)
+  },
+  async listNotes(id: string): Promise<CaseNote[]> {
+    await wait(150)
+    readCase(id)
+    return clone(cases.get(id)!.notes)
+  },
+  async addNote(id: string, note: { author: string; text: string }): Promise<CaseNote> {
+    await wait(200)
+    readCase(id)
+    const saved = {
+      id: crypto.randomUUID(),
+      author: note.author,
+      text: note.text.trim(),
+      created_at: new Date().toISOString(),
+    }
+    cases.get(id)!.notes.push(saved)
+    return clone(saved)
+  },
+  async deleteNote(id: string, noteId: string): Promise<{ ok: boolean }> {
+    await wait(150)
+    const stored = cases.get(id)
+    if (!stored) throw new Error('404 Not Found')
+    stored.notes = stored.notes.filter((n) => n.id !== noteId)
+    return { ok: true }
   },
   async listReferences(id: string, limit: number): Promise<Result[]> {
     await wait(400)
@@ -701,9 +835,16 @@ export const mockBackend = {
   },
   async removeReference(id: string, entityId: number): Promise<Selection> {
     await wait(150)
-    addedRefs.set(id, (addedRefs.get(id) ?? []).filter((r) => r.entity_id !== entityId))
+    addedRefs.set(
+      id,
+      (addedRefs.get(id) ?? []).filter((r) => r.entity_id !== entityId),
+    )
     const stored = selections.get(id)
-    if (stored) selections.set(id, stored.filter((e) => e !== entityId))
+    if (stored)
+      selections.set(
+        id,
+        stored.filter((e) => e !== entityId),
+      )
     return mockBackend.getSelection(id)
   },
   async getCaseChat(id: string): Promise<CaseChatTurn[]> {

@@ -7,6 +7,7 @@ import type {
   Case,
   CaseChatTurn,
   CaseFeedback,
+  CaseNote,
   CaseStatus,
   ChatRequest,
   ChatResponse,
@@ -17,6 +18,7 @@ import type {
   Pitch,
   ResourcePage,
   Result,
+  ReviewInput,
   RuleKind,
   Selection,
   Source,
@@ -64,6 +66,15 @@ const realBackend = {
     api<Selection>(`/cases/${id}/references/${entityId}`, { method: 'DELETE' }),
   getCaseChat: (id: string) => api<CaseChatTurn[]>(`/cases/${id}/chat`),
   getCaseFeedback: (id: string) => api<CaseFeedback>(`/cases/${id}/feedback`),
+
+  setReview: (id: string, review: ReviewInput) =>
+    api<Case>(`/cases/${id}/review`, { method: 'PUT', body: JSON.stringify(review) }),
+  clearReview: (id: string) => api<Case>(`/cases/${id}/review`, { method: 'DELETE' }),
+  listNotes: (id: string) => api<CaseNote[]>(`/cases/${id}/notes`),
+  addNote: (id: string, note: { author: string; text: string }) =>
+    api<CaseNote>(`/cases/${id}/notes`, { method: 'POST', body: JSON.stringify(note) }),
+  deleteNote: (id: string, noteId: string) =>
+    api<{ ok: boolean }>(`/cases/${id}/notes/${noteId}`, { method: 'DELETE' }),
 
   chat: (req: ChatRequest) =>
     api<ChatResponse>('/chat', { method: 'POST', body: JSON.stringify(req) }),

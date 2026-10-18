@@ -193,6 +193,7 @@ function onBearDrop(e: DragEvent) {
               :key="c.id"
               :item="c"
               @open="openId = c.id"
+              @open-case="(id) => (openId = id)"
               @move="(s) => move(c.id, s)"
               @reject="(el) => reject(c.id, el)"
             />
@@ -239,6 +240,7 @@ function onBearDrop(e: DragEvent) {
           :key="c.id"
           :item="c"
           @open="openFromRejected(c.id)"
+          @open-case="openFromRejected"
           @move="(s) => move(c.id, s)"
         />
       </div>
@@ -250,6 +252,7 @@ function onBearDrop(e: DragEvent) {
       @close="openId = null"
       @move="(s) => openCase && move(openCase.id, s)"
       @reject="rejectFromDrawer"
+      @open="(id) => (openId = id)"
     />
 
     <AnalysisOverlay

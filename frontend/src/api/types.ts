@@ -22,6 +22,44 @@ export interface Case {
   score: number | null // 0-100 overall fit of Canton Bern; null while pending
   score_breakdown: ScoreItem[]
   summary: string | null // short summary for the person using the app
+  // Not served by the backend yet (FRONTEND_API.md "Review"); the UI treats missing as empty
+  review?: Review | null
+  notes_count?: number
+  similar_cases?: SimilarCase[] // best first, at most 3
+}
+
+// The reviewer's own fit score. Kept next to the AI score, never replacing it.
+export interface Review {
+  score: number // 0-100
+  reason: string // required: why the reviewer sees it this way
+  author: string
+  reviewed_at: string // ISO 8601
+}
+
+export interface ReviewInput {
+  score: number
+  reason: string
+  author: string
+}
+
+export interface CaseNote {
+  id: string
+  author: string
+  text: string
+  created_at: string // ISO 8601
+}
+
+// An earlier case close to this one: same company, or similar needs and references
+export interface SimilarCase {
+  case_id: string
+  company_name: string
+  status: CaseStatus
+  score: number | null // the AI score
+  review: Review | null
+  similarity: number // 0-1
+  duplicate: boolean // same company name or same PDF
+  shared_needs: string[]
+  shared_references: number // references both cases have in their top 25
 }
 
 // --- Search results: mirror the Pydantic models in docs/PLAN.md section 8.8 ---

@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { BadgeCheck, FileText, RotateCcw, Search, TriangleAlert, X } from '@lucide/vue'
+import {
+  BadgeCheck,
+  Copy,
+  FileText,
+  History,
+  MessageSquare,
+  RotateCcw,
+  Search,
+  TriangleAlert,
+  X,
+} from '@lucide/vue'
 import { computed, useTemplateRef, type Component } from 'vue'
 
 import type { Case, CaseStatus } from '@/api'
@@ -12,6 +22,7 @@ const emit = defineEmits<{
   open: []
   move: [status: CaseStatus]
   reject: [el: HTMLElement]
+  openCase: [id: string]
 }>()
 
 const root = useTemplateRef<HTMLElement>('root')
@@ -21,6 +32,18 @@ const NEXT: Partial<Record<CaseStatus, { status: CaseStatus; label: string; icon
   in_review: { status: 'accepted', label: 'Accept', icon: BadgeCheck },
 }
 const next = computed(() => NEXT[props.item.status])
+const similar = computed(() => props.item.similar_cases?.[0])
+const similarLabel = computed(() =>
+  similar.value
+    ? `${similar.value.duplicate ? 'Possible duplicate of' : 'Similar to'} ${similar.value.company_name} (${STATUS_LABEL[similar.value.status]})`
+    : '',
+)
+const STATUS_LABEL: Record<CaseStatus, string> = {
+  new: 'new',
+  in_review: 'in review',
+  accepted: 'accepted',
+  rejected: 'rejected',
+}
 const pending = computed(() => props.item.analysis_status === 'pending')
 const failed = computed(() => props.item.analysis_status === 'failed')
 
@@ -46,7 +69,16 @@ function onDragStart(e: DragEvent) {
         <h3>{{ item.company_name }}</h3>
         <p class="file"><FileText :size="13" /> {{ item.file_name }}</p>
       </div>
-      <ScoreRing :score="item.score" :size="44" />
+      <!-- The reviewer's score leads once there is one; the AI score stays visible -->
+      <figure
+        class="rings"
+        :title="item.review ? `Reviewer ${item.review.score} · AI ${item.score}` : 'AI score'"
+      >
+        <ScoreRing :score="item.review?.score ?? item.score" :size="44" />
+        <figcaption v-if="item.review">
+          Reviewer<span v-if="item.score !== null"> · AI {{ item.score }}</span>
+        </figcaption>
+      </figure>
     </header>
 
     <p v-if="pending" class="state muted">Analysing business model…</p>
@@ -64,6 +96,21 @@ function onDragStart(e: DragEvent) {
     <footer>
       <span v-if="item.industry" class="tag">{{ item.industry }}</span>
       <span class="when">{{ timeAgo(item.uploaded_at) }}</span>
+      <span v-if="item.notes_count" class="notes" :title="`${item.notes_count} notes`">
+        <MessageSquare :size="13" /> {{ item.notes_count }}
+      </span>
+      <!-- An accessory: the full list is in the case pop-up -->
+      <button
+        v-if="similar"
+        class="similar"
+        :class="{ duplicate: similar.duplicate }"
+        :title="similarLabel"
+        :aria-label="similarLabel"
+        @click.stop="emit('openCase', similar.case_id)"
+      >
+        <Copy v-if="similar.duplicate" :size="13" />
+        <History v-else :size="13" />
+      </button>
       <span class="spacer" />
       <template v-if="item.status !== 'rejected'">
         <button
@@ -189,6 +236,49 @@ h3 {
 }
 .fill-bad {
   background: var(--score-weak);
+}
+
+.rings {
+  flex: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+.rings figcaption {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.similar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.similar.duplicate {
+  color: var(--mid);
+}
+.similar:hover {
+  background: var(--surface-alt);
+  color: var(--bern-red);
+}
+.similar:focus-visible {
+  outline: 2px solid var(--focus);
+}
+.notes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 footer {

@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import {
   backend,
   type Case,
+  type CaseNote,
   type CaseStatus,
   type ChatResponse,
   type Pitch,
@@ -41,6 +42,7 @@ export const useCasesStore = defineStore('cases', () => {
   const chats = ref<Record<string, ChatTurn[]>>({})
   const ratings = ref<Record<string, Record<number, Rating>>>({})
   const flagged = ref<Record<string, number[]>>({})
+  const notes = ref<Record<string, CaseNote[]>>({})
 
   const byStatus = computed(() => {
     const groups: Record<CaseStatus, Case[]> = {
@@ -198,6 +200,36 @@ export const useCasesStore = defineStore('cases', () => {
     return pitch
   }
 
+  // The reviewer's own score and notes; the author is the name given in this browser
+  async function setReview(id: string, score: number, reason: string, author: string) {
+    upsert(await backend.setReview(id, { score, reason, author }))
+  }
+
+  async function clearReview(id: string) {
+    upsert(await backend.clearReview(id))
+  }
+
+  async function loadNotes(id: string) {
+    notes.value[id] = await backend.listNotes(id)
+  }
+
+  function countNotes(id: string) {
+    const c = cases.value.find((x) => x.id === id)
+    if (c) c.notes_count = notes.value[id]?.length ?? 0
+  }
+
+  async function addNote(id: string, text: string, author: string) {
+    const note = await backend.addNote(id, { author, text })
+    ;(notes.value[id] ??= []).push(note)
+    countNotes(id)
+  }
+
+  async function deleteNote(id: string, noteId: string) {
+    await backend.deleteNote(id, noteId)
+    notes.value[id] = (notes.value[id] ?? []).filter((n) => n.id !== noteId)
+    countNotes(id)
+  }
+
   return {
     cases,
     loading,
@@ -210,6 +242,7 @@ export const useCasesStore = defineStore('cases', () => {
     chats,
     ratings,
     flagged,
+    notes,
     byStatus,
     load,
     upload,
@@ -222,5 +255,10 @@ export const useCasesStore = defineStore('cases', () => {
     flagFact,
     loadPitch,
     generatePitch,
+    setReview,
+    clearReview,
+    loadNotes,
+    addNote,
+    deleteNote,
   }
 })

@@ -81,6 +81,40 @@ routes the backend does not serve yet (the crawl rules and re-crawl, #79 and #80
     from them, so a blank message with `filters` still works.
   - Feedback: the last 👍/👎 per entity and the claims flagged in the session `case-<id>`.
 
+## Review, notes and similar cases
+
+The reviewer can give a case their own score and write notes; the card links to earlier cases that
+look alike. Not served yet; the mock answers. `Case` gains three fields (the UI treats a missing
+field as empty, so the current backend keeps working):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `review` | `Review \| null` | `{score 0–100, reason, author, reviewed_at}`: the reviewer's score, next to the AI `score`, never replacing it |
+| `notes_count` | `int` | number of notes, for the card |
+| `similar_cases` | `SimilarCase[]` | up to 3 earlier cases, best first |
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| PUT | `/api/cases/{id}/review` | `{score, reason, author}` | `Case` |
+| DELETE | `/api/cases/{id}/review` | – | `Case` (`review: null`) |
+| GET | `/api/cases/{id}/notes` | – | `CaseNote[]` (`{id, author, text, created_at}`), oldest first |
+| POST | `/api/cases/{id}/notes` | `{author, text}` | `CaseNote` |
+| DELETE | `/api/cases/{id}/notes/{note_id}` | – | `{ok: true}` |
+
+- `reason` is required: `422` when empty. `score` is clamped to 0–100.
+- No user accounts (PLAN non-goals): `author` is a name the reviewer types once; the browser keeps it.
+- Notes are internal. They MUST NOT go into the pitch or any LLM prompt that writes public text.
+
+**`SimilarCase`**: `{case_id, company_name, status, score, review, similarity 0–1, duplicate,
+shared_needs: string[], shared_references: int}`. Only cases uploaded **before** this one (the ones
+"already worked on"), any status, rejected included. Suggested computation, at analysis time:
+
+- `similarity`: cosine of bge-m3 embeddings of `summary` + `needs` (the model search already loads);
+  keep ≥ 0.6.
+- `duplicate`: same normalised company name or same PDF hash; listed first.
+- `shared_needs`: needs both cases have (exact or near-equal query), `shared_references`: entity ids
+  both cases have in their top 25 `refs`. These explain the match in the UI.
+
 ## Chat and feedback (section 8.9)
 
 - `POST /api/chat` with `{session_id, message, filters?}`; the frontend reads `reply`, `results`, `no_result`.
