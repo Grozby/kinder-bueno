@@ -11,7 +11,7 @@ The Vue frontend (`frontend/`) calls JSON endpoints under `/api`. Types are in
 
 The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory mock
 (`frontend/src/api/mock.ts`) for UI work on routes the backend does not serve yet;
-`VITE_SHOW_UNFINISHED=true` shows controls whose backend is not there yet (the chat examples, #97). In dev, Vite proxies
+`VITE_SHOW_UNFINISHED=true` shows controls whose backend is not there yet (the chat examples: served since #97, still hidden by default). In dev, Vite proxies
 `/api` to `BACKEND_URL` (default `http://localhost:8000`); in the Docker image, nginx does
 (`frontend/deploy/default.conf.template`) and adds `API_TOKEN`.
 
@@ -148,13 +148,23 @@ shared_needs: string[], shared_references: int}`. Only cases uploaded **before**
 ## Chat and feedback (section 8.9)
 
 - `POST /api/chat` with `{session_id, message, filters?}`; the frontend reads `reply`, `results`, `no_result`.
-  - Served since #50 as a plain chat, without the LangGraph agent of plan 8.10: each message is a new
-    search through the same pipeline as `GET /api/search`. "More like #2" or "who works with her?" are
-    searched as plain text.
+  - The chat agent (plan 8.10, #97): Apertus picks a tool for each message. The response shape is unchanged.
+    - **search:** a new topic, e.g. "glucose sensors".
+    - **set_filters:** "only DCB", "only people", "all sources again". It changes `filters` and re-runs the last query.
+    - **more_like:** "more like #1" searches with that result's shown topics; the result itself is left out.
+    - **related:** "who works with #2?", "which lab is she in?". Returns the entities linked to it by shown
+      relations, in both directions, filtered by `type` if one is set.
+    - `#N` is the N-th result of the session's previous turn. "her", "them" or "that lab" mean #1, unless
+      the message names another result.
+  - If the gateway fails, a tool call is bad (e.g. `#9` of 6 results), or no tool is called, the message is
+    searched as plain text, as before #97. The chat is never worse than the search box.
   - `filters` replaces the session's filters; without it, the session keeps the last ones. A blank
-    `message` with `filters` re-runs the last query (`422` if the session has none yet).
-  - `reply` is a template: `"Showing <n> results for '<query>' (source: dcb, type: person)."`.
-    The response also has `filters` (the ones the server used) and `expansion`.
+    `message` with `filters` re-runs the last query without the model (`422` if the session has none yet).
+  - `reply` is one sentence about what was done. Either:
+    - the template `"Showing <n> results for '<query>' (source: dcb, type: person)."` (or "similar to #1 …",
+      "linked to #2 …"), or
+    - the model's own sentence, kept only if it names no result without a valid claim citation.
+    The response also has `filters` (the ones the server used) and `expansion` (`null` after `related`).
   - Every session's turns are stored in Postgres (#103), so a restart or another API worker keeps the
     context. Standalone sessions are dropped after 30 days; case sessions (`case-<id>`) stay with their
     case (see "Cases").

@@ -7,7 +7,7 @@ The chat session of a case is "case-<id>" (frontend/src/stores/cases.ts). Result
 import psycopg
 from psycopg.types.json import Jsonb
 
-from navigator import analysis
+from navigator import agent, analysis
 from navigator.explain import recheck
 from navigator.models import (
     CaseChatTurn,
@@ -115,6 +115,20 @@ def last_query(conn: psycopg.Connection, session: str) -> tuple[str, ChatFilters
         "SELECT query, filters FROM chat_turn WHERE session_id = %s ORDER BY id DESC LIMIT 1", (session,)
     ).fetchone()
     return (row[0], ChatFilters(**row[1])) if row else None
+
+
+def last_turn(conn: psycopg.Connection, session: str) -> agent.Previous:
+    """The session's previous turn for the chat agent (#97): its query, filters, message and reply, and its
+    results rebuilt in their stored order, so "#2" means the 2nd card the user saw. Empty for a new session."""
+    row = conn.execute(
+        "SELECT query, filters, message, reply, results FROM chat_turn WHERE session_id = %s ORDER BY id DESC LIMIT 1",
+        (session,),
+    ).fetchone()
+    if row is None:
+        return agent.Previous()
+    query, filters, message, reply, stored = row
+    results = build_results(conn, [(r["entity_id"], r["score"]) for r in stored])
+    return agent.Previous(query=query, filters=ChatFilters(**filters), results=results, message=message, reply=reply)
 
 
 def chat_history(conn: psycopg.Connection, case_id: str) -> list[CaseChatTurn] | None:

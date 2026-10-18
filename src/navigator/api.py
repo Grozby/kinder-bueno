@@ -12,7 +12,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import analysis, case_state, cases, chunks_db, documents, ingest, pages, pitch, rules
+from navigator import agent, analysis, case_state, cases, chunks_db, documents, ingest, pages, pitch, rules
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -74,6 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.warning("topic vectors not embedded at startup (%s); the first search will do it", e)
     app.state.llm = LLM(settings)
     app.state.explain_llm = LLM(settings, settings.explain_model)  # its own model: 8B while the gateway is slow
+    app.state.chat_model = agent.chat_model(settings)  # the chat agent's tool-calling model (plan 8.10, #97)
     yield
 
 
@@ -107,6 +108,11 @@ def get_expand(request: Request) -> Callable[[str], TermExpansion]:
     """Query expansion (plan 8.1). Sync routes run in a worker thread, so the coroutine runs on the main loop."""
     llm = request.app.state.llm
     return lambda q: anyio.from_thread.run(expand_query, llm, q)
+
+
+def get_chat_model(request: Request):
+    """The chat agent's model (LangChain, tools bound). Sync: the chat route runs in a worker thread."""
+    return request.app.state.chat_model
 
 
 def get_explain(request: Request) -> Callable[[str, list[Result]], dict[int, str]]:
@@ -230,24 +236,33 @@ def chat_reply(n: int, query: str, filters: ChatFilters) -> str:
 
 
 @app.post("/api/chat")
-def chat(conn: Conn, embed: Embed, expand: Expand, explain: Explain, body: ChatRequest) -> ChatResponse:
-    """Plain refinement chat (#50): each message is a new search with the session's filters; a blank
-    message with new `filters` re-runs the last query. The LangGraph agent (plan 8.10) is a follow-up.
-    Every turn is stored in `chat_turn` (#103), so any worker can answer the next message, and a restart
-    loses nothing."""
-    last = case_state.last_query(conn, body.session_id)
-    query = body.message.strip() or (last[0] if last else None)
-    if query is None:
-        raise HTTPException(status_code=422, detail="Type a search first")
-    filters = body.filters or (last[1] if last else ChatFilters())
-    found = run_search(
-        conn, embed, expand, explain, query,
-        [filters.source] if filters.source else [], [filters.type] if filters.type else [],
-    )
-    response = ChatResponse(
-        reply=chat_reply(len(found.results), query, filters), results=found.results, filters=filters,
-        expansion=found.expansion, no_result=found.no_result,
-    )
+def chat(
+    conn: Conn, embed: Embed, expand: Expand, explain: Explain, body: ChatRequest,
+    chat_model: Annotated[object, Depends(get_chat_model)],
+) -> ChatResponse:
+    """The chat agent (plan 8.10, #97): the model picks tools (search, set_filters, more_like, related) and
+    "#2" means the 2nd result of the previous turn. A blank message with new `filters` re-runs the last query
+    without the model. Every turn is stored in `chat_turn` (#103), so any worker can answer the next message."""
+    previous = case_state.last_turn(conn, body.session_id)
+
+    def search_fn(q: str, f: ChatFilters) -> SearchResponse:
+        return run_search(conn, embed, expand, explain, q, [f.source] if f.source else [], [f.type] if f.type else [])
+
+    if not body.message.strip():
+        if previous.query is None:
+            raise HTTPException(status_code=422, detail="Type a search first")
+        filters = body.filters or previous.filters
+        found = search_fn(previous.query, filters)
+        response = ChatResponse(
+            reply=chat_reply(len(found.results), previous.query, filters), results=found.results, filters=filters,
+            expansion=found.expansion, no_result=found.no_result,
+        )
+        query = previous.query
+    else:
+        turn = agent.Agent(conn, chat_model, search_fn).run(body.message, previous, body.filters)
+        response = ChatResponse(reply=turn.reply, results=turn.results, filters=turn.filters,
+                                expansion=turn.expansion, no_result=turn.no_result)
+        query = turn.query
     case_state.save_turn(conn, body.session_id, body.message, query, response)
     return response
 
