@@ -1,33 +1,61 @@
-"""Shared fixtures for integration tests on a separate `navigator_test` database."""
+"""Shared fixtures for integration tests on a test database of their own, one per pytest run.
 
+Several sessions run tests at the same time on one Postgres: with one shared test database their TRUNCATEs and
+schema runs deadlock, and the shared `navigator` database must never get a branch's schema or table locks.
+"""
+
+import os
+
+import numpy as np
 import psycopg
 import pytest
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-import numpy as np
-
 from navigator import chunks_db, db
 from navigator.settings import PROJECT_ROOT, get_settings
 from navigator.sources import load_sources
 
-TEST_DB = "navigator_test"
+TEST_DB_PREFIX = "navigator_test_"
+TEST_DB = f"{TEST_DB_PREFIX}{os.getpid()}"
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _drop_stale(admin: psycopg.Connection) -> None:
+    """Drop test databases of pytest runs that are gone (killed before their teardown)."""
+    for (name,) in admin.execute("SELECT datname FROM pg_database WHERE datname LIKE %s", (TEST_DB_PREFIX + "%",)):
+        pid = name.removeprefix(TEST_DB_PREFIX)
+        if pid.isdigit() and not _alive(int(pid)):
+            admin.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name)))
 
 
 @pytest.fixture(scope="session")
-def test_database_url() -> str:
-    """Create `navigator_test` if missing and run the schema on it. Skip when Postgres is not running."""
+def test_database_url():
+    """A fresh database for this pytest run with the schema applied, dropped at the end.
+    Skip when Postgres is not running."""
     base = conninfo_to_dict(get_settings().database_url)
+    admin_url = make_conninfo(**{**base, "dbname": "postgres"})
     try:
-        with psycopg.connect(make_conninfo(**{**base, "dbname": "postgres"}), autocommit=True) as admin:
-            if not admin.execute("SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB,)).fetchone():
-                admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(TEST_DB)))
+        with psycopg.connect(admin_url, autocommit=True) as admin:
+            _drop_stale(admin)
+            admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(TEST_DB)))
     except psycopg.OperationalError:
         pytest.skip("Postgres not running")
     url = make_conninfo(**{**base, "dbname": TEST_DB})
     with db.connect(url) as conn:
         db.init_db(conn, load_sources(PROJECT_ROOT / "config" / "sources.yaml"))
-    return url
+    yield url
+    with psycopg.connect(admin_url, autocommit=True) as admin:
+        admin.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(TEST_DB)))
 
 
 @pytest.fixture

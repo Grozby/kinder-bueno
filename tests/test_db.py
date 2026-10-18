@@ -1,21 +1,17 @@
-"""Integration tests. They need Postgres: `docker compose up -d db`. Skipped otherwise."""
+"""Integration tests on the run's own test database (tests/conftest.py), never the shared one: init_db there
+takes table locks and writes the schema of whatever branch runs the tests. Skipped without Postgres."""
 
 import psycopg
 import pytest
 
 from navigator import db
-from navigator.settings import PROJECT_ROOT, get_settings
+from navigator.settings import PROJECT_ROOT
 from navigator.sources import load_sources
 
 
 @pytest.fixture
-def conn():
-    try:
-        connection = db.connect(get_settings().database_url)
-    except psycopg.OperationalError:
-        pytest.skip("Postgres not running")
-    with connection:
-        yield connection
+def conn(test_conn):
+    return test_conn
 
 
 def test_init_db_is_idempotent(conn):

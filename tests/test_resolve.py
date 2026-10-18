@@ -1,9 +1,7 @@
-"""resolve: name normalisation (unit tests) and the merge rules on a separate `navigator_test` database."""
+"""resolve: name normalisation (unit tests) and the merge rules on the run's own test database (tests/conftest.py)."""
 
-import psycopg
 import pytest
 from psycopg import sql
-from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from navigator import db
 from navigator.resolve import (
@@ -16,8 +14,6 @@ from navigator.resolve import (
     site_name,
 )
 from navigator.results import build_results
-from navigator.settings import PROJECT_ROOT, get_settings
-from navigator.sources import load_sources
 
 
 def test_looks_like_person():
@@ -34,17 +30,9 @@ def test_norm_name_drops_titles_and_accents():
 
 
 @pytest.fixture
-def conn():
-    """Test database (created if missing), emptied before each test. Skipped without Postgres."""
-    base = conninfo_to_dict(get_settings().database_url)
-    try:
-        with psycopg.connect(make_conninfo(**{**base, "dbname": "postgres"}), autocommit=True) as admin:
-            if not admin.execute("SELECT 1 FROM pg_database WHERE datname = 'navigator_test'").fetchone():
-                admin.execute("CREATE DATABASE navigator_test")
-    except psycopg.OperationalError:
-        pytest.skip("Postgres not running")
-    with db.connect(make_conninfo(**{**base, "dbname": "navigator_test"})) as connection:
-        db.init_db(connection, load_sources(PROJECT_ROOT / "config" / "sources.yaml"))
+def conn(test_database_url):
+    """The run's test database (tests/conftest.py), emptied before each test."""
+    with db.connect(test_database_url) as connection:
         tables = [r[0] for r in connection.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")]
         connection.execute(
             sql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(sql.SQL(", ").join(map(sql.Identifier, tables)))
