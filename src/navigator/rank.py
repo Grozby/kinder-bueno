@@ -16,8 +16,9 @@ from navigator.verify import norm
 DEFAULT_TYPES = ["person", "unit"]  # projects / infrastructure only when the filter asks (8.4 step 4)
 MAX_RESULTS = 10
 MAX_PER_UNIT = 3      # fairness cap (8.5)
-MIN_SIM = 0.45        # below this, and with no keyword hit, there is no reliable result (8.7)
-# Tuned on the eval set (#29, recall@10 14% -> 46%; #59, 46% -> 59%). Re-run `navigator eval` after changing any of these.
+MIN_SIM = 0.50        # below this, and with no keyword hit, there is no reliable result (8.7). #99: gold queries
+                      # 0.57-0.74, off-topic ones 0.32-0.47
+# Tuned on the eval set (#29, recall@10 14% -> 46%; #59, 46% -> 59%; #99 sweep in PLAN.md 10.2). Re-run `navigator eval` after changing any of these.
 BEST_CHUNKS = 1       # plan 8.4 said the best 3: that favours entities on long pages with many matching chunks
 PAGE_ONLY_WEIGHT = 0.25
 USE_IDF = True        # an entity with claims on many pages ("ARTORG Center") is linked to every query on them
