@@ -72,11 +72,14 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
    - `continuous glucose monitoring`, then `glucose sensors`: other words, same core (DCB Research AG, AI in
      Health and Nutrition, University Clinic for Diabetology). Apertus expands each query with synonyms and
      German terms (e.g. CGM, biosensors) before searching.
+   - `More like #1` (~5 s), then `Who works with #2?` (~1 s): the chat agent (#131) reads the numbers as earlier
+     results, finding similar people and units, then the people linked to result #2 (e.g. DCB and Tidepool →
+     Andrea Celoria, Thomas Züger). Add one of them as a reference.
    - `quantum cryptography`: "Showing 0 results": no reliable source, so nothing is made up.
 5. **Pitch** (~10 s). Deselect a weak reference (e.g. Acoustic Robotics Systems Lab: "Found for", no matching
-   claim), move the card to "Accepted", generate the pitch. Statements about references carry claim ids like
-   [11218] that point to the evidence rows; sentences about references that cite nothing, or cite facts outside the
-   selection, are removed.
+   claim), move the card to "Accepted", generate the pitch. Statements about references carry small numbered
+   citations (#109): click one to show the cited fact, its quote and the source page. Sentences about references
+   that cite nothing, or cite facts outside the selection, are removed.
 6. *(Optional)* **Honest "no fit".** Drop `vinora-business-model.pdf` (agritech, ~20 s): fit score **0**,
    every criterion 0, "No matching experts in our sources", and the references say "No references in our sources
    match these needs" (#110): nothing is preselected, so no pitch is offered for a case we can't serve.
