@@ -46,7 +46,7 @@ services:
       BACKEND_URL: ${BACKEND_URL:-http://app:8000}  # read by vite.config.ts; a teammate's backend with --no-deps
       BACKEND_TOKEN: ${BACKEND_TOKEN:-${API_TOKEN:-}}  # default: the app's API_TOKEN from .env; the proxy adds it, the browser never sees it
       VITE_USE_MOCK: ${VITE_USE_MOCK:-false}  # real backend; true for UI work on routes the backend does not serve yet
-      VITE_SHOW_UNFINISHED: ${VITE_SHOW_UNFINISHED:-false}  # true shows controls whose backend is not there yet (#97)
+      VITE_SHOW_UNFINISHED: ${VITE_SHOW_UNFINISHED:-false}  # true shows controls whose backend is not there yet (none since #97)
     depends_on:
       app: { condition: service_healthy }
     ports: ["${UI_PORT:-5173}:5173"]
