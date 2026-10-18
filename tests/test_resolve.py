@@ -10,6 +10,7 @@ from navigator.resolve import (
     norm_name,
     norm_unit,
     parent_url,
+    project_code_aliases,
     resolve,
     site_name,
 )
@@ -302,3 +303,26 @@ def test_acronym_unit_is_merged_in_resolve(conn):
     assert conn.execute("SELECT name, norm_key FROM entity WHERE type = 'unit'").fetchall() == [
         ("Diabetes Center Berne", "diabetes center berne")
     ]
+
+
+def test_project_code_merges_into_its_one_titled_name():
+    keys = {"spn-005", "spn-005 - pilot study on painless glucose monitoring", "better4u",
+            "abc-1: first study", "abc-1 - second study", "abc-1", "xyz-9 - lonely title"}
+    # ABC-1 fits two titled projects: ambiguous, kept apart. XYZ-9 has no code-only project. BETTER4U has no title.
+    assert project_code_aliases(keys) == {"spn-005": "spn-005 - pilot study on painless glucose monitoring"}
+
+
+def test_project_code_is_merged_in_resolve(conn):
+    own = _page(conn, "dcb", "https://d/project/spn-005")
+    listing = _page(conn, "dcb", "https://d/projects")
+    _claim(conn, own, "project", "SPN-005", "expertise", "non-invasive glucose monitoring")
+    _claim(conn, listing, "project", "SPN-005 – Pilot study on painless glucose monitoring", "name",
+           "SPN-005 – Pilot study on painless glucose monitoring")
+    _claim(conn, listing, "project", "SPN-005 – Pilot study on painless glucose monitoring", "expertise",
+           "continuous glucose monitoring")
+    resolve(conn)
+    assert conn.execute("SELECT name FROM entity WHERE type = 'project'").fetchall() == [
+        ("SPN-005 – Pilot study on painless glucose monitoring",)
+    ]
+    assert conn.execute("SELECT count(*) FROM claim").fetchone()[0] == 3
+
