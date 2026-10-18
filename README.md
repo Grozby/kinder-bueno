@@ -57,7 +57,7 @@ docker compose up -d app frontend                          # API + UI
   own data: `DB_PORT=55432 API_PORT=18000 UI_PORT=15173 docker compose -p navclean up -d`.
 - Single steps also work in the container: `docker compose run --rm app uv run navigator <command>`.
 - The compose UI calls the real backend. `VITE_USE_MOCK=true docker compose up -d frontend` brings back the mock,
-  e.g. for the Sources page's "Ranked pages" tab, which the backend does not serve yet (#78–#80).
+  e.g. for UI parts the backend does not serve yet (reviewer score, notes and similar cases).
 
 ### Demo
 
@@ -71,8 +71,12 @@ docker compose exec -T db pg_dump -Fc --no-owner -U navigator navigator > checkp
 # On the demo machine, with checkpoints/demo.dump copied in
 docker compose up -d db
 docker compose run --rm restore                            # replaces the database with the snapshot
+docker compose run --rm app uv run navigator init-db       # adds tables and columns the snapshot predates
 docker compose up -d app frontend                          # healthy once bge-m3 is loaded (~1 min)
 ```
+
+- Run `init-db` after every restore: it only adds what is missing. Without it, a snapshot older than the code
+  (e.g. one without `page.blocked`, #79) keeps `app` unhealthy with `column ... does not exist`.
 
 - `restore` drops and recreates every table: cases, chats and feedback since the snapshot are lost.
   `DEMO_SNAPSHOT=other.dump` loads another file from `checkpoints/`.
