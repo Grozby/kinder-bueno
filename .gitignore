@@ -15,8 +15,10 @@ wheels/
 *.swp
 *.swo
 
-# Secrets
+# Secrets (e.g. the LLM API key); commit .env.example instead
 .env
+.env.*
+!.env.example
 
 # Claude Code
 .claude/settings.local.json
