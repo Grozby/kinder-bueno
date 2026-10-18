@@ -1,5 +1,5 @@
-// Typed backend endpoints. Until the backend serves them, an in-memory mock answers instead:
-// set VITE_USE_MOCK=false to talk to the real backend.
+// Typed backend endpoints. VITE_USE_MOCK=true swaps in an in-memory mock, e.g. for UI work on routes
+// the backend does not serve yet.
 // /chat and /feedback follow docs/PLAN.md section 8.9; the rest is in docs/FRONTEND_API.md.
 import { api } from './client'
 import { mockBackend } from './mock'
@@ -24,7 +24,9 @@ import type {
   Source,
 } from './types'
 
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+// Controls whose backend is not there yet (the chat agent's examples, #97): hidden unless set, or on the mock
+export const SHOW_UNFINISHED = USE_MOCK || import.meta.env.VITE_SHOW_UNFINISHED === 'true'
 
 const realBackend = {
   listCases: () => api<Case[]>('/cases'),

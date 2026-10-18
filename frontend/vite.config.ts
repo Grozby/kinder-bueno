@@ -5,13 +5,13 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
     plugins: [
       vue(),
-      vueDevTools(),
+      command === 'serve' && vueDevTools(), // dev server only, never in the production build
     ],
     resolve: {
       alias: {
