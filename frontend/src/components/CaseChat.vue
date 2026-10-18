@@ -4,6 +4,7 @@
 import { Check, LoaderCircle, Plus, Send } from '@lucide/vue'
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 
+import { SHOW_UNFINISHED } from '@/api'
 import { useCasesStore } from '@/stores/cases'
 import { hostOf } from '@/utils/format'
 import BaseButton from './ui/BaseButton.vue'
@@ -83,7 +84,7 @@ async function send(message = draft.value.trim()) {
       </div>
     </div>
 
-    <div class="examples">
+    <div v-if="SHOW_UNFINISHED" class="examples">
       <button v-for="ex in EXAMPLES" :key="ex" type="button" :disabled="busy" @click="send(ex)">
         {{ ex }}
       </button>

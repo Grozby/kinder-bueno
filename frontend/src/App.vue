@@ -62,7 +62,7 @@ onMounted(() => {
         <span
           v-if="USE_MOCK"
           class="tag demo"
-          title="Set VITE_USE_MOCK=false to use the real backend"
+          title="Unset VITE_USE_MOCK to use the real backend"
         >
           Demo data
         </span>

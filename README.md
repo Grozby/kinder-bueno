@@ -37,6 +37,9 @@ flowchart LR
 
 ## Run with Docker
 
+> **Running the Navigator on another machine** (built UI on nginx, only the UI published, from a snapshot):
+> follow [`docs/HANDOFF.md`](docs/HANDOFF.md). The commands below are the development stack.
+
 Everything runs in containers: Postgres, the Python pipeline and API, and the Vue UI. Nothing connects to
 cantonal networks. The only outside calls are the crawled public sites and the Apertus gateway.
 
@@ -56,6 +59,7 @@ docker compose up -d app frontend                          # API + UI
 - Host ports can be changed with `DB_PORT`, `API_PORT` and `UI_PORT`, e.g. to run a second stack with its
   own data: `DB_PORT=55432 API_PORT=18000 UI_PORT=15173 docker compose -p navclean up -d`.
 - Single steps also work in the container: `docker compose run --rm app uv run navigator <command>`.
+- `navigator warm` downloads bge-m3 and the case reranker (~4.5 GB) ahead of time, so the first PDF upload does not wait.
 - The compose UI calls the real backend. `VITE_USE_MOCK=true docker compose up -d frontend` brings back the mock,
   e.g. for UI parts the backend does not serve yet (reviewer score, notes and similar cases).
 
@@ -80,7 +84,8 @@ docker compose up -d app frontend                          # healthy once bge-m3
 
 - `restore` drops and recreates every table: cases, chats and feedback since the snapshot are lost.
   `DEMO_SNAPSHOT=other.dump` loads another file from `checkpoints/`.
-- `checkpoints/` is git-ignored: the dump holds the uploaded case texts. Pass it on directly, not through git.
+- `checkpoints/` is git-ignored: the dump holds the crawled page texts and any uploaded case texts. Pass it on
+  directly, never through git or a GitHub release: the repository is public.
 - `KEERA_API_KEY` is still needed: search, chat, case analysis and the pitch call the Apertus gateway.
 - **Frontend only**, against a teammate's backend (no database or model download):
   `BACKEND_URL=http://<host-ip>:8000 BACKEND_TOKEN=<token> docker compose up --no-deps frontend`.

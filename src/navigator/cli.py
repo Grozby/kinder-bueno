@@ -212,6 +212,20 @@ def search_chunks(
 
 
 @app.command()
+def warm() -> None:
+    """Download the local models (bge-m3, the case reranker) into the HuggingFace cache, so neither the first
+    start nor the first case upload waits on a ~4.5 GB download."""
+    from navigator.analysis import _reranker
+    from navigator.embed import get_model
+
+    typer.echo(f"Embedding model: {get_settings().embed_model}")
+    get_model()
+    typer.echo("Reranker: loading")
+    _reranker()
+    typer.echo("Models ready.")
+
+
+@app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", help="Bind address."),
     port: int = typer.Option(8000, help="Port."),

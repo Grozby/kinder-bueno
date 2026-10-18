@@ -1,0 +1,23 @@
+# The packaged stack (docs/HANDOFF.md), on top of docker-compose.yml: the built UI on nginx instead of the Vite dev
+# server, and only the UI published (127.0.0.1:8080). The database and the API stay inside Docker.
+# Turned on by one line in .env, so every command stays a plain `docker compose ...`:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.handoff.yml
+services:
+  db:
+    restart: unless-stopped
+    ports: !reset []
+
+  app:
+    restart: unless-stopped
+    ports: !reset []
+
+  frontend:                         # nginx proxies /api to the app and adds API_TOKEN; the browser never sees it
+    build: ./frontend
+    image: !reset null
+    working_dir: !reset null
+    command: !reset null
+    volumes: !reset []
+    restart: unless-stopped
+    environment:
+      API_TOKEN: ${API_TOKEN:-}
+    ports: !override ["${UI_BIND:-127.0.0.1}:${UI_PORT:-8080}:80"]  # UI_BIND=0.0.0.0 opens the UI to the network
