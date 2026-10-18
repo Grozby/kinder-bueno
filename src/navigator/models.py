@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 EntityType = Literal["person", "unit", "project", "infrastructure"]
 Rating = Literal["up", "down", "wrong_fact"]
+JudgeVerdict = Literal["supported", "partial"]  # "unsupported" claims are never shown
 
 
 class Evidence(BaseModel):
@@ -14,7 +15,7 @@ class Evidence(BaseModel):
     value: str
     quote: str
     url: str
-    judge_verdict: str | None   # [PoC] "supported" | "partial" | None
+    judge_verdict: JudgeVerdict | None  # [PoC] None: not judged
     judge_reason: str | None    # [PoC]
 
 
