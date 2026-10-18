@@ -84,7 +84,7 @@ def extract(
         if not pages:
             typer.echo("No pages match.")
             raise typer.Exit(1)
-        model = settings.extract_model or settings.llm_model
+        model = settings.extract_model
         typer.echo(f"Extracting {len(pages)} pages with {model} (concurrency {settings.llm_concurrency})...")
         results = asyncio.run(extract_pages(LLM(settings, settings.extract_model), pages))
         db.replace_raw_extractions(conn, results)

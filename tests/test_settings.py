@@ -25,3 +25,18 @@ def test_env_file_and_paths_from_another_directory(tmp_path):
         capture_output=True, text=True, check=True,
     ).stdout.split()
     assert out == ["some/reranker", str(tmp_path / "eval"), str(tmp_path / "s.yaml")]
+
+
+def test_extract_model_is_8b_unless_set(tmp_path):
+    """Host runs extract with the same model as Docker: unset or empty (as in .env.example) is 8B, not LLM_MODEL."""
+    code = "from navigator.settings import get_settings as g; print(g().extract_model)"
+    clean = {k: v for k, v in os.environ.items() if k not in {"EXTRACT_MODEL", "LLM_MODEL"}}
+    out = []
+    for text in ["LLM_MODEL=apertus-v1-5-70b\n", "LLM_MODEL=apertus-v1-5-70b\nEXTRACT_MODEL=\n", "EXTRACT_MODEL=other\n"]:
+        env = tmp_path / "navigator.env"
+        env.write_text(text)
+        out.append(subprocess.run(
+            [sys.executable, "-c", code], cwd=tmp_path, env={**clean, "NAVIGATOR_ENV_FILE": str(env)},
+            capture_output=True, text=True, check=True,
+        ).stdout.strip())
+    assert out == ["apertus-v1-5-8b", "apertus-v1-5-8b", "other"]
