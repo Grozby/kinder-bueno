@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Archive, LoaderCircle, TriangleAlert } from '@lucide/vue'
-import { computed, onMounted, ref } from 'vue'
+import { LoaderCircle, TriangleAlert } from '@lucide/vue'
+import { computed, ref } from 'vue'
 
 import type { CaseStatus } from '@/api'
 import BernBear from '@/components/BernBear.vue'
@@ -25,7 +25,6 @@ const openCase = computed(() => store.cases.find((c) => c.id === openId.value) ?
 const dragging = ref(false)
 const overColumn = ref<CaseStatus | null>(null)
 const overBear = ref(false)
-const showRejected = ref(false)
 const notice = ref<{ text: string; undo?: () => void } | null>(null)
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -76,7 +75,7 @@ function rejectFromDrawer() {
 }
 
 function openFromRejected(id: string) {
-  showRejected.value = false
+  store.showDiscarded = false
   openId.value = id
 }
 
@@ -122,10 +121,6 @@ function onBearDrop(e: DragEvent) {
   const id = caseIdFrom(e)
   if (id) reject(id)
 }
-
-onMounted(() => {
-  if (!store.cases.length) store.load()
-})
 </script>
 
 <template>
@@ -161,9 +156,6 @@ onMounted(() => {
           <dd>{{ avgScore ?? '–' }}</dd>
         </div>
       </dl>
-      <BaseButton size="sm" variant="ghost" :icon="Archive" @click="showRejected = true">
-        Rejected ({{ store.byStatus.rejected.length }})
-      </BaseButton>
     </div>
 
     <p v-if="store.error" class="load-error">
@@ -230,10 +222,10 @@ onMounted(() => {
     </Transition>
 
     <BaseOverlay
-      :open="showRejected"
-      :title="`Rejected cases (${store.byStatus.rejected.length})`"
+      :open="store.showDiscarded"
+      :title="`Discarded cases (${store.byStatus.rejected.length})`"
       width="460px"
-      @close="showRejected = false"
+      @close="store.showDiscarded = false"
     >
       <div v-if="store.byStatus.rejected.length" class="rejected-list">
         <CaseCard
@@ -244,7 +236,7 @@ onMounted(() => {
           @move="(s) => move(c.id, s)"
         />
       </div>
-      <p v-else class="muted">No rejected cases.</p>
+      <p v-else class="muted">No discarded cases.</p>
     </BaseOverlay>
 
     <CaseDrawer

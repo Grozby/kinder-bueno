@@ -29,6 +29,8 @@ export const useCasesStore = defineStore('cases', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const uploading = ref(0)
+  // The discarded (rejected) cases panel; opened from the sidebar, shown on the board
+  const showDiscarded = ref(false)
 
   // Per case: references (backend top 25, plus results added from the chat), the entity ids
   // chosen for the pitch, the last pitch, the chat turns, and the feedback given per entity
@@ -159,6 +161,7 @@ export const useCasesStore = defineStore('cases', () => {
     loading,
     error,
     uploading,
+    showDiscarded,
     references,
     selected,
     pitches,

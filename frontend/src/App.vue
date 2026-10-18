@@ -1,10 +1,26 @@
 <script setup lang="ts">
-import { Database, LayoutGrid } from '@lucide/vue'
-import { RouterLink, RouterView } from 'vue-router'
+import { Archive, Database, LayoutGrid } from '@lucide/vue'
+import { onMounted } from 'vue'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 
 import { USE_MOCK } from '@/api'
 import BernBear from '@/components/BernBear.vue'
 import BernEater from '@/components/BernEater.vue'
+import { useCasesStore } from '@/stores/cases'
+
+const store = useCasesStore()
+const router = useRouter()
+
+// The panel lives on the board, so go there first when opened from another page
+async function openDiscarded() {
+  await router.push('/')
+  store.showDiscarded = true
+}
+
+// Load the cases at start, so the discarded count is right on every page
+onMounted(() => {
+  if (!store.cases.length) store.load()
+})
 </script>
 
 <template>
@@ -29,13 +45,24 @@ import BernEater from '@/components/BernEater.vue'
         </RouterLink>
       </nav>
 
-      <span
-        v-if="USE_MOCK"
-        class="tag demo"
-        title="Set VITE_USE_MOCK=false to use the real backend"
-      >
-        Demo data
-      </span>
+      <div class="sidebar-foot">
+        <span
+          v-if="USE_MOCK"
+          class="tag demo"
+          title="Set VITE_USE_MOCK=false to use the real backend"
+        >
+          Demo data
+        </span>
+        <button
+          class="discarded"
+          title="Discarded cases: restore a card from here"
+          @click="openDiscarded"
+        >
+          <Archive :size="15" />
+          <span>Discarded</span>
+          <span class="count">{{ store.byStatus.rejected.length }}</span>
+        </button>
+      </div>
     </aside>
 
     <main>
@@ -115,9 +142,42 @@ nav a.router-link-exact-active {
   border-left-color: var(--bern-red);
   color: var(--text);
 }
-.demo {
+.sidebar-foot {
   margin-top: auto;
-  align-self: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.discarded {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.discarded:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+.discarded:focus-visible {
+  outline: 2px solid var(--focus);
+}
+.discarded .count {
+  min-width: 20px;
+  padding: 0 0.3rem;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
 }
 
 main {
@@ -142,8 +202,12 @@ main {
   }
   .brand-text,
   nav a span,
+  .discarded > span:not(.count),
   .demo {
     display: none;
+  }
+  .sidebar-foot {
+    justify-content: center;
   }
   nav a {
     justify-content: center;

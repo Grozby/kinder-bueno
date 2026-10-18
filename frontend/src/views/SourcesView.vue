@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BadgeCheck, ExternalLink, LoaderCircle, Plus, TriangleAlert, X } from '@lucide/vue'
+import { BadgeCheck, ExternalLink, LoaderCircle, Plus, TriangleAlert } from '@lucide/vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 
 import type { Source } from '@/api'
@@ -81,16 +81,10 @@ onMounted(() => {
           crawler explore it and the pages it links to.
         </p>
       </div>
-      <BaseButton
-        :variant="showForm ? 'secondary' : 'primary'"
-        :icon="showForm ? X : Plus"
-        @click="showForm = !showForm"
-      >
-        {{ showForm ? 'Cancel' : 'Add source' }}
-      </BaseButton>
+      <BaseButton variant="primary" :icon="Plus" @click="showForm = true">Add source</BaseButton>
     </section>
 
-    <dl class="kpis">
+    <dl class="kpis toolbar">
       <div>
         <dt>Sources</dt>
         <dd>{{ store.sources.length }}</dd>
@@ -109,15 +103,18 @@ onMounted(() => {
       </div>
     </dl>
 
-    <Transition name="fold">
-      <form v-if="showForm" class="add panel-box" @submit.prevent="submit">
-        <div class="add-intro">
-          <h2>Add a source</h2>
-          <p class="muted">
-            The crawler starts at this page and follows its links up to the chosen depth. Only facts
-            that can be verified against the page text are kept.
-          </p>
-        </div>
+    <BaseOverlay
+      :open="showForm"
+      side="center"
+      width="720px"
+      title="Add a source"
+      @close="showForm = false"
+    >
+      <form class="add" @submit.prevent="submit">
+        <p class="add-intro muted">
+          The crawler starts at this page and follows its links up to the chosen depth. Only facts
+          that can be verified against the page text are kept.
+        </p>
 
         <label class="field wide">
           <span class="field-label">Start page URL</span>
@@ -177,12 +174,13 @@ onMounted(() => {
 
         <div class="submit">
           <small v-if="formError" class="score-bad">{{ formError }}</small>
+          <BaseButton @click="showForm = false">Cancel</BaseButton>
           <BaseButton type="submit" variant="primary" :loading="submitting" :disabled="!urlValid">
             Start crawl
           </BaseButton>
         </div>
       </form>
-    </Transition>
+    </BaseOverlay>
 
     <p v-if="store.error" class="load-error">
       <TriangleAlert :size="16" /> The sources could not be loaded: {{ store.error }}
@@ -280,16 +278,16 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Fills <main> and scrolls inside it, so the sidebar stays in place. */
+/* Fills <main> exactly; only the list of sources scrolls. */
 .sources-page {
   height: 100%;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
-  padding: 1.5rem clamp(1rem, 2.5vw, 2rem) 3rem;
+  gap: 1rem;
+  padding: 1.5rem clamp(1rem, 2.5vw, 2rem);
 }
 .intro {
+  flex: none;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -307,30 +305,31 @@ h1 {
 }
 
 .kpis {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
 }
 .kpis div {
-  padding: 1rem 1.25rem;
-}
-.kpis div + div {
-  border-left: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 .kpis dt {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 .kpis dd {
-  margin: 0.15rem 0 0;
-  font-size: 26px;
+  margin: 0;
+  font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .load-error {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -344,15 +343,9 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem 1.5rem;
-  padding: 1.5rem;
-  border-top: 3px solid var(--bern-red);
 }
 .add-intro {
   grid-column: 1 / -1;
-}
-.add-intro h2 {
-  font-size: 20px;
-  margin-bottom: 0.25rem;
 }
 .field {
   display: flex;
@@ -417,9 +410,14 @@ h1 {
 }
 
 .grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  align-content: start;
   gap: 1.25rem;
+  padding: 2px 4px 1rem 2px;
 }
 .source {
   display: flex;
@@ -592,27 +590,14 @@ dd {
   color: var(--bad);
 }
 
-.fold-enter-active,
-.fold-leave-active {
-  transition:
-    opacity 0.2s,
-    transform 0.2s;
+@media (max-width: 1100px) {
+  .lead {
+    display: none;
+  }
 }
-.fold-enter-from,
-.fold-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
-}
-
 @media (max-width: 760px) {
   .kpis {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .kpis div:nth-child(3) {
-    border-left: 0;
-  }
-  .kpis div:nth-child(n + 3) {
-    border-top: 1px solid var(--border);
+    gap: 0.5rem 1rem;
   }
   .add {
     grid-template-columns: 1fr;
