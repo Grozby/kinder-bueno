@@ -77,7 +77,8 @@ Ethical rules from the challenge, and how we meet them:
 | Run environment | `docker-compose`: `db`, `app` (backend API) and `frontend` services. No connection to Canton Bern networks. |
 | Database | Postgres 16 with `pgvector` (Docker image `pgvector/pgvector:pg16`) |
 | LLM | Apertus v1.5 70B via the Keera gateway (OpenAI-compatible API) |
-| LLM model name | `apertus-v1-5-70b` for all steps. Do NOT use the `-thinking` variants (slower, extra reasoning text breaks JSON parsing). |
+| LLM model name | `apertus-v1-5-70b` for all steps, except extraction (see below). Do NOT use the `-thinking` variants (slower, extra reasoning text breaks JSON parsing). |
+| Extraction model | `EXTRACT_MODEL=apertus-v1-5-8b` for now. On the shared gateway, 70B dropped from ~51 to ~5 tokens/s (other teams), so a 100-page run timed out. 8B runs at ~160 tokens/s: 100 pages in ~10 min. Quote verification protects against 8B errors. Re-run with 70B (`EXTRACT_MODEL=` empty) when the gateway is fast again. |
 | Embeddings | `BAAI/bge-m3` (1024 dimensions, multilingual), runs locally on CPU via `sentence-transformers`. The gateway has no embedding model. |
 | Keyword search | Postgres full-text search, `simple` config (mixed German/English text) |
 | UI | Vue 3 + Vite + TypeScript, PrimeVue 5, Pinia, vue-router, in `frontend/` (scaffold already in the repo). *Pending teammate review.* |
@@ -94,8 +95,10 @@ Ethical rules from the challenge, and how we meet them:
 - Auth: header `Authorization: Bearer $KEERA_API_KEY`
 - Available models: `apertus-v1-5-70b`, `apertus-v1-5-70b-thinking`, `apertus-v1-5-8b`, `apertus-v1-5-8b-thinking`
 - Test call to `apertus-v1-5-70b`: works, ~1.3 s for a short answer.
-- Rate limits: **unknown**. Check in hour 1 (send 16 parallel requests, look for HTTP 429).
-- JSON mode (`response_format={"type": "json_object"}`): **unknown**. Try it. If the gateway rejects it, remove it and parse the first JSON object from the text.
+- Rate limits: none seen (16 parallel requests: all OK in 0.6 s).
+- JSON mode (`response_format={"type": "json_object"}`): **works** (checked). The client still falls back to plain parsing if it is rejected.
+- **Speed varies a lot** (shared gateway): 70B measured at 51 and later at 5 tokens/s; 8B at ~160 tokens/s.
+- **Long answers end in `504 Gateway Time-out`.** All calls MUST stream (`stream=True`); `llm.py` does this.
 - Tool calling (OpenAI `tools` + `tool_choice: "auto"`): **works** (checked). The gateway is vLLM. Test: "Find experts on glucose sensors at DCB only." → `search(query="glucose sensors", source="dcb")`, `finish_reason: "tool_calls"`.
 
 Python client:
@@ -405,6 +408,8 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 Entities with no verified claims left after a re-ingest SHOULD be deleted by a cleanup query at the end of `ingest`.
 
+**Raw extraction tables (as built):** `raw_claim` and `raw_relation` store every extracted item with `verified` and `fail_reason`, before merging. `resolve` reads them, so it can be re-run without LLM calls. A re-crawl deletes them with the page (cascade).
+
 **Shown claim** (used everywhere below): `verified = true AND judge_verdict IS DISTINCT FROM 'unsupported'`. Same rule for relations. Without the judge (NULL verdict), this is the same as `verified = true`.
 
 ### 7.2 Crawl (`crawl.py`)
@@ -443,6 +448,15 @@ The cleaned text is stored in `page.text`. It is the ground truth for quote chec
 - Measured: 377 chunks for the 100 pages (artorg 92, dcb 211, unibe 74), embedded in ~20 s.
 
 ### 7.5 Extract (`extract.py`, `llm.py`)
+
+> **As built (differs from the text below, learned from live runs):**
+> - **Two focused prompts per page part**: `PEOPLE_PROMPT` (people, role/email/phone, `member_of`) and `TOPICS_PROMPT` (units, projects, infrastructure, expertise). One combined prompt often returned only one of the two.
+> - The prompts list the **allowed fields per entity type** (without it the model invented `website`, `address`, `organization`) and require **contiguous** quotes. Examples cover a member list and a lab page.
+> - **Compact rows** instead of objects: `[entity_type, entity_name, field, value, quote]` and `[from_type, from_name, rel, to_type, to_name, quote]` (~3x fewer tokens). Rows are routed by length (5 = claim, 6 = relation).
+> - Page parts of **6,000** characters, answers up to 12,000 tokens.
+> - **Salvage:** when an answer is cut off (8B sometimes loops until `max_tokens`), every complete row is recovered from the text and duplicates are removed.
+> - The page **title** counts as page text for verification (unit names often only appear there).
+> - Full run (8B, 100 pages, ~10 min): 1,488 / 1,705 claims verified (87%), 259 relations verified, facts on 97 pages. Most rejections are real errors: names copied from the prompt example, invented entity names, author abbreviations.
 
 One LLM call per page. If `page.text` is longer than 12,000 characters, split it into parts of 12,000 characters (on paragraph breaks) and call once per part.
 
@@ -514,7 +528,9 @@ Relations: the same check 1 on their quote, plus both entity names appear in the
 
 Only verified claims and relations are used in search and in the UI. Unverified ones stay in the database for debugging and for the eval report (count them).
 
-Unit tests MUST cover: exact match, whitespace difference, curly quote, invented quote (rejected), name not in quote (rejected).
+4. **Quote rebuild (as built)** for `name`, `role`, `email`, `phone` only: if the model's quote fails (the 8B model often writes "Name\nRole" where the page has "Role\nName"), the quote is built from the page: for `name` the name's own text; otherwise the shortest page span that holds the entity name and the value, if they are at most 200 characters apart. The stored quote is still exact page text. A value far from the name (another person's role) is rejected.
+
+Unit tests MUST cover: exact match, whitespace difference, curly quote, invented quote (rejected), name not in quote (rejected), reordered quote rebuilt, value far from the name (rejected).
 
 ### 7.7 Merge duplicates (`resolve.py`)
 
