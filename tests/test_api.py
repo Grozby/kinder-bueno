@@ -247,9 +247,9 @@ def test_guess_kind_falls_back_on_entity_types():
     assert guess_kind("https://example.org/x", person_claims=0, claims=0) == "other"
 
 
-def test_page_rules_from_sources_yaml():
-    rules = get_page_rules()
-    assert {"artorg", "dcb", "unibe"} <= rules.keys()
+def test_page_rules_from_sources_yaml(test_conn, graph):
+    rules = get_page_rules(test_conn)  # no stored rules: the sources.yaml blocks of the sources in the DB
+    assert rules.keys() == {"artorg", "dcb"}
     assert all(isinstance(r, SourceRules) for r in rules.values())
 
 

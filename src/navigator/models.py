@@ -180,6 +180,19 @@ class Pitch(BaseModel):
     generated_at: datetime
 
 
+class CrawlRulesUpdate(BaseModel):
+    """PUT /api/sources/{id}/rules (#79): the four lists replace the source's rules. Patterns are regexes
+    matched with re.search on the URL."""
+    allow_hosts: list[str]
+    include_patterns: list[str]
+    exclude_patterns: list[str]
+    priority_patterns: list[str]
+
+
+class CrawlRules(CrawlRulesUpdate):
+    changed_at: datetime | None  # last PUT; None while the defaults (sources.yaml) apply
+
+
 class ResourcePage(BaseModel):
     """A crawled page and what it gives the search (FRONTEND_API "Resources", #78)."""
     id: int

@@ -186,9 +186,9 @@ with actions to block or prioritise pages.
   `status` is always `"crawled"` (failed fetches are not stored). `kind` comes from the URL
   (`/team/`, `group_members` → team; `/project/` → project; `/services/` → infrastructure; `_lab/` → lab),
   else `team` when most shown claims are about people, else `other`. Feedback counts 👍/👎 on entities
-  with a shown claim on the page. `blocked_by` / `prioritised_by` read `config/sources.yaml` until the
-  stored rules land (#79).
-- Not served yet (the mock answers): the rules and re-crawl routes (#79, #80).
+  with a shown claim on the page. `blocked_by` / `prioritised_by` read the source's current rules (#79).
+  A blocked page keeps its counts here, so the table still shows what blocking it hides.
+- Served since #79: `GET`/`PUT /api/sources/{id}/rules`. Not served yet (the mock answers): re-crawl (#80).
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
@@ -213,8 +213,9 @@ A failed fetch scores 0 on the first three parts. The same numbers come back as 
 plus `kind` (`team` | `lab` | `project` | `infrastructure` | `other`, a guess from the URL or the
 entity types on the page is fine).
 
-**Rules** are the per-source blocks of `config/sources.yaml`; patterns are regular expressions
-matched with `re.search` on the URL (the UI only uses syntax JavaScript shares). The UI writes:
+**Rules** default to the source's block in `config/sources.yaml` (or its stored config, for a source
+added from the UI); a `PUT` stores all four lists, which then replace the defaults, also for
+`navigator crawl` and the re-crawl. Patterns are regular expressions matched with `re.search` on the URL (the UI only uses syntax JavaScript shares). The UI writes:
 
 - *Block* → `^<escaped url>$` added to `exclude_patterns`. *Block similar…* → a pattern the user
   edits, prefilled with the page's folder (`^https://host/path/`).
@@ -223,10 +224,14 @@ matched with `re.search` on the URL (the UI only uses syntax JavaScript shares).
 
 Expected behaviour:
 
-- **A block applies at once:** search, chat and case references drop claims whose only sources
-  match an exclude pattern, without a re-crawl. Each `ResourcePage` returns the matching
-  pattern in `blocked_by` (and `prioritised_by`), or `null`.
-- Rules are stored server-side (DB table or a rules file next to `sources.yaml`), not lost on
-  restart. `changed_at` is set on every PUT; when it is newer than the source's `last_crawled_at`,
-  the UI offers a re-crawl, which must also re-embed the source.
-- Invalid patterns → `422` with the pattern in the message.
+- **A block applies at once:** search, chat, case references, `/api/stats` and `navigator eval` drop
+  claims and relations from pages that match an exclude pattern, without a re-crawl (each claim row
+  has one page, so the same fact from another page stays). An entity with no shown claim left is
+  dropped. Each `ResourcePage` returns the matching pattern in `blocked_by` (and `prioritised_by`), or
+  `null`. Case scores computed before a block are not recomputed.
+- Rules are stored in the database (`source_rules`), not lost on restart. `changed_at` is set on every
+  PUT (`null` while the defaults apply); when it is newer than the source's `last_crawled_at`, the UI
+  offers a re-crawl. Include, priority and host rules only change the next crawl.
+- `422` names the list and the pattern that does not compile (`exclude_patterns: invalid regex '(x': …`),
+  or says `allow_hosts` is empty for a source that has no host regex. `404` for an unknown source.
+- **Shared backend:** a block hides facts for every teammate at once.

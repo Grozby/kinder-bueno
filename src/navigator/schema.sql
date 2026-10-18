@@ -172,3 +172,14 @@ CREATE TABLE IF NOT EXISTS crawl_url (
   status     text NOT NULL CHECK (status IN ('queued','crawled','skipped','failed')),
   UNIQUE (source_id, url)
 );
+
+-- Crawl rules edited in the UI (#79): they replace the source's defaults (sources.yaml or source.config).
+CREATE TABLE IF NOT EXISTS source_rules (
+  source_id   text PRIMARY KEY REFERENCES source(id) ON DELETE CASCADE,
+  rules       jsonb NOT NULL,         -- {allow_hosts, include_patterns, exclude_patterns, priority_patterns}
+  changed_at  timestamptz NOT NULL
+);
+-- A page matching a stored exclude pattern: its claims and relations are hidden at once (results.shown).
+ALTER TABLE page ADD COLUMN IF NOT EXISTS blocked boolean NOT NULL DEFAULT false;
+-- shown() checks it inside the ranking queries: a tiny partial index (few pages are blocked)
+CREATE INDEX IF NOT EXISTS page_blocked_idx ON page(id) WHERE blocked;

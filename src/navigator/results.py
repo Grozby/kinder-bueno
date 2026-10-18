@@ -8,9 +8,13 @@ from navigator.models import Evidence, Result
 from navigator.verify import norm
 
 
-def shown(alias: str) -> str:
-    """SQL condition for a shown claim or relation (plan 7.1)."""
-    return f"{alias}.verified AND {alias}.judge_verdict IS DISTINCT FROM 'unsupported'"
+def shown(alias: str, include_blocked: bool = False) -> str:
+    """SQL condition for a shown claim or relation (plan 7.1): verified, not judged unsupported, and not
+    from a page blocked by a crawl rule (#79). `include_blocked` keeps blocked pages (the pages list)."""
+    cond = f"{alias}.verified AND {alias}.judge_verdict IS DISTINCT FROM 'unsupported'"
+    if include_blocked:
+        return cond
+    return f"{cond} AND NOT EXISTS (SELECT 1 FROM page bp WHERE bp.id = {alias}.page_id AND bp.blocked)"
 
 
 REL_FIELDS = {

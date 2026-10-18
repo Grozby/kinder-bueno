@@ -88,9 +88,9 @@ def list_pages(conn: psycopg.Connection, rules: dict[str, SourceRules], page_id:
                coalesce(f.up, 0), coalesce(f.down, 0)
         FROM page p
         LEFT JOIN LATERAL (
-            SELECT count(*) FILTER (WHERE {shown("cl")}) AS claims,
-                   count(DISTINCT cl.entity_id) FILTER (WHERE {shown("cl")}) AS entities,
-                   count(*) FILTER (WHERE {shown("cl")} AND e.type = 'person') AS person_claims,
+            SELECT count(*) FILTER (WHERE {shown("cl", include_blocked=True)}) AS claims,
+                   count(DISTINCT cl.entity_id) FILTER (WHERE {shown("cl", include_blocked=True)}) AS entities,
+                   count(*) FILTER (WHERE {shown("cl", include_blocked=True)} AND e.type = 'person') AS person_claims,
                    count(*) FILTER (WHERE cl.verified AND cl.judge_verdict IS NOT NULL) AS judged,
                    count(*) FILTER (WHERE cl.verified AND cl.judge_verdict = 'supported') AS supported
             FROM claim cl JOIN entity e ON e.id = cl.entity_id
@@ -104,7 +104,7 @@ def list_pages(conn: psycopg.Connection, rules: dict[str, SourceRules], page_id:
             SELECT count(*) FILTER (WHERE fb.rating = 'up') AS up, count(*) FILTER (WHERE fb.rating = 'down') AS down
             FROM feedback fb
             WHERE EXISTS (SELECT 1 FROM claim cl WHERE cl.entity_id = fb.entity_id AND cl.page_id = p.id
-                            AND {shown("cl")})
+                            AND {shown("cl", include_blocked=True)})
         ) f ON true
         WHERE %(id)s::int IS NULL OR p.id = %(id)s
         ORDER BY p.id
@@ -126,7 +126,7 @@ def get_page(conn: psycopg.Connection, rules: dict[str, SourceRules], page_id: i
             f"""
             SELECT cl.id, e.id, e.name, e.type, cl.field, cl.value, cl.quote, cl.judge_verdict
             FROM claim cl JOIN entity e ON e.id = cl.entity_id
-            WHERE cl.page_id = %s AND {shown("cl")}
+            WHERE cl.page_id = %s AND {shown("cl", include_blocked=True)}
             ORDER BY e.name, cl.id
             """,
             (page_id,),
