@@ -42,6 +42,8 @@ packages = ["src/navigator"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["-m", "not integration"]  # the Docker stack tests: `uv run pytest -m integration` (tests/integration)
+markers = ["integration: needs Docker and the LLM gateway; starts its own stack (tests/integration/conftest.py)"]
 
 # Linux (Docker) gets the CPU-only torch wheel: the default one pulls ~4 GB of CUDA libraries.
 [tool.uv.sources]
