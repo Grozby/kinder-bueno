@@ -32,8 +32,8 @@ flowchart LR
   (13% of extracted facts were rejected, including names the model made up).
 - **Sovereign:** Apertus (Swiss open LLM) for extraction, query expansion and explanations; bge-m3 embeddings run
   locally; everything runs in Docker with no connection to cantonal networks.
-- **Two models:** extraction runs on `apertus-v1-5-8b` (`EXTRACT_MODEL`), because 70B was too slow on the
-  shared gateway; quote verification catches the small model's errors.
+- **Two models:** extraction runs on `apertus-v1-5-8b` (`EXTRACT_MODEL`), because 70B was slower and, on the
+  same pages, not better (plan section 3); quote verification catches the small model's errors.
 
 ## Run with Docker
 
@@ -50,7 +50,8 @@ docker compose up -d app frontend                          # API + UI
 - UI: http://localhost:5173 · API docs: http://localhost:8000/docs
 - `ingest` on 100 pages takes about 15–20 min. The first run also downloads bge-m3 (~2.3 GB) into the
   `hf_cache` volume. The app image is ~2 GB (CPU-only torch).
-- Extraction uses `apertus-v1-5-8b` by default (`EXTRACT_MODEL`): 70B is too slow on the shared gateway.
+- Extraction uses `apertus-v1-5-8b` by default (`EXTRACT_MODEL`): 70B was slower and not better (plan section 3).
+  `navigator llm-speed` shows the current gateway speed per model.
   Override with `EXTRACT_MODEL=apertus-v1-5-70b docker compose run ...`.
 - Host ports can be changed with `DB_PORT`, `API_PORT` and `UI_PORT`, e.g. to run a second stack with its
   own data: `DB_PORT=55432 API_PORT=18000 UI_PORT=15173 docker compose -p navclean up -d`.
