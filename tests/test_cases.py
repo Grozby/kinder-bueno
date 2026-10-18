@@ -5,8 +5,10 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from pypdf import PdfWriter
+from test_analysis import fake_embed_many, fake_read, no_explain
+from test_api import fake_embed
 
-from navigator import cases
+from navigator import analysis, cases
 from navigator.api import app, get_analyze, get_conn
 from navigator.settings import PROJECT_ROOT
 
@@ -16,7 +18,8 @@ GLUCORA = PROJECT_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
 @pytest.fixture
 def client(test_conn):
     app.dependency_overrides[get_conn] = lambda: test_conn
-    app.dependency_overrides[get_analyze] = lambda: lambda case_id: cases.analyze(test_conn, case_id)
+    app.dependency_overrides[get_analyze] = lambda: lambda case_id: analysis.analyze(
+        test_conn, case_id, read=fake_read, embed=fake_embed, embed_many=fake_embed_many, explain=no_explain)
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -32,7 +35,7 @@ def blank_pdf() -> bytes:
     return out.getvalue()
 
 
-def test_upload_returns_pending_then_analysis_finishes(client, test_conn):
+def test_upload_returns_pending_then_analysis_finishes(client, test_conn, graph):
     res = upload(client, GLUCORA.read_bytes())
     assert res.status_code == 200
     case = res.json()
@@ -45,6 +48,15 @@ def test_upload_returns_pending_then_analysis_finishes(client, test_conn):
     stored = client.get(f"/api/cases/{case['id']}").json()
     assert stored["analysis_status"] == "done"  # TestClient runs background tasks after the response
     assert stored["file_name"] == "glucora-business-model.pdf"
+    assert stored["company_name"] == "Glucora Health"  # read by the analysis
+    assert len(stored["score_breakdown"]) == 5
+
+    refs = client.get(f"/api/cases/{case['id']}/references", params={"limit": 2}).json()
+    assert len(refs) == 2 and refs[0]["why"].startswith("Matches '")
+
+
+def test_references_unknown_case(client):
+    assert client.get("/api/cases/nope/references").status_code == 404
 
 
 @pytest.mark.parametrize(

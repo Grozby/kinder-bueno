@@ -7,7 +7,6 @@ import uuid
 from pathlib import Path
 
 import psycopg
-from psycopg.types.json import Jsonb
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
@@ -78,11 +77,3 @@ def set_status(conn: psycopg.Connection, case_id: str, status: CaseStatus) -> Ca
     ).fetchone()
     return _case(row) if row else None
 
-
-def analyze(conn: psycopg.Connection, case_id: str) -> None:
-    """Placeholder analysis until #53: the company name stays the one from the file name, nothing is scored."""
-    conn.execute(
-        """UPDATE "case" SET analysis_status = 'done', score_breakdown = %s, needs = %s, refs = %s
-           WHERE id = %s AND analysis_status = 'pending'""",
-        (Jsonb([]), Jsonb([]), Jsonb([]), case_id),
-    )

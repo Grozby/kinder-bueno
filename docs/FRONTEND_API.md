@@ -42,10 +42,21 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
   The pitch MUST only use facts from these entities (traceability rule, section 1).
 - Upload errors: `413` above 10 MB; `422` if the file is not a PDF, cannot be read, or has no text
   (a scanned PDF). Only the PDF's text is stored, never the file.
-- Until the analysis lands (#53), `company_name` comes from the file name
-  (`glucora-business-model.pdf` → "Glucora Business Model"), `analysis_status` turns `done` right away,
-  and `score`, `industry` and `summary` stay `null`.
-- `references` is not served yet (#53).
+- Analysis (#53, ~30–60 s): Apertus reads the text (company name, industry, summary, 3–6 needs), each need
+  is searched, and the top 25 references are stored. Until then, and if it fails, `company_name` is
+  taken from the file name (`glucora-business-model.pdf` → "Glucora Business Model").
+- Score: five fixed criteria, each counting only references whose shown topic claims match a need.
+  `rationale` names those matches. `score` is the weighted mean:
+  - Research fit (40%): the share of needs covered.
+  - Expert pool (20%): 20 per person in a matching lab.
+  - Research units (15%): 34 per unit.
+  - Infrastructure & labs (15%): 50 per entry.
+  - Running projects (10%): 50 per project.
+
+  Each criterion is capped at 100. It measures fit within our sources, not all of Canton Bern.
+- References: `why` starts with the need the reference matched (`Matches 'continuous glucose monitoring': …`),
+  then a sentence whose claim citations are checked again on every request. `[]` before the analysis
+  is done.
 - Pitch (#54): plain text, paragraphs separated by a blank line. Every sentence about a reference cites
   claim ids like `[9606]`, all from the selected entities' evidence; sentences that fail the check are
   removed. If none is left, or the gateway fails or takes over 30 s, the text is a template that lists the
