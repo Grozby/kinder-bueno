@@ -234,12 +234,12 @@ Keep `priority_patterns` narrow and anchored to the site root: they decide what 
 ## Submission package
 
 ```bash
-scripts/submission.sh slides.pdf slides.pptx   # dist/submission.zip: slides, docs/REPORT.md as PDF, eval reports, HANDOFF.md
+scripts/submission.sh   # dist/technical-report.pdf: docs/REPORT.md printed to PDF
 ```
 
-Re-run `navigator eval` and `navigator case-eval` first, and update the numbers in `docs/REPORT.md`,
-`docs/PITCH.md` and the slides. The report is printed with headless Chrome (`CHROME=` for another path). The demo
-dump is never included: it goes to the challenge owner separately.
+The submission is the technical report only. Re-run `navigator eval` and `navigator case-eval` first, and
+update the numbers in `docs/REPORT.md` (and in `docs/PITCH.md` and the slides, for the demo). The report is
+printed with headless Chrome (`CHROME=` for another path).
 
 ## Tests
 

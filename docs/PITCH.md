@@ -8,8 +8,8 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
 ## Slides (5 minutes)
 
 The deck is [`docs/slides/pitch.html`](slides/pitch.html): 10 slides with speaker notes. Open it in a browser:
-the arrow keys page through it, N shows the notes, F goes full screen. Printing it gives one slide per page, the
-PDF that `scripts/submission.sh` takes; the command is in the file's header. The outline below is the talk
+the arrow keys page through it, N shows the notes, F goes full screen. Printing it gives one slide per page; the
+command is in the file's header. The outline below is the talk
 track; the slides use the same numbers.
 
 1. **The problem.** Expertise in Bern is spread over hundreds of faculty, institute, lab and centre pages, and
