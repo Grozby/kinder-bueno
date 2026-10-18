@@ -128,7 +128,15 @@ judge call the LLM, and the judge re-checks every source because resolve rebuild
 ## Resources: ranked pages and crawl rules
 
 The Sources page has a "Ranked pages" tab: every crawled page, ranked by what it gives the search,
-with actions to block or prioritise pages. Not served yet; the mock answers.
+with actions to block or prioritise pages.
+
+- Served since #78: `GET /api/pages` and `/api/pages/{id}` (read-only, ~20 ms for 100 pages).
+  `status` is always `"crawled"` (failed fetches are not stored). `kind` comes from the URL
+  (`/team/`, `group_members` → team; `/project/` → project; `/services/` → infrastructure; `_lab/` → lab),
+  else `team` when most shown claims are about people, else `other`. Feedback counts 👍/👎 on entities
+  with a shown claim on the page. `blocked_by` / `prioritised_by` read `config/sources.yaml` until the
+  stored rules land (#79).
+- Not served yet (the mock answers): the rules and re-crawl routes (#79, #80).
 
 | Method | Path | Body | Returns |
 |---|---|---|---|

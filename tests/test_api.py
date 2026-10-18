@@ -4,8 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import onehot
-from navigator.api import ChatSessions, app, get_conn, get_embed, get_expand, get_explain, get_seeds, get_sessions
+from navigator.api import (
+    ChatSessions, app, get_conn, get_embed, get_expand, get_explain, get_page_rules, get_seeds, get_sessions,
+)
 from navigator.expand import Expansion
+from navigator.pages import SourceRules, guess_kind
 
 
 def fake_embed(query: str):
@@ -24,6 +27,7 @@ def client(test_conn, graph):
     app.dependency_overrides[get_expand] = lambda: lambda q: Expansion()  # expansion failed / disabled
     app.dependency_overrides[get_explain] = lambda: lambda q, results: {}  # explanations failed: template
     app.dependency_overrides[get_seeds] = lambda: {"artorg": "https://artorg.example/"}  # dcb is not validated
+    app.dependency_overrides[get_page_rules] = lambda: {"artorg": SourceRules(exclude=[r"/alice$"], priority=[r"/lab"])}
     sessions = ChatSessions()  # fresh chat state per test
     app.dependency_overrides[get_sessions] = lambda: sessions
     yield TestClient(app)
@@ -170,6 +174,83 @@ def test_source_get_and_unknown(client, graph):
     response = client.get("/api/sources/nope")
     assert response.status_code == 404
     assert response.json() == {"detail": "Source not found"}
+
+
+@pytest.fixture
+def page_feedback(test_conn, graph):
+    """3 raw claims on Bob's page (1 failed the quote check); 2 up on Bob, 1 down on Alice."""
+    for verified in (True, True, False):
+        test_conn.execute(
+            "INSERT INTO raw_claim (page_id, entity_type, entity_name, field, value, quote, verified) "
+            "VALUES (%s, 'person', 'Bob Beispiel', 'role', 'Postdoc', 'q', %s)", (graph["p3"], verified),
+        )
+    for entity, rating in (("bob", "up"), ("bob", "up"), ("alice", "down")):
+        test_conn.execute(
+            "INSERT INTO feedback (session_id, entity_id, rating) VALUES ('s', %s, %s)", (graph[entity], rating)
+        )
+
+
+def test_pages_list(client, graph, page_feedback):
+    body = client.get("/api/pages").json()
+    assert [p["id"] for p in body] == [graph["p1"], graph["p2"], graph["p3"]]
+    alice, lab, bob = body
+    # Alice's page: 4 shown claims, one judged and supported; mostly about a person
+    assert (alice["verified_claims"], alice["entities"], alice["judge_supported"], alice["drop_rate"]) == (4, 1, 1.0, None)
+    assert alice["kind"] == "team" and alice["status"] == "crawled" and alice["crawled_at"]
+    assert (alice["feedback_up"], alice["feedback_down"]) == (0, 1)
+    assert alice["blocked_by"] == "/alice$" and alice["prioritised_by"] is None
+    # Lab page: the unsupported robotics claim is hidden but counts as judged; Alice's down vote cites it too
+    assert (lab["verified_claims"], lab["entities"], lab["judge_supported"], lab["feedback_down"]) == (6, 5, 0.0, 1)
+    assert lab["blocked_by"] is None and lab["prioritised_by"] == "/lab"
+    # Bob's page (dcb: no rules): yield 5, no judged claims 0, 2 of 3 raw claims kept 67, feedback (2+1)/(2+2) 75
+    assert [(i["criterion"], i["score"]) for i in bob["score_breakdown"]] == [
+        ("Yield", 5), ("Precision", 0), ("Verification", 67), ("Feedback", 75),
+    ]
+    assert bob["score"] == 23 and bob["drop_rate"] == pytest.approx(1 / 3)
+    assert bob["score_breakdown"][2]["rationale"] == "33% of the 3 extracted facts were dropped: their quote was not on the page."
+    assert bob["blocked_by"] is None and bob["prioritised_by"] is None
+
+
+def test_page_detail_and_unknown(client, graph):
+    body = client.get(f"/api/pages/{graph['p2']}").json()
+    assert body["verified_claims"] == len(body["facts"]) == 6
+    assert "surgical robotics" not in {f["value"] for f in body["facts"]}  # unsupported: never shown
+    names = [f["entity_name"] for f in body["facts"]]
+    assert [n for i, n in enumerate(names) if i == 0 or n != names[i - 1]] == list(dict.fromkeys(names))  # grouped
+    diabetes = next(f for f in body["facts"] if f["value"] == "diabetes technology")
+    assert diabetes == {
+        "claim_id": graph["alice_diabetes"], "entity_id": graph["alice"], "entity_name": "Alice Muster",
+        "entity_type": "person", "field": "expertise", "value": "diabetes technology",
+        "quote": "quote for diabetes technology", "judge_verdict": "partial",
+    }
+    response = client.get("/api/pages/999999")
+    assert response.status_code == 404 and response.json() == {"detail": "Page not found"}
+
+
+@pytest.mark.parametrize("url, kind", [
+    ("https://www.dcberne.com/en/team/", "team"),
+    ("https://www.artorg.unibe.ch/research/aihn/group_members/index_eng.html", "team"),
+    ("https://www.artorg.unibe.ch/research/aihn/group_members/prof_em_dr_diem_peter/index_eng.html", "team"),
+    ("https://www.dcberne.com/en/project/insulin-activity-project/", "project"),
+    ("https://www.artorg.unibe.ch/research/aihn/research_activities/index_eng.html", "project"),
+    ("https://www.artorg.unibe.ch/services/electronics_lab/index_eng.html", "infrastructure"),
+    ("https://www.dbmr.unibe.ch/research/research_programs/allam_lab/index_eng.html", "lab"),
+    ("https://www.artorg.unibe.ch/research/aihn/index_eng.html", "lab"),
+    ("https://www.artorg.unibe.ch/index_eng.html", "other"),
+])
+def test_guess_kind_from_url(url, kind):
+    assert guess_kind(url, person_claims=0, claims=10) == kind
+
+
+def test_guess_kind_falls_back_on_entity_types():
+    assert guess_kind("https://example.org/x", person_claims=6, claims=10) == "team"
+    assert guess_kind("https://example.org/x", person_claims=0, claims=0) == "other"
+
+
+def test_page_rules_from_sources_yaml():
+    rules = get_page_rules()
+    assert {"artorg", "dcb", "unibe"} <= rules.keys()
+    assert all(isinstance(r, SourceRules) for r in rules.values())
 
 
 def test_seeds_from_sources_yaml():
