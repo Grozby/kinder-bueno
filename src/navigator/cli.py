@@ -59,11 +59,18 @@ def crawl(
 def extract(
     source: str | None = typer.Option(None, help="Source id. Default: all sources."),
     limit: int | None = typer.Option(None, help="Only the first N pages (for testing)."),
+    url_like: str | None = typer.Option(
+        None, help="Only pages whose URL matches this SQL LIKE pattern, e.g. '%/aihn/group_members/%'."
+    ),
 ) -> None:
-    """Extract claims and relations with Apertus, verify quotes, store raw results."""
+    """Extract claims and relations with Apertus, verify quotes, store raw results.
+    Only the selected pages' raw rows are replaced."""
     settings = get_settings()
     with db.connect(settings.database_url) as conn:
-        pages = db.pages_for_extraction(conn, source, limit)
+        pages = db.pages_for_extraction(conn, source, limit, url_like)
+        if not pages:
+            typer.echo("No pages match.")
+            raise typer.Exit(1)
         model = settings.extract_model or settings.llm_model
         typer.echo(f"Extracting {len(pages)} pages with {model} (concurrency {settings.llm_concurrency})...")
         results = asyncio.run(extract_pages(LLM(settings, settings.extract_model), pages))

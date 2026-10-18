@@ -15,7 +15,8 @@ from navigator.verify import PageText, verify_claim, verify_relation
 log = logging.getLogger(__name__)
 
 MAX_PART_CHARS = 6_000  # dense team pages produce long answers; smaller parts keep them complete
-MAX_ANSWER_TOKENS = 12_000
+MAX_ANSWER_TOKENS = 12_000  # people prompt: long member lists
+MAX_TOPICS_TOKENS = 4_000   # topics answers are short; on member lists 8B loops, so fail fast
 
 FIELDS: dict[str, set[str]] = {
     "person": {"name", "role", "email", "phone", "expertise", "bio"},
@@ -92,7 +93,7 @@ is focused on advancing the mechanistic understanding of cardiac arrhythmias.":
  "relations": []}
 """
 
-PROMPTS = (PEOPLE_PROMPT, TOPICS_PROMPT)
+PROMPTS = ((PEOPLE_PROMPT, MAX_ANSWER_TOKENS), (TOPICS_PROMPT, MAX_TOPICS_TOKENS))
 
 EntityType = Literal["person", "unit", "project", "infrastructure"]
 
@@ -250,10 +251,10 @@ async def extract_page(llm: LLM, page_id: int, url: str, title: str, text: str) 
     result = PageResult(page_id)
     page = PageText(f"{title}\n{text}")  # the title is source content too (unit names often live there)
 
-    async def call(system: str, part: str) -> dict | None:
+    async def call(system: str, max_tokens: int, part: str) -> dict | None:
         user = f"Page URL: {url}\nPage title: {title}\n\nPage text:\n<<<\n{part}\n>>>"
         try:
-            return await llm.chat_json(system, user, max_tokens=MAX_ANSWER_TOKENS)
+            return await llm.chat_json(system, user, max_tokens=max_tokens)
         except LLMError as e:
             salvaged = salvage_rows(e.text)
             n = len(salvaged["claims"]) + len(salvaged["relations"])
@@ -267,7 +268,9 @@ async def extract_page(llm: LLM, page_id: int, url: str, title: str, text: str) 
             result.error = str(e)[:200]
             return None
 
-    answers = await asyncio.gather(*(call(p, part) for part in split_text(text) for p in PROMPTS))
+    answers = await asyncio.gather(
+        *(call(prompt, max_tokens, part) for part in split_text(text) for prompt, max_tokens in PROMPTS)
+    )
     for data in answers:
         if data is None:
             continue

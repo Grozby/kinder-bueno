@@ -30,3 +30,21 @@ def test_init_db_is_idempotent(conn):
 def test_stats_lists_every_source(conn):
     db.init_db(conn, load_sources(PROJECT_ROOT / "config" / "sources.yaml"))
     assert {r[0] for r in db.stats(conn)} >= {"artorg", "dcb", "unibe"}
+
+
+def test_pages_for_extraction_filters(conn):
+    db.init_db(conn, load_sources(PROJECT_ROOT / "config" / "sources.yaml"))
+    with conn.transaction(force_rollback=True):  # test rows never reach the real data
+        conn.execute("INSERT INTO source (id, name) VALUES ('t_src', 'Test')")
+        for url in ("https://t.test/a/group_members/x", "https://t.test/a/index", "https://t.test/b/group_members/y"):
+            conn.execute("INSERT INTO page (source_id, url, title, text) VALUES ('t_src', %s, 'T', 'text')", (url,))
+
+        def urls(**kw):
+            return [r[1] for r in db.pages_for_extraction(conn, kw.get("source", "t_src"), kw.get("limit"), kw.get("url_like"))]
+
+        assert len(urls()) == 3
+        assert urls(url_like="%/group_members/%") == ["https://t.test/a/group_members/x", "https://t.test/b/group_members/y"]
+        assert urls(url_like="%/b/%") == ["https://t.test/b/group_members/y"]
+        assert urls(url_like="%/group_members/%", limit=1) == ["https://t.test/a/group_members/x"]
+        assert urls(url_like="%nothing%") == []
+        assert urls(source="dcb", url_like="https://t.test/%") == []  # both filters apply

@@ -36,12 +36,16 @@ def replace_pages(conn: psycopg.Connection, source_id: str, pages: list) -> None
             )
 
 
-def pages_for_extraction(conn: psycopg.Connection, source_id: str | None, limit: int | None) -> list[tuple]:
-    """(page_id, url, title, text) for one source or all sources."""
+def pages_for_extraction(
+    conn: psycopg.Connection, source_id: str | None, limit: int | None, url_like: str | None = None
+) -> list[tuple]:
+    """(page_id, url, title, text), optionally filtered by source and by a SQL LIKE pattern on the URL."""
     return conn.execute(
         "SELECT id, url, coalesce(title, ''), text FROM page "
-        "WHERE %(source)s::text IS NULL OR source_id = %(source)s ORDER BY id LIMIT %(limit)s",
-        {"source": source_id, "limit": limit},
+        "WHERE (%(source)s::text IS NULL OR source_id = %(source)s) "
+        "AND (%(url_like)s::text IS NULL OR url LIKE %(url_like)s) "
+        "ORDER BY id LIMIT %(limit)s",
+        {"source": source_id, "limit": limit, "url_like": url_like},
     ).fetchall()
 
 
