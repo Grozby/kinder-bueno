@@ -166,3 +166,22 @@ def test_references_keep_checked_sentences_and_drop_missing_entities(test_conn, 
 
 def test_references_unknown_case(test_conn):
     assert analysis.references(test_conn, "nope", 25) is None
+
+
+def test_umbrella_units_do_not_count(test_conn, graph):
+    lab = result(1, "unit", "Diabetes Lab", evidence=[
+        {"claim_id": 1, "field": "expertise", "value": "insulin pumps", "quote": "q", "url": "u",
+         "judge_verdict": None, "judge_reason": None}])
+    alice = result(2, "person", "Alice", evidence=[
+        {"claim_id": 2, "field": "unit_expertise", "value": "insulin pumps", "quote": "q", "url": "u",
+         "judge_verdict": None, "judge_reason": None, "via_unit": "Diabetes Lab"}])
+    assert set(analysis.match_needs([lab, alice], ["insulin delivery"], fake_embed_many)) == {1, 2}
+    assert analysis.match_needs([lab, alice], ["insulin delivery"], fake_embed_many, {"Diabetes Lab"}) == {}
+
+    assert analysis.umbrella_units(test_conn) == set()
+    for n in range(analysis.UMBRELLA_TOPICS):
+        test_conn.execute(
+            "INSERT INTO claim (entity_id, field, value, quote, page_id, verified) VALUES (%s, 'expertise', %s, 'q', %s, true)",
+            (graph["center"], f"topic {n}", graph["p2"]),
+        )
+    assert analysis.umbrella_units(test_conn) == {"ARTORG Center"}
