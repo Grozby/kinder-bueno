@@ -226,6 +226,61 @@ def warm() -> None:
 
 
 @app.command()
+def search(
+    query: str,
+    source: list[str] = typer.Option([], help="Source id (repeatable). Default: all sources."),
+    type_: list[str] = typer.Option(
+        [], "--type", help="person, unit, project or infrastructure (repeatable). Default: person and unit."
+    ),
+    limit: int = typer.Option(10, min=1, help="Number of results to show."),
+    as_json: bool = typer.Option(False, "--json", help="Print the API's result objects."),
+    explain: bool = typer.Option(True, help="Ask Apertus for the 'why' sentences, like /api/search."),
+) -> None:
+    """Rank entities for a query, like GET /api/search: expansion, fusion, fairness cap, explanations."""
+    from typing import get_args
+
+    from navigator import chunks_db
+    from navigator.api import run_search
+    from navigator.embed import embed_query
+    from navigator.expand import expand_query
+    from navigator.explain import explain as explain_results
+    from navigator.models import EntityType
+
+    unknown = [t for t in type_ if t not in get_args(EntityType)]
+    if unknown:
+        raise typer.BadParameter(f"unknown type {', '.join(unknown)}", param_hint="--type")
+    settings = get_settings()
+
+    # A new LLM per call: the client is bound to the event loop of its first asyncio.run.
+    def expand(q):
+        return asyncio.run(expand_query(LLM(settings), q))
+
+    def why(q, results):
+        if not explain:
+            return {}
+        return asyncio.run(explain_results(LLM(settings, settings.explain_model), q, results[:limit]))
+
+    with chunks_db.connect(settings.database_url) as conn:
+        found = run_search(conn, embed_query, expand, why, query, source, type_)
+    found = found.model_copy(update={"results": found.results[:limit]})
+    if as_json:
+        typer.echo(found.model_dump_json(indent=2))
+        return
+    if found.expansion:
+        typer.echo(f"en: {', '.join(found.expansion.en) or '-'}\nde: {', '.join(found.expansion.de) or '-'}\n")
+    if found.no_result:
+        typer.echo("No result.")
+    for i, r in enumerate(found.results, start=1):
+        typer.echo(f"{i:>2}. {r.name} ({r.type}, score {r.score:.3f})")
+        if r.affiliations:
+            typer.echo(f"    unit: {'; '.join(r.affiliations)}")
+        typer.echo(f"    why: {r.why}")
+        for ev in r.evidence:
+            value = " ".join(ev.value.split())[:80]
+            typer.echo(f"    - {ev.field}: {value}  {ev.url}")
+
+
+@app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", help="Bind address."),
     port: int = typer.Option(8000, help="Port."),

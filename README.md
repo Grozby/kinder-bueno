@@ -142,6 +142,15 @@ uv run navigator search-chunks "Herzklappen" --expand   # add Apertus search ter
 Prints the top chunks (keyword + semantic search, fused with RRF) with page URL and score.
 With `--expand` it first prints the English and German search terms from Apertus.
 
+```bash
+uv run navigator search "continuous glucose monitoring" --limit 5
+uv run navigator search "Roboter Chirurgie" --type person --source artorg --no-explain --json
+```
+
+Runs the same pipeline as `GET /api/search` (expansion, fusion, fairness cap, "why" sentences) and
+prints rank, name, type, unit, score and each piece of evidence with its page URL. `--json` prints the
+API's result objects; `--no-explain` skips the Apertus explanation calls. Read-only.
+
 ## Evaluation
 
 ```bash
