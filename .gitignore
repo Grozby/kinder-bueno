@@ -22,3 +22,6 @@ wheels/
 
 # Claude Code
 .claude/settings.local.json
+
+# Database checkpoints (pg_dump), e.g. for the integration tests
+checkpoints/
