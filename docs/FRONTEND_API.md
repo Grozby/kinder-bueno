@@ -1,0 +1,67 @@
+# Frontend ↔ backend API
+
+The Vue frontend (`frontend/`) calls JSON endpoints under `/api`. Types are in
+`frontend/src/api/types.ts` — that file is the source of truth on the frontend side.
+
+- **From `PLAN.md` section 8.9 (used as specified):** `POST /api/chat`, `POST /api/feedback`.
+  The frontend uses the `Result` / `Evidence` models from section 8.8 everywhere a person, unit,
+  project or infrastructure is shown.
+- **Added by the frontend (not in the plan yet):** the case endpoints (PDF upload, scoring,
+  references, pitch) and the source endpoints below.
+
+Until the backend serves them, the frontend uses an in-memory mock (`frontend/src/api/mock.ts`).
+Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, Vite proxies
+`/api` to `BACKEND_URL` (default `http://localhost:8000`).
+
+## Flow
+
+1. A user uploads a company's business model PDF → a **case** card in the "New" column.
+2. The backend scores how well Canton Bern fits (0–100, with a breakdown) and proposes the top 25
+   references (`Result[]`, best first). The UI preselects the first 10.
+3. The user **refines** the references with the chat (`/api/chat`, one `session_id` per case:
+   `case-<case id>`). Chat results can be added to the case; added ones are selected.
+4. The user moves the card to "In review", then "Accepted" — or rejects it.
+5. For an accepted case, the user generates a **sales pitch** from the selected references.
+
+## Cases
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/cases` | – | `Case[]` |
+| GET | `/api/cases/{id}` | – | `Case` |
+| POST | `/api/cases` | `multipart/form-data`, field `file` (PDF) | `Case` with `analysis_status: "pending"` |
+| PATCH | `/api/cases/{id}` | `{"status": "new" \| "in_review" \| "accepted" \| "rejected"}` | `Case` |
+| GET | `/api/cases/{id}/references?limit=25` | – | `Result[]` (section 8.8), best first |
+| POST | `/api/cases/{id}/pitch` | `{"entity_ids": [1, 2, …]}` | `{text, entity_ids, generated_at}` |
+
+- Upload returns at once. The analysis runs in the background; the frontend polls
+  `GET /api/cases/{id}` every 1.5 s until `analysis_status` is `done` or `failed`.
+- `score` and each `score_breakdown[].score` are 0–100. `summary` is a short text for the user.
+- `entity_ids` can include entities added from the chat, not only the top 25.
+  The pitch MUST only use facts from these entities (traceability rule, section 1).
+
+## Chat and feedback (section 8.9)
+
+- `POST /api/chat` with `{session_id, message}`; the frontend reads `reply`, `results`, `no_result`.
+- `POST /api/feedback` with `{session_id, query, entity_id, rating}` from the 👍/👎 buttons on a
+  reference. `query` is the company name. **Assumption:** `rating` is `"up"` or `"down"` — the plan
+  does not fix the type yet.
+
+## Sources
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/sources` | – | `Source[]` |
+| GET | `/api/sources/{id}` | – | `Source` |
+| POST | `/api/sources` | `NewSource` | `Source` with `status: "crawling"` |
+
+`NewSource`:
+
+```json
+{ "url": "https://…", "name": "optional", "max_depth": 2, "max_pages": 50, "follow_outbound": false }
+```
+
+- `follow_outbound: true` means the crawler may also follow links to other hosts.
+- While `status` is `crawling`, the frontend polls `GET /api/sources/{id}` every second and draws
+  `discovered` (`{url, parent, depth, status}`) as a live graph. A sample of up to ~60 pages is enough.
+- `pages`, `entities`, `verified_claims` map to the counts from `navigator stats` / `GET /api/stats`.
