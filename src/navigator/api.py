@@ -578,6 +578,15 @@ def case_feedback(conn: Conn, case_id: str) -> CaseFeedback:
     return found
 
 
+@app.delete("/api/cases/{case_id}")
+def delete_case(conn: Conn, case_id: str) -> dict[str, bool]:
+    """Delete the case and everything stored for it (#134): PDF text, analysis, notes, documents, its chat and
+    feedback. Cannot be undone; snapshots taken before keep it."""
+    if not case_state.delete_case(conn, case_id):
+        raise HTTPException(status_code=404, detail="Case not found")
+    return {"ok": True}
+
+
 @app.patch("/api/cases/{case_id}")
 def update_case(conn: Conn, case_id: str, body: CaseStatusUpdate) -> Case:
     """Move the case to another board column."""

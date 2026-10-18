@@ -34,6 +34,7 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
 | GET | `/api/cases/{id}` | – | `Case` |
 | POST | `/api/cases` | `multipart/form-data`, field `file` (PDF) | `Case` with `analysis_status: "pending"` |
 | PATCH | `/api/cases/{id}` | `{"status": "new" \| "in_review" \| "accepted" \| "rejected"}` | `Case` |
+| DELETE | `/api/cases/{id}` | – | `{ok: true}`; deletes the case and everything stored for it (#134), `404` if unknown |
 | GET | `/api/cases/{id}/references?limit=25` | – | `Result[]` (section 8.8), best first |
 | POST | `/api/cases/{id}/pitch` | `{"entity_ids": [1, 2, …]}` | `{text, entity_ids, generated_at}` |
 | GET | `/api/cases/{id}/pitch` | – | the last pitch, `404` if none yet |

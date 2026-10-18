@@ -40,6 +40,8 @@ const realBackend = {
   },
   setCaseStatus: (id: string, status: CaseStatus) =>
     api<Case>(`/cases/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  // Deletes the case and everything stored for it (#134); cannot be undone
+  deleteCase: (id: string) => api<{ ok: boolean }>(`/cases/${id}`, { method: 'DELETE' }),
   listReferences: (id: string, limit: number) =>
     api<Result[]>(`/cases/${id}/references?limit=${limit}`),
   generatePitch: (id: string, entityIds: number[]) =>
