@@ -23,7 +23,8 @@ MIN_SIM = 0.50        # below this, and with no keyword hit, there is no reliabl
 BEST_CHUNKS = 1       # plan 8.4 said the best 3: that favours entities on long pages with many matching chunks
 PAGE_ONLY_WEIGHT = 0.25
 USE_IDF = True        # an entity with claims on many pages ("ARTORG Center") is linked to every query on them
-INHERIT = 0.5         # a person gets this share of their unit's score (people have almost no topic claims)
+INHERIT = 0.3         # a person gets this share of their unit's score (people have almost no topic claims). #99: 0.5 put
+                      # a big lab's members above other labs; 0.3 is best on both the 100- and the 340-page corpus
 SENIOR_BOOST = 0.3    # heads and professors first among a unit's members
 TOPIC_WEIGHT = 0.4    # entities whose own topic claims (expertise, description) match the query (#59)
 TOPIC_MIN = 0.5       # cosine similarity below this adds nothing
