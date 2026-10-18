@@ -11,7 +11,9 @@ are then swapped in and resolved in one short transaction. So until the swap, se
 previous data, and a failure anywhere (more than half the pages failing extraction counts as a failure)
 leaves it untouched.
 
-- One ingest at a time (process-wide lock); the API answers 409 while one runs.
+- One ingest at a time, across API workers and replicas: a Postgres advisory lock, held by the connection
+  the background ingest runs on. The API answers 409 while one runs. If the process dies, Postgres closes
+  the connection and frees the lock.
 - Server caps: MAX_PAGES pages, MAX_DEPTH link depth; robots.txt and the per-host delay as for every source.
 - Only public hosts: the start URL must resolve to public IP addresses, and with `follow_outbound` the
   crawler only follows links to host names, never to IP addresses or `localhost`.
@@ -26,7 +28,6 @@ import ipaddress
 import logging
 import re
 import socket
-import threading
 from urllib.parse import urlsplit
 
 import psycopg
@@ -41,7 +42,7 @@ MAX_PAGES = 50
 MAX_DEPTH = 4
 PUBLIC_HOST = r"^(?!localhost$)(?!.*\.local$)(?=.*[a-z])[a-z0-9.-]+\.[a-z]{2,}$"  # a name with a TLD, not an IP
 
-_lock = threading.Lock()
+INGEST_LOCK = 0x6B696E64  # advisory lock key of the one ingest slot (per database)
 
 
 class SourceError(ValueError):
@@ -83,17 +84,25 @@ def source_config(source_id: str, name: str, url: str, host: str, follow_outboun
     return SourceConfig(id=source_id, name=name, seeds=[url], max_pages=min(max_pages, MAX_PAGES), **allow)
 
 
-def try_start() -> bool:
-    """Take the one ingest slot; False if an ingest is running."""
-    return _lock.acquire(blocking=False)
+def try_start(database_url: str) -> psycopg.Connection | None:
+    """Take the one ingest slot: a session advisory lock on a new connection, which the background ingest then
+    runs on (`run_ingest`) and closes. None if an ingest is running, in this process or any other."""
+    conn = chunks_db.connect(database_url)
+    conn.autocommit = True  # each stage and each crawl_url row is visible to the polling UI at once
+    if conn.execute("SELECT pg_try_advisory_lock(%s)", (INGEST_LOCK,)).fetchone()[0]:
+        return conn
+    conn.close()
+    return None
 
 
-def finish() -> None:
-    _lock.release()
+def finish(slot: psycopg.Connection) -> None:
+    """Free the slot: closing the connection releases the lock."""
+    slot.close()
 
 
 def _recover_interrupted(conn: psycopg.Connection) -> None:
-    """Called holding the slot, so no ingest runs: a source still 'crawling' was cut off by an API restart."""
+    """Called holding the slot, so no ingest runs: a source still 'crawling' was cut off (an API restart or a
+    worker that died)."""
     conn.execute("UPDATE source SET status = 'failed', stage = NULL, error = 'interrupted: the API restarted' "
                  "WHERE status = 'crawling'")
 
@@ -183,8 +192,9 @@ def _swap_in(conn: psycopg.Connection, source_id: str, pages: list, chunks: list
         resolve(conn)
 
 
-def run_ingest(database_url: str, source_id: str) -> None:
-    """The background ingest of a new or re-crawled source. Releases the ingest slot when done."""
+def run_ingest(slot: psycopg.Connection, source_id: str) -> None:
+    """The background ingest of a new or re-crawled source, on the slot's connection (`try_start`), which it
+    closes when done."""
     from navigator.chunk import chunk_page
     from navigator.crawl import crawl_source
     from navigator.embed import embed_documents
@@ -196,8 +206,7 @@ def run_ingest(database_url: str, source_id: str) -> None:
 
     settings = get_settings()
     try:
-        with chunks_db.connect(database_url) as conn:
-            conn.autocommit = True  # each stage and each crawl_url row is visible to the polling UI at once
+        with slot as conn:
             stage = "crawl"
             try:
                 source, max_depth = crawl_config(conn, load_sources(settings.sources_file), source_id)
@@ -243,4 +252,4 @@ def run_ingest(database_url: str, source_id: str) -> None:
             _set(conn, source_id, status="ready", stage=None, error=error)
             log.info("ingest of %s done", source_id)
     finally:
-        finish()
+        finish(slot)

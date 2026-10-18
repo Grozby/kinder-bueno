@@ -284,11 +284,12 @@ def search(
 def serve(
     host: str = typer.Option("127.0.0.1", help="Bind address."),
     port: int = typer.Option(8000, help="Port."),
+    workers: int = typer.Option(1, min=1, help="Worker processes; each loads the models (~3 GB of RAM)."),
 ) -> None:
-    """Start the HTTP API (one worker)."""
+    """Start the HTTP API. Chats and the ingest slot are kept in Postgres (#103), so any number of workers works."""
     import uvicorn
 
-    uvicorn.run("navigator.api:app", host=host, port=port, workers=1)
+    uvicorn.run("navigator.api:app", host=host, port=port, workers=workers)
 
 
 @app.command()

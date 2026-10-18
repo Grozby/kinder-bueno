@@ -21,6 +21,7 @@ from navigator.results import build_results
 
 DEFAULT_SELECTION = 10  # matching references selected for the pitch until the user changes the selection
 SESSION_PREFIX = "case-"
+STANDALONE_DAYS = 30  # standalone chat sessions (search page) are kept this long
 
 
 def session_id(case_id: str) -> str:
@@ -90,6 +91,13 @@ def remove_reference(conn: psycopg.Connection, case_id: str, entity_id: int) -> 
 
 
 def save_turn(conn: psycopg.Connection, session: str, message: str, query: str, response: ChatResponse) -> None:
+    """Store a chat turn of any session (#103). Case chats are kept with their case; standalone chats are
+    dropped after STANDALONE_DAYS."""
+    if not session.startswith(SESSION_PREFIX):
+        conn.execute(
+            "DELETE FROM chat_turn WHERE session_id NOT LIKE %s AND created_at < now() - make_interval(days => %s)",
+            (f"{SESSION_PREFIX}%", STANDALONE_DAYS),
+        )
     results = [{"entity_id": r.entity_id, "score": r.score, "why": r.why} for r in response.results]
     conn.execute(
         "INSERT INTO chat_turn (session_id, message, query, reply, filters, expansion, results) "
@@ -102,7 +110,7 @@ def save_turn(conn: psycopg.Connection, session: str, message: str, query: str, 
 
 
 def last_query(conn: psycopg.Connection, session: str) -> tuple[str, ChatFilters] | None:
-    """The last query and filters of a stored session: restores it after an API restart."""
+    """The last query and filters of a session: the next message refines them, on any worker."""
     row = conn.execute(
         "SELECT query, filters FROM chat_turn WHERE session_id = %s ORDER BY id DESC LIMIT 1", (session,)
     ).fetchone()
