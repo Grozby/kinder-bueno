@@ -71,6 +71,8 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
   (it counts in the score), `Found for '…'` when the search found the reference but no claim matched,
   then a sentence whose claim citations are checked again on every request. `[]` before the analysis
   is done, and when no reference matches any need (a 0-fit case, #110): only chat-added ones are listed then.
+  Order (#123): the `Matches` references first, then the `Found for` ones, each in the search's order;
+  chat-added ones last.
 - Pitch (#54): plain text, paragraphs separated by a blank line. Every sentence about a reference cites
   claim ids like `[9606]`, all from the selected entities' evidence; sentences that fail the check are
   removed. If none is left, or the gateway fails or takes over 30 s, the text is a template that lists the
