@@ -5,6 +5,7 @@ description = "Research & Expertise Navigator for the Bern research ecosystem"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi==0.144.0",
     "httpx[http2]>=0.28.1",
     "pgvector>=0.5.1",
     "openai>=3.35.1",
@@ -18,6 +19,7 @@ dependencies = [
     "tenacity>=9.2.1",
     "typer>=0.27.3",
     "unidecode>=1.4.0",
+    "uvicorn==0.54.0",
 ]
 
 [dependency-groups]

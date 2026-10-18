@@ -122,3 +122,39 @@ export interface NewSource {
   max_pages: number
   follow_outbound: boolean // also explore links that leave the start host
 }
+
+// --- Search and stats: mirror src/navigator/models.py (plan 8.9) ---
+
+export interface Expansion {
+  en: string[]
+  de: string[]
+}
+
+export interface SearchResponse {
+  results: Result[]
+  expansion: Expansion | null
+  no_result: boolean
+}
+
+export interface SourceStats {
+  source: string
+  pages: number
+  chunks: number
+  entities: number // entities with at least one shown claim
+  shown_claims: number
+}
+
+export interface FeedbackCounts {
+  up: number
+  down: number
+  wrong_fact: number
+}
+
+export interface StatsResponse {
+  sources: SourceStats[]
+  feedback: FeedbackCounts
+}
+
+export interface FeedbackResponse {
+  ok: boolean
+}

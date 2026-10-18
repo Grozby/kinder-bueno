@@ -155,5 +155,16 @@ def search_chunks(
         typer.echo(f"{i:>2}. rrf={hit.score:.4f} sim={sim} {hit.url}\n    {snippet}")
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Bind address."),
+    port: int = typer.Option(8000, help="Port."),
+) -> None:
+    """Start the HTTP API (one worker)."""
+    import uvicorn
+
+    uvicorn.run("navigator.api:app", host=host, port=port, workers=1)
+
+
 if __name__ == "__main__":
     app()
