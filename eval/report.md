@@ -4,15 +4,15 @@
 
 | use case | query | results | expected found | recall@10 | judged relevant | expansion terms |
 |---|---|---|---|---|---|---|
-| glucose | continuous glucose monitoring | 10 | Lilian Witthauer, Stavroula Mougiakakou, AI in Health and Nutrition | 50% | 3/9 | 8 |
-| glucose | glucose sensors | 10 | Diabetes Center Berne, Lilian Witthauer, Stavroula Mougiakakou, AI in Health and Nutrition | 67% | 4/10 | 15 |
+| glucose | continuous glucose monitoring | 10 | Lilian Witthauer, Stavroula Mougiakakou, AI in Health and Nutrition | 50% | 5/10 | 8 |
+| glucose | glucose sensors | 10 | Diabetes Center Berne, Lilian Witthauer, Stavroula Mougiakakou, AI in Health and Nutrition | 67% | 6/10 | 15 |
 | glucose | biosensing for diabetes | 10 | Diabetes Center Berne, Lilian Witthauer, Thomas Züger, Stavroula Mougiakakou, AI in Health and Nutrition | 83% | 9/10 | 11 |
-| surgery | computer-assisted surgery | 10 | Chair for Image-guided Therapy, Neuro Robotics Group, Artificial Intelligence in Medical Imaging | 43% | 6/10 | 10 |
-| surgery | surgical robots | 10 | Chair for Image-guided Therapy, Neuro Robotics Group, Manuela Eugster | 43% | 2/10 | 12 |
-| surgery | image-guided intervention | 10 | Chair for Image-guided Therapy, Artificial Intelligence in Medical Imaging | 29% | 7/10 | 12 |
-| cardio | cardiovascular engineering | 10 | Dominik Obrist, Cardiovascular Engineering, Cardiovascular Research Cluster Bern, Odening Lab | 80% | 6/10 | 14 |
-| cardio | heart valve research | 10 | Dominik Obrist, Cardiovascular Engineering, Cardiovascular Research Cluster Bern, Odening Lab, Longnus Lab | 100% | 4/9 | 16 |
-| cardio | heart valve prostheses | 10 | Dominik Obrist, Cardiovascular Engineering, Odening Lab, Longnus Lab | 80% | 2/10 | 13 |
+| surgery | computer-assisted surgery | 10 | Chair for Image-guided Therapy, Neuro Robotics Group, Artificial Intelligence in Medical Imaging | 43% | 9/10 | 10 |
+| surgery | surgical robots | 10 | Chair for Image-guided Therapy, Neuro Robotics Group, Manuela Eugster | 43% | 8/10 | 12 |
+| surgery | image-guided intervention | 10 | Chair for Image-guided Therapy, Artificial Intelligence in Medical Imaging | 29% | 9/10 | 12 |
+| cardio | cardiovascular engineering | 10 | Dominik Obrist, Cardiovascular Engineering, Cardiovascular Research Cluster Bern, Odening Lab | 80% | 8/10 | 15 |
+| cardio | heart valve research | 10 | Dominik Obrist, Cardiovascular Engineering, Cardiovascular Research Cluster Bern, Odening Lab, Longnus Lab | 100% | 8/10 | 16 |
+| cardio | heart valve prostheses | 10 | Dominik Obrist, Cardiovascular Engineering, Odening Lab, Longnus Lab | 80% | 5/10 | 13 |
 
 ## Metrics (plan 10.2)
 
@@ -29,8 +29,8 @@
 | field fill, person results: expertise | 0% | report |
 | field fill, person results: unit_topics | 98% | report |
 | field fill, person results: sources | 100% | report |
-| judged precision@10 [PoC] (mean of 9 judged queries) | 49% | report |
-| judge gold agreement [PoC] (gold hits judged relevant) | 61% (19 / 31) | judge not reliable |
+| judged precision@10 [PoC] (mean of 9 judged queries) | 74% | report |
+| judge gold agreement [PoC] (gold hits judged relevant) | 76% (25 / 33) | judge not reliable |
 | extraction drop rate (unverified raw claims) | 13% (221 / 1705) | report |
 
 ## Source coverage

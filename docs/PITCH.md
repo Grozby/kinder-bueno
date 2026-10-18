@@ -29,10 +29,8 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
    - Field fill for people: role 100%, affiliation 100% (249 people linked to their lab from member pages).
      98% of people show **their lab's topics**, labelled as the lab's and linked to the lab page. Personal
      expertise is 0%: the pages state topics for labs, not for each person, and we don't pretend otherwise.
-   - Precision (LLM judge, PoC): 49% of the top-10 results judged relevant (60% before the last ranking
-     change, #130). The judge sees all 10 results at once, and its verdicts depend on their order: reversing it
-     changes 16% of them. It agrees with the human gold set on
-     only 61% of gold hits, so treat this as a signal, not a measurement.
+   - Precision (LLM judge, PoC): 74% of the top-10 results judged relevant, each result judged on its own. It
+     agrees with the human gold set on 76% of gold hits, so treat this as a signal, not a measurement.
 5. **Sovereign and cheap to run.** Apertus (Swiss open LLM), local bge-m3 embeddings, Postgres, one
    `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
    and, measured on the same pages, not better); quote verification is what makes the small model safe to use. A new site is
@@ -99,7 +97,7 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
   pages) reaches 58% today: the resolver keeps a few duplicates there, which are the next fix.
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
-  We report it as a signal, not as proof (judge agreement with the gold set: 61–73%).
+  We report it as a signal, not as proof (judge agreement with the gold set: 76%).
 - *How is the fit score computed?* Five fixed criteria: research fit (40%, share of needs covered), expert
   pool, research units, infrastructure and running projects. Each counts only references whose verified
   topic claims match a need. It measures fit within our sources, not all of Canton Bern.

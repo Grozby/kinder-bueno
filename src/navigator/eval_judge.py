@@ -1,5 +1,8 @@
 """Eval judge [PoC] (plan 10.3): an LLM marks each top-10 result relevant or not, from its shown evidence only.
 
+One call per result: with all ten in one call, the verdicts depended on the other results and their order
+(reversing the order changed 14 of 86 verdicts; identical input changed none, #116).
+
 Same model family as the extractor, so it is biased (plan 3): a PoC precision signal, not ground truth.
 """
 
@@ -13,20 +16,20 @@ from navigator.models import Evidence, Result
 
 log = logging.getLogger(__name__)
 
-TIMEOUT = 90.0  # seconds per query; a failed or slow call leaves the query "not judged"
-MAX_EVIDENCE = 8  # evidence rows per result, so ten results fit one prompt
+TIMEOUT = 90.0  # seconds per call; a failed or slow call leaves that result "not judged"
+MAX_EVIDENCE = 8  # evidence rows per result
 MAX_QUOTE = 200
 FIELD_ORDER = ("expertise", "unit_expertise", "description", "role")  # topic rows first, so the cap keeps them
 
 SYSTEM = """You judge results of an expert search in the Bern research ecosystem.
-For each result, decide if this person or unit is a good match for the query.
+Decide if the person or unit in the result is a good match for the query.
 Use ONLY the evidence listed. Do not use your own knowledge.
 - relevant = true: the evidence shows work on the query topic or a close sub-topic.
 - relevant = false: otherwise, or if the evidence is too thin to tell.
 - A "lab topic (via <unit>)" is a topic of the person's unit: a person is relevant if their unit's
   topics match the query (they are listed in that unit). Say so in the reason.
-Return ONLY JSON: {"<entity_id>": {"relevant": true|false, "reason": "<one short sentence>"}, ...}
-Use the number at the start of each result as the key, without the name."""
+Return ONLY JSON: {"<entity_id>": {"relevant": true|false, "reason": "<one short sentence>"}}
+Use the number at the start of the result as the key, without the name."""
 
 
 @dataclass(frozen=True)
@@ -68,17 +71,23 @@ def parse_verdicts(data: dict, entity_ids: set[int]) -> dict[int, Verdict]:
     return verdicts
 
 
-async def judge_query(llm: LLM, query: str, results: list[Result], timeout: float = TIMEOUT) -> dict[int, Verdict] | None:
-    """Verdicts per entity id, or None if the query could not be judged (no results, error, timeout, no usable verdict)."""
-    if not results:
-        return None
-    user = f"Query: {query}\nResults:\n{format_results(results)}"
+async def _judge_one(llm: LLM, query: str, result: Result, timeout: float) -> dict[int, Verdict]:
+    user = f"Query: {query}\nResults:\n{format_results([result])}"
     try:
-        data = await asyncio.wait_for(llm.chat_json(SYSTEM, user, max_tokens=1500), timeout)
-    except Exception as e:  # LLM, network or timeout: the query is left out of the mean
-        log.warning("eval judge failed for %r: %s", query, e or type(e).__name__)
-        return None
-    return parse_verdicts(data, {r.entity_id for r in results}) or None
+        data = await asyncio.wait_for(llm.chat_json(SYSTEM, user, max_tokens=300), timeout)
+    except Exception as e:  # LLM, network or timeout: this result is left out of the mean
+        log.warning("eval judge failed for %r, %s: %s", query, result.name, e or type(e).__name__)
+        return {}
+    return parse_verdicts(data, {result.entity_id})
+
+
+async def judge_query(llm: LLM, query: str, results: list[Result], timeout: float = TIMEOUT) -> dict[int, Verdict] | None:
+    """Verdicts per entity id, one call per result; None if no result could be judged (no results, errors,
+    timeouts, no usable verdict)."""
+    verdicts: dict[int, Verdict] = {}
+    for one in await asyncio.gather(*(_judge_one(llm, query, r, timeout) for r in results)):
+        verdicts |= one
+    return verdicts or None
 
 
 async def judge_all(llm: LLM, runs: dict[str, list[Result]]) -> dict[str, dict[int, Verdict] | None]:
