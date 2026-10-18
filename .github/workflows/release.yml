@@ -1,0 +1,106 @@
+# Public images on every v* tag (#101): ghcr.io/<owner>/kinder-bueno-app and -frontend, for amd64 and arm64, so a
+# handoff pulls instead of building (docker-compose.images.yml). Each architecture builds on its own native runner
+# (no emulation: torch under QEMU takes hours); a second job joins the two into one multi-arch tag.
+# Run it by hand (Actions → Release → Run workflow) to check that both images build: that run pushes nothing.
+# Once, after the first tag: GHCR creates new packages as private. Make both public in GitHub → Packages →
+# kinder-bueno-app / kinder-bueno-frontend → Package settings → Change visibility (there is no API for it).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [app, frontend]
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - { image: app, context: . }
+          - { image: frontend, context: frontend }
+          - { platform: linux/amd64, runner: ubuntu-24.04 }
+          - { platform: linux/arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    env:
+      PUSH: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image name
+        # GHCR names must be lowercase; the owner is "Grozby"
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kinder-bueno-${{ matrix.image }}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: env.PUSH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          platforms: ${{ matrix.platform }}
+          # The source label links the package to this repository
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ env.PUSH }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }},mode=max
+      - name: Save the digest
+        if: env.PUSH == 'true'
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@v4
+        if: env.PUSH == 'true'
+        with:
+          name: digests-${{ matrix.image }}-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  # One tag per version for both architectures: 0.1.1, 0.1 and latest
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        image: [app, frontend]
+    steps:
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kinder-bueno-${{ matrix.image }}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - name: Create the multi-arch tags
+        working-directory: /tmp/digests
+        run: |
+          mapfile -t tags < <(jq -r '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          digests=()
+          for d in *; do digests+=("$IMAGE@sha256:$d"); done
+          docker buildx imagetools create "${tags[@]}" "${digests[@]}"
+      - name: Inspect
+        run: docker buildx imagetools inspect "$IMAGE:${{ steps.meta.outputs.version }}"
