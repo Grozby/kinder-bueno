@@ -627,6 +627,12 @@ Query: <query>
 
 Cache results in memory (dict) for the session. If the call fails, continue with the original query only.
 
+As built (`expand.py`, `expand_query(llm, query) -> Expansion(en, de)`; pass `expansion.terms` to `search_chunks`):
+- Timeout 10 s (the shared gateway can be slow); timeout or any error → empty expansion, not cached.
+- Clean-up: strings only, trimmed, no duplicates, not the query itself, max 8 per language. `"term (ABBR)"` is split into `"term"` and `"ABBR"`, so keyword search can match the abbreviation alone.
+- `terms` = English first (the semantic query in 8.3 uses the first 4), duplicates across languages removed.
+- Measured (70B, 2026-10-18): 1.3–2.1 s per query. Top-10 page overlap between "glucose sensors" and "continuous glucose monitoring" went from 0.83 to 1.00; "Herzklappen" now ranks ARTORG Cardiovascular Engineering first.
+
 ### 8.2 Keyword search
 
 ```sql
