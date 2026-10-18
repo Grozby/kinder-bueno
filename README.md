@@ -41,6 +41,16 @@ uv run navigator search-chunks "Herzklappen" --expand   # add Apertus search ter
 Prints the top chunks (keyword + semantic search, fused with RRF) with page URL and score.
 With `--expand` it first prints the English and German search terms from Apertus.
 
+## Evaluation
+
+```bash
+uv run navigator eval             # 9 gold queries (eval/gold.yaml) through the /api/search pipeline
+uv run navigator eval --no-expand # without query expansion (no gateway needed)
+```
+
+Prints the plan 10.2 metrics (recall@10, phrasing overlap, traceability, field fill, coverage, drop rate)
+and saves them to `eval/report.md`. Re-run it after every change to extraction, resolve or ranking.
+
 ## Tests
 
 ```bash

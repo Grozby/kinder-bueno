@@ -207,5 +207,25 @@ def resolve() -> None:
         typer.echo(f"{name:<26}{n:>6}")
 
 
+@app.command("eval")
+def evaluate(
+    expand: bool = typer.Option(True, help="Use query expansion, like /api/search."),
+    gold: str = typer.Option("eval/gold.yaml", help="Gold set (plan 10.1)."),
+    out: str = typer.Option("eval/report.md", help="Where to save the Markdown report."),
+) -> None:
+    """Run the gold queries and report the plan 10.2 metrics (stdout and eval/report.md)."""
+    from pathlib import Path
+
+    from navigator import chunks_db
+    from navigator.evaluate import load_gold, run
+
+    settings = get_settings()
+    with chunks_db.connect(settings.database_url) as conn:
+        text = run(conn, LLM(settings) if expand else None, load_gold(Path(gold)))
+    Path(out).write_text(text)
+    typer.echo(text)
+    typer.echo(f"Saved to {out}")
+
+
 if __name__ == "__main__":
     app()
