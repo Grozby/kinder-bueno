@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glucora Health – Business Model</title>
+<style>
+  @page { size: A4; margin: 18mm 18mm 20mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1d1d1d; margin: 0; }
+  h1 { font-size: 26pt; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 { font-size: 13.5pt; margin: 18pt 0 6pt; padding-bottom: 3pt; border-bottom: 1.5pt solid #0b6e5b; color: #0b6e5b; }
+  h3 { font-size: 11pt; margin: 10pt 0 3pt; }
+  p { margin: 0 0 7pt; }
+  ul { margin: 0 0 7pt; padding-left: 16pt; }
+  li { margin-bottom: 2pt; }
+  .cover { border-left: 5pt solid #0b6e5b; padding: 6pt 0 6pt 14pt; margin-bottom: 14pt; }
+  .tagline { font-size: 13pt; color: #4a4a4a; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4pt 18pt; margin-top: 10pt; font-size: 9.5pt; color: #4a4a4a; }
+  .meta b { color: #1d1d1d; }
+  .box { background: #eef6f3; border-radius: 6pt; padding: 9pt 12pt; margin: 8pt 0 10pt; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.5pt; }
+  th, td { text-align: left; padding: 4pt 6pt; border-bottom: 0.75pt solid #d8d8d8; vertical-align: top; }
+  th { background: #f3f3f3; font-weight: 700; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18pt; }
+  .page-break { break-before: page; }
+  h2, h3 { break-after: avoid; }
+  .two, table, .box, li { break-inside: avoid; }
+  .footer-note { margin-top: 16pt; font-size: 8.5pt; color: #777; border-top: 0.75pt solid #d8d8d8; padding-top: 6pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Glucora Health</h1>
+  <p class="tagline">Needle-free glucose monitoring with AI-guided insulin and nutrition coaching</p>
+  <div class="meta">
+    <span><b>Legal form:</b> GmbH (Munich, DE)</span>
+    <span><b>Founded:</b> 2023</span>
+    <span><b>Employees:</b> 34</span>
+    <span><b>Stage:</b> Series A (EUR 14 M, closed Q2 2026)</span>
+    <span><b>Contact:</b> Business Development, Glucora Health</span>
+  </div>
+</div>
+
+<h2>1. Executive summary</h2>
+<p>Glucora Health develops <b>Glucora One</b>, a wearable patch that estimates interstitial glucose through the skin with a
+microneedle-free optical and electrochemical sensor, paired with a mobile app that gives AI-based insulin-dosing and meal
+recommendations. The product targets people with type 1 diabetes and insulin-treated type 2 diabetes who find current
+continuous glucose monitors (CGM) painful, expensive or hard to interpret.</p>
+<p>We plan to open our <b>European headquarters and R&amp;D centre in Switzerland</b> in 2027, and are evaluating Canton Bern
+as the location. We want to be close to clinical diabetes research, medical engineering, and the Swiss regulatory and
+reimbursement system.</p>
+
+<div class="box">
+  <b>What we are looking for in Bern</b>
+  <ul style="margin:4pt 0 0">
+    <li>Clinical partners for a 300-patient validation study of sensor accuracy (MARD) against reference blood glucose.</li>
+    <li>Research groups in <b>continuous glucose monitoring, closed-loop / artificial pancreas</b> systems and diabetes technology.</li>
+    <li>Expertise in <b>AI for nutrition and carbohydrate estimation</b> from meal photos, and in medical machine learning.</li>
+    <li>Biomedical engineering know-how in <b>wearable biosensors</b>, skin-sensor interfaces and signal processing.</li>
+    <li>Access to lab infrastructure for biocompatibility tests and usability studies.</li>
+  </ul>
+</div>
+
+<h2>2. Problem</h2>
+<ul>
+  <li>Around 500,000 people in Switzerland live with diabetes; about 40,000 have type 1 diabetes.</li>
+  <li>Current CGMs need a filament under the skin, cost CHF 1,200–2,000 per year, and must be replaced every 10–14 days.</li>
+  <li>Many users get raw glucose curves but no clear advice on what to eat or how much insulin to take. Hypoglycaemia
+      at night is still a major fear for patients and families.</li>
+</ul>
+
+<h2>3. Solution and technology</h2>
+<div class="two">
+  <div>
+    <h3>Glucora One patch</h3>
+    <ul>
+      <li>Reusable optical-electrochemical sensor head, 21-day adhesive patch.</li>
+      <li>Target accuracy: MARD below 10% (current prototype: 11.8% in a 42-patient pilot).</li>
+      <li>Bluetooth Low Energy, open interface to insulin pumps (iCGM-ready).</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Glucora Coach app</h3>
+    <ul>
+      <li>Glucose forecast 30–60 minutes ahead with hypo alerts.</li>
+      <li>Meal photo → carbohydrate estimate → bolus suggestion.</li>
+      <li>Clinician dashboard for remote follow-up; data hosted in Switzerland.</li>
+    </ul>
+  </div>
+</div>
+<p>Core IP: two granted patents on the optical sensing method (EP, US), one pending patent on the signal-fusion algorithm.</p>
+
+<h2>4. Market</h2>
+<table>
+  <tr><th>Segment</th><th class="num">Size</th><th>Comment</th></tr>
+  <tr><td>Global CGM market 2025</td><td class="num">USD 12 bn</td><td>Growing ~15% per year</td></tr>
+  <tr><td>DACH insulin-treated patients</td><td class="num">≈ 2.3 M</td><td>First target region</td></tr>
+  <tr><td>Switzerland, type 1 + insulin-treated type 2</td><td class="num">≈ 110,000</td><td>Beachhead and reference market</td></tr>
+</table>
+<p>Competitors: established CGM makers (filament-based sensors) and diabetes-management apps without their own sensor.
+Glucora's advantage is the needle-free sensor <i>and</i> the coaching in one product.</p>
+
+<h2>5. Business model</h2>
+<table>
+  <tr><th>Revenue stream</th><th>Price</th><th>Payer</th></tr>
+  <tr><td>Glucora One starter kit (sensor head + 2 patches)</td><td>CHF 290 one-time</td><td>Patient / health insurer</td></tr>
+  <tr><td>Patch subscription (one every 21 days)</td><td>CHF 89 / month</td><td>Health insurer (MiGeL listing targeted)</td></tr>
+  <tr><td>Glucora Coach premium</td><td>CHF 9 / month</td><td>Patient</td></tr>
+  <tr><td>Clinician dashboard licence</td><td>CHF 2,400 / clinic / year</td><td>Hospitals, diabetes clinics</td></tr>
+  <tr><td>Anonymised research data access</td><td>Project-based</td><td>Universities, pharma</td></tr>
+</table>
+<p>Channels: diabetes clinics and endocrinologists, patient associations, pharmacies, and insurer partnerships.
+Gross margin target: 68% at 50,000 active users.</p>
+
+<h2>6. Plans for the Swiss site</h2>
+<table>
+  <tr><th>Function</th><th class="num">2027</th><th class="num">2029</th><th>Profiles</th></tr>
+  <tr><td>R&amp;D: sensor and signal processing</td><td class="num">8</td><td class="num">20</td><td>Biomedical engineers, physicists</td></tr>
+  <tr><td>Data science / AI</td><td class="num">5</td><td class="num">12</td><td>ML engineers, clinical data scientists</td></tr>
+  <tr><td>Clinical affairs &amp; regulatory</td><td class="num">3</td><td class="num">7</td><td>MDR / Swissmedic specialists</td></tr>
+  <tr><td>Pilot manufacturing (patch assembly)</td><td class="num">0</td><td class="num">15</td><td>Production technicians, quality</td></tr>
+  <tr><td>HQ functions, sales DACH</td><td class="num">4</td><td class="num">9</td><td>Management, market access</td></tr>
+  <tr><td><b>Total</b></td><td class="num"><b>20</b></td><td class="num"><b>63</b></td><td></td></tr>
+</table>
+<ul>
+  <li><b>Space:</b> 600 m² offices and labs in 2027, plus 1,200 m² ISO 13485 clean-room space for pilot manufacturing from 2029.</li>
+  <li><b>Investment:</b> CHF 9 M over three years (lab equipment, clean room, clinical study).</li>
+  <li><b>Regulatory path:</b> CE marking under MDR (class IIb) in 2028, Swissmedic registration, MiGeL reimbursement application.</li>
+</ul>
+
+<h2>7. Why we consider Canton Bern</h2>
+<ul>
+  <li>A strong cluster in <b>diabetes technology</b> and digital diabetes care, with links to the university hospital.</li>
+  <li>Biomedical engineering research on <b>AI in health and nutrition</b>, medical robotics and cardiovascular engineering.</li>
+  <li>The federal capital: closeness to Swissmedic, the Federal Office of Public Health and insurers' associations.</li>
+  <li>Medtech supplier base and precision manufacturing in the canton; bilingual German/French workforce.</li>
+  <li>Open questions for the Economic Development Agency: available lab space, start-up support, tax conditions,
+      work permits for non-EU engineers, and introductions to research partners.</li>
+</ul>
+
+<h2>8. Financials (plan)</h2>
+<table>
+  <tr><th>CHF million</th><th class="num">2026</th><th class="num">2027</th><th class="num">2028</th><th class="num">2029</th></tr>
+  <tr><td>Revenue</td><td class="num">0.2</td><td class="num">1.1</td><td class="num">6.8</td><td class="num">19.5</td></tr>
+  <tr><td>Operating costs</td><td class="num">7.4</td><td class="num">11.9</td><td class="num">16.2</td><td class="num">21.0</td></tr>
+  <tr><td>EBITDA</td><td class="num">−7.2</td><td class="num">−10.8</td><td class="num">−9.4</td><td class="num">−1.5</td></tr>
+  <tr><td>Headcount (group)</td><td class="num">34</td><td class="num">52</td><td class="num">78</td><td class="num">110</td></tr>
+</table>
+<p>Funding: Series A covers operations until mid-2027. A Series B of about CHF 30 M is planned for 2027, partly
+to finance the Swiss site and the pivotal clinical study.</p>
+
+<h2>9. Team</h2>
+<ul>
+  <li><b>CEO:</b> co-founder, 12 years in medical devices, former head of product for an insulin-pump company.</li>
+  <li><b>CTO:</b> co-founder, PhD in optical biosensors, 9 publications on non-invasive glucose sensing.</li>
+  <li><b>Chief Medical Officer:</b> endocrinologist, 15 years of clinical diabetes care.</li>
+  <li><b>Head of AI:</b> PhD in machine learning for time-series forecasting.</li>
+</ul>
+
+<p class="footer-note">Fictional company and figures, created as a demo input for the HackApertus Bern Fit prototype.
+Any resemblance to real companies is coincidental.</p>
+
+</body>
+</html>
