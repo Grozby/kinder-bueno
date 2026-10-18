@@ -78,7 +78,7 @@ Ethical rules from the challenge, and how we meet them:
 | Database | Postgres 16 with `pgvector` (Docker image `pgvector/pgvector:pg16`) |
 | LLM | Apertus v1.5 70B via the Keera gateway (OpenAI-compatible API) |
 | LLM model name | `apertus-v1-5-70b` for all steps, except extraction (see below). Do NOT use the `-thinking` variants (slower, extra reasoning text breaks JSON parsing). |
-| Extraction model | `EXTRACT_MODEL=apertus-v1-5-8b` for now. On the shared gateway, 70B dropped from ~51 to ~5 tokens/s (other teams), so a 100-page run timed out. 8B runs at ~160 tokens/s: 100 pages in ~10 min. Quote verification protects against 8B errors. Re-run with 70B (`EXTRACT_MODEL=` empty) when the gateway is fast again. |
+| Extraction model | `EXTRACT_MODEL=apertus-v1-5-8b` (kept after a measured comparison, #16). On the shared gateway, 70B dropped from ~51 to ~5 tokens/s (other teams), so a 100-page run timed out. 8B runs at ~120–160 tokens/s: 100 pages in ~10 min. Quote verification protects against 8B errors. When 70B was fast again (52.6 tokens/s, `navigator llm-speed`), a 70B run on a copy of the database was **not better** (table below), so 8B stays. |
 | Embeddings | `BAAI/bge-m3` (1024 dimensions, multilingual), runs locally on CPU via `sentence-transformers`. The gateway has no embedding model. |
 | Keyword search | Postgres full-text search, `simple` config (mixed German/English text) |
 | UI | Vue 3 + Vite + TypeScript, PrimeVue 5, Pinia, vue-router, in `frontend/` (scaffold already in the repo). *Pending teammate review.* |
@@ -97,7 +97,19 @@ Ethical rules from the challenge, and how we meet them:
 - Test call to `apertus-v1-5-70b`: works, ~1.3 s for a short answer.
 - Rate limits: none seen (16 parallel requests: all OK in 0.6 s).
 - JSON mode (`response_format={"type": "json_object"}`): **works** (checked). The client still falls back to plain parsing if it is rejected.
-- **Speed varies a lot** (shared gateway): 70B measured at 51 and later at 5 tokens/s; 8B at ~160 tokens/s.
+- **Speed varies a lot** (shared gateway): 70B measured at 51 and later at 5 tokens/s; 8B at ~160 tokens/s. Check it with `navigator llm-speed` (one short streamed call per model: time to first token and tokens/s).
+- **70B vs 8B extraction (2026-10-18, #16).** Same 100 pages, same eval code (after #42), each run followed by resolve and the claim judge. 70B at 52.6 tokens/s took 15 min (8B ~10 min).
+
+  | | 8B | 70B |
+  |---|---|---|
+  | verified raw claims | 87% (1,484 / 1,705) | 87% (1,448 / 1,661) |
+  | entities artorg / dcb / unibe | 268 / 126 / 83 | 255 / 162 / 80 |
+  | recall@10 (lay-term) | **46% (47%)** | 43% (43%) |
+  | field fill: affiliations / unit_topics | **100% / 78%** | 85% / 65% |
+  | judged precision@10 [PoC] | **63%** | 46% |
+  | judge gold agreement [PoC] | 90% | 58% (judge not reliable) |
+
+  70B found more DCB entities but did not rank or fill better. The claim judge also failed on 25 DCB pages (empty error), so 173 DCB claims stayed unjudged. Decision: keep 8B; the bottleneck is ranking (#59), not the extraction model.
 - **Long answers end in `504 Gateway Time-out`.** All calls MUST stream (`stream=True`); `llm.py` does this.
 - Tool calling (OpenAI `tools` + `tool_choice: "auto"`): **works** (checked). The gateway is vLLM. Test: "Find experts on glucose sensors at DCB only." → `search(query="glucose sensors", source="dcb")`, `finish_reason: "tool_calls"`.
 

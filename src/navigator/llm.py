@@ -3,6 +3,8 @@
 import asyncio
 import json
 import logging
+import time
+from dataclasses import dataclass
 
 import openai
 from openai import AsyncOpenAI
@@ -96,3 +98,34 @@ class LLM:
                     raise
                 log.info("unparseable JSON, retrying once")
         raise AssertionError("unreachable")
+
+
+@dataclass
+class Speed:
+    model: str
+    first_token_s: float | None
+    tokens: int
+    seconds: float
+
+    @property
+    def tokens_per_s(self) -> float:
+        return self.tokens / self.seconds if self.seconds else 0.0
+
+
+async def measure_speed(settings: Settings, model: str, max_tokens: int = 300) -> Speed:
+    """One short streamed answer: time to first token and generation speed (#16).
+    The shared gateway's speed changes a lot, so measure before choosing a model."""
+    client = AsyncOpenAI(base_url=settings.llm_base_url, api_key=settings.keera_api_key, timeout=120)
+    start, first, chunks, usage = time.monotonic(), None, 0, None
+    stream = await client.chat.completions.create(
+        model=model, temperature=0, max_tokens=max_tokens, stream=True,
+        stream_options={"include_usage": True},
+        messages=[{"role": "user", "content": "Write about 200 words on how heart valves work."}],
+    )
+    async for chunk in stream:
+        if chunk.usage:
+            usage = chunk.usage.completion_tokens
+        if chunk.choices and chunk.choices[0].delta.content:
+            first = first if first is not None else time.monotonic() - start
+            chunks += 1
+    return Speed(model, first, usage or chunks, time.monotonic() - start)

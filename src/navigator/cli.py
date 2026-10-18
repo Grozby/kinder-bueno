@@ -291,5 +291,24 @@ def judge(source: str | None = typer.Option(None, help="Source id. Default: all 
         _run_judge(conn, settings, source)
 
 
+@app.command("llm-speed")
+def llm_speed(
+    model: list[str] = typer.Option([], help="Model to test (repeatable). Default: the 70B and 8B models."),
+) -> None:
+    """Measure the gateway: time to first token and tokens/s per model (#16)."""
+    from navigator.llm import measure_speed
+
+    settings = get_settings()
+    models = model or [settings.llm_model, "apertus-v1-5-8b"]
+    for m in dict.fromkeys(models):
+        try:
+            sp = asyncio.run(measure_speed(settings, m))
+            first = f"{sp.first_token_s:.1f}s" if sp.first_token_s is not None else "-"
+            typer.echo(f"{m:<28} first token {first:>6}   {sp.tokens:>4} tokens in {sp.seconds:5.1f}s   "
+                       f"{sp.tokens_per_s:6.1f} tokens/s")
+        except Exception as e:  # report and go on with the next model
+            typer.echo(f"{m:<28} failed: {str(e)[:120]}")
+
+
 if __name__ == "__main__":
     app()

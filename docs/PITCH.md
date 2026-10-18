@@ -26,8 +26,8 @@ Numbers come from `eval/report.md` (9 gold queries, 100 pages; run after #44) an
    - Precision (LLM judge, PoC): 59% of the top-10 results judged relevant; the judge agrees with the human
      gold set on 80% of gold hits.
 5. **Sovereign and cheap to run.** Apertus (Swiss open LLM), local bge-m3 embeddings, Postgres, one
-   `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was too
-   slow on the shared gateway); quote verification is what makes the small model safe to use. A new site is
+   `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
+   and, measured on the same pages, not better); quote verification is what makes the small model safe to use. A new site is
    one config block (`config/sources.yaml`).
 6. **Next.** Scale from 100 to ~2,000 pages (config only, crawling personal profile pages for person-level
    expertise), recall from 46% towards 80%, and the same pipeline for company location reports: suppliers,
@@ -52,8 +52,9 @@ open http://localhost:5173, and run each query once to warm the query-expansion 
 
 ## Questions to expect
 
-- *Why 8B and not 70B?* The shared gateway ran 70B at ~5 tokens/s. 8B runs at ~160 tokens/s (100 pages in
-  ~10 min), and every fact still has to pass the quote check. Switching back is one setting.
+- *Why 8B and not 70B?* We measured both on the same 100 pages. 70B was slower (15 vs ~10 min) and not
+  better: recall@10 43% vs 46%, judged precision 46% vs 63%. Every fact still has to pass the quote check, and
+  switching is one setting (`EXTRACT_MODEL`).
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
   We report it as a signal, not as proof (judge agreement with the gold set: 80%).

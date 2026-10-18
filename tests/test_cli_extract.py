@@ -63,3 +63,18 @@ def test_extract_judge_disabled_by_setting(fakes, monkeypatch):
         cli.get_settings.cache_clear()
     assert result.exit_code == 0, result.output
     assert fakes == ["extract", "store", "resolve"]
+
+
+def test_llm_speed_reports_each_model(monkeypatch):
+    from navigator import llm
+
+    async def fake(settings, model, max_tokens=300):
+        if model == "broken":
+            raise RuntimeError("504 Gateway Time-out")
+        return llm.Speed(model, 0.2, 100, 2.0)
+
+    monkeypatch.setattr(llm, "measure_speed", fake)
+    result = runner.invoke(cli.app, ["llm-speed", "--model", "m1", "--model", "broken"])
+    assert result.exit_code == 0, result.output
+    assert "m1" in result.output and "50.0 tokens/s" in result.output
+    assert "broken" in result.output and "failed: 504" in result.output
