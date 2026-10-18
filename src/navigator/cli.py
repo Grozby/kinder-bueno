@@ -6,7 +6,11 @@ import logging
 import typer
 
 from navigator import db
+from collections import Counter
+
 from navigator.crawl import crawl_source
+from navigator.extract import extract_pages
+from navigator.llm import LLM
 from navigator.settings import get_settings
 from navigator.sources import load_sources
 
@@ -49,6 +53,40 @@ def crawl(
         for src, pages in zip(selected, results):
             db.replace_pages(conn, src.id, pages)
             typer.echo(f"{src.id}: stored {len(pages)} pages")
+
+
+@app.command()
+def extract(
+    source: str | None = typer.Option(None, help="Source id. Default: all sources."),
+    limit: int | None = typer.Option(None, help="Only the first N pages (for testing)."),
+) -> None:
+    """Extract claims and relations with Apertus, verify quotes, store raw results."""
+    settings = get_settings()
+    with db.connect(settings.database_url) as conn:
+        pages = db.pages_for_extraction(conn, source, limit)
+        model = settings.extract_model or settings.llm_model
+        typer.echo(f"Extracting {len(pages)} pages with {model} (concurrency {settings.llm_concurrency})...")
+        results = asyncio.run(extract_pages(LLM(settings, settings.extract_model), pages))
+        db.replace_raw_extractions(conn, results)
+    _print_extraction_report(results)
+
+
+def _print_extraction_report(results: list) -> None:
+    claims = [c for r in results for c in r.claims]
+    relations = [x for r in results for x in r.relations]
+    failed = [r for r in results if r.error]
+    ok = sum(c.verified for c in claims)
+    typer.echo(f"pages: {len(results)} ({len(failed)} with LLM errors)")
+    typer.echo(f"claims: {len(claims)}, verified {ok} ({ok / max(len(claims), 1):.0%})")
+    by_field = Counter((c.item.field, c.verified) for c in claims)
+    for f in sorted({c.item.field for c in claims}):
+        typer.echo(f"  {f:<12} {by_field[(f, True)]:>4} verified / {by_field[(f, True)] + by_field[(f, False)]:>4}")
+    rel_ok = sum(x.verified for x in relations)
+    typer.echo(f"relations: {len(relations)}, verified {rel_ok}")
+    typer.echo(f"items dropped by schema validation: {sum(r.dropped for r in results)}")
+    reasons = Counter(c.fail_reason for c in claims + relations if not c.verified)
+    for reason, n in reasons.most_common():
+        typer.echo(f"  rejected: {reason} ({n})")
 
 
 @app.command()

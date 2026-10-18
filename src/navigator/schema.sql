@@ -55,3 +55,53 @@ CREATE TABLE IF NOT EXISTS relation (
   verified    boolean NOT NULL DEFAULT false,
   UNIQUE (from_id, rel, to_id, page_id)
 );
+
+-- [PoC] LLM judge verdicts (section 7.8). ALTER so existing databases get the columns too.
+ALTER TABLE claim    ADD COLUMN IF NOT EXISTS judge_verdict text CHECK (judge_verdict IN ('supported','partial','unsupported'));
+ALTER TABLE claim    ADD COLUMN IF NOT EXISTS judge_reason  text;
+ALTER TABLE relation ADD COLUMN IF NOT EXISTS judge_verdict text CHECK (judge_verdict IN ('supported','partial','unsupported'));
+ALTER TABLE relation ADD COLUMN IF NOT EXISTS judge_reason  text;
+
+-- Raw extraction output, one row per claim / relation, before entity merging (resolve).
+-- Kept so resolve can be re-run without new LLM calls.
+CREATE TABLE IF NOT EXISTS raw_claim (
+  id           serial PRIMARY KEY,
+  page_id      int NOT NULL REFERENCES page(id) ON DELETE CASCADE,
+  entity_type  text NOT NULL,
+  entity_name  text NOT NULL,
+  field        text NOT NULL,
+  value        text NOT NULL,
+  quote        text NOT NULL,              -- exact page text when verified, model output otherwise
+  verified     boolean NOT NULL,
+  fail_reason  text
+);
+CREATE INDEX IF NOT EXISTS raw_claim_page_idx ON raw_claim(page_id);
+
+CREATE TABLE IF NOT EXISTS raw_relation (
+  id           serial PRIMARY KEY,
+  page_id      int NOT NULL REFERENCES page(id) ON DELETE CASCADE,
+  from_type    text NOT NULL,
+  from_name    text NOT NULL,
+  rel          text NOT NULL,
+  to_type      text NOT NULL,
+  to_name      text NOT NULL,
+  quote        text NOT NULL,
+  verified     boolean NOT NULL,
+  fail_reason  text
+);
+CREATE INDEX IF NOT EXISTS raw_relation_page_idx ON raw_relation(page_id);
+
+-- [PoC] User feedback from the UI. Log only: it never changes what is shown.
+-- entity/claim ids change on re-ingest, so keep a text snapshot; ids become NULL.
+CREATE TABLE IF NOT EXISTS feedback (
+  id          serial PRIMARY KEY,
+  session_id  text NOT NULL,
+  query       text,
+  entity_id   int REFERENCES entity(id) ON DELETE SET NULL,
+  claim_id    int REFERENCES claim(id) ON DELETE SET NULL,
+  entity_name text,
+  claim_text  text,
+  rating      text NOT NULL CHECK (rating IN ('up','down','wrong_fact')),
+  comment     text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);

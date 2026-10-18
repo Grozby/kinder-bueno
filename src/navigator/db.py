@@ -36,6 +36,41 @@ def replace_pages(conn: psycopg.Connection, source_id: str, pages: list) -> None
             )
 
 
+def pages_for_extraction(conn: psycopg.Connection, source_id: str | None, limit: int | None) -> list[tuple]:
+    """(page_id, url, title, text) for one source or all sources."""
+    return conn.execute(
+        "SELECT id, url, coalesce(title, ''), text FROM page "
+        "WHERE %(source)s::text IS NULL OR source_id = %(source)s ORDER BY id LIMIT %(limit)s",
+        {"source": source_id, "limit": limit},
+    ).fetchall()
+
+
+def replace_raw_extractions(conn: psycopg.Connection, results: list) -> None:
+    """Store extraction results (extract.PageResult), replacing older rows of the same pages."""
+    page_ids = [r.page_id for r in results]
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("DELETE FROM raw_claim WHERE page_id = ANY(%s)", (page_ids,))
+        cur.execute("DELETE FROM raw_relation WHERE page_id = ANY(%s)", (page_ids,))
+        cur.executemany(
+            "INSERT INTO raw_claim (page_id, entity_type, entity_name, field, value, quote, verified, fail_reason) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            [
+                (r.page_id, c.item.entity_type, c.item.entity_name, c.item.field, c.item.value,
+                 c.quote, c.verified, c.fail_reason)
+                for r in results for c in r.claims
+            ],
+        )
+        cur.executemany(
+            "INSERT INTO raw_relation (page_id, from_type, from_name, rel, to_type, to_name, quote, verified, fail_reason) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            [
+                (r.page_id, x.item.from_type, x.item.from_name, x.item.rel, x.item.to_type, x.item.to_name,
+                 x.quote, x.verified, x.fail_reason)
+                for r in results for x in r.relations
+            ],
+        )
+
+
 def stats(conn: psycopg.Connection) -> list[tuple]:
     """Counts per source: pages, chunks, entities with verified claims, verified claims."""
     return conn.execute(
