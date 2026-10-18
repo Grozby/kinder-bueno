@@ -41,7 +41,7 @@ class Expansion(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[Result]
-    expansion: Expansion | None  # None when query expansion did not run
+    expansion: Expansion | None  # None when query expansion failed or gave no terms
     no_result: bool
 
 

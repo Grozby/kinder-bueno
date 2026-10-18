@@ -4,7 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import onehot
-from navigator.api import app, get_conn, get_embed
+from navigator.api import app, get_conn, get_embed, get_expand
+from navigator.expand import Expansion
 
 
 def fake_embed(query: str):
@@ -20,6 +21,7 @@ def fake_embed(query: str):
 def client(test_conn, graph):
     app.dependency_overrides[get_conn] = lambda: test_conn
     app.dependency_overrides[get_embed] = lambda: fake_embed
+    app.dependency_overrides[get_expand] = lambda: lambda q: Expansion()  # expansion failed / disabled
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -85,3 +87,12 @@ def test_feedback_unknown_entity_is_404(client):
     response = client.post("/api/feedback", json={"session_id": "s1", "entity_id": 999999, "rating": "up"})
     assert response.status_code == 404
     assert response.json() == {"detail": "Entity not found"}
+
+
+def test_search_uses_and_returns_expansion(client, graph):
+    # "zebrafish" alone has no result; the expansion term "insulin" finds the lab page.
+    app.dependency_overrides[get_expand] = lambda: lambda q: Expansion(en=["insulin"], de=["Insulinpumpe"])
+    body = client.get("/api/search", params={"q": "zebrafish", "type": "unit"}).json()
+    assert body["expansion"] == {"en": ["insulin"], "de": ["Insulinpumpe"]}
+    assert body["no_result"] is False
+    assert "Diabetes Lab" in {r["name"] for r in body["results"]}
