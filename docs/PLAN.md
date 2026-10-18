@@ -83,13 +83,14 @@ Ethical rules from the challenge, and how we meet them:
 | Extraction model | `EXTRACT_MODEL=apertus-v1-5-8b` (kept after a measured comparison, #16). On the shared gateway, 70B dropped from ~51 to ~5 tokens/s (other teams), so a 100-page run timed out. 8B runs at ~120–160 tokens/s: 100 pages in ~10 min. Quote verification protects against 8B errors. When 70B was fast again (52.6 tokens/s, `navigator llm-speed`), a 70B run on a copy of the database was **not better** (table below), so 8B stays. |
 | Embeddings | `BAAI/bge-m3` (1024 dimensions, multilingual), runs locally on CPU via `sentence-transformers`. The gateway has no embedding model. |
 | Keyword search | Postgres full-text search, `simple` config (mixed German/English text) |
-| UI | Vue 3 + Vite + TypeScript, PrimeVue 5, Pinia, vue-router, in `frontend/` (scaffold already in the repo). *Pending teammate review.* |
+| UI | Vue 3 + Vite + TypeScript, Pinia, vue-router, in `frontend/`. As built: no PrimeVue; the UI has its own small components (`components/ui/Base*.vue`). The case board (section 9.1) is the primary UI. |
 | Backend API | FastAPI + uvicorn on port 8000; one worker by default, more with `--workers` (chat state and the ingest slot are in Postgres, #103). The Vite dev server proxies `/api` to it. |
 | LLM judge [PoC] | Same model, `apertus-v1-5-70b`, temperature 0. It judges its own extractions, so it is **biased** (self-preference). Accepted for the PoC; say so in the pitch. No human calibration now (see section 16). |
-| Chat state [PoC] | LangGraph `StateGraph` + `MemorySaver` checkpointer, `thread_id` = browser `session_id`. Later: swap to `PostgresSaver` (same Postgres). |
+| Chat state [PoC] | LangGraph `StateGraph`, no checkpointer. As built (#103, #131): every turn is a `chat_turn` row, and the agent rebuilds its state from the session's last turn, so any API worker can answer and a restart loses nothing. |
 | Crawl size | **100 pages total** to start. Configurable. Scale up later. |
 | Graph DB | Not now. Postgres tables `entity` + `relation` keep the data graph-shaped. |
-| Reranker | Later (after the hackathon): `BAAI/bge-reranker-v2-m3` on top 50. Its hour-6 slot now goes to the chat [PoC]. |
+| Reranker | `BAAI/bge-reranker-v2-m3` (local) decides which case references match a need (#74). For `/api/search` it was measured and left off (#99). |
+| API auth | Optional shared bearer token: `API_TOKEN` on the host, `BACKEND_TOKEN` for the frontend proxy (`docs/SHARED_SERVER.md`). A `401` from `/api` means a missing or wrong token. |
 
 ### LLM endpoint facts (checked)
 
@@ -202,21 +203,31 @@ kinder-bueno/
 │   ├── extract.py             # page → claims (with quotes)
 │   ├── verify.py              # quote check
 │   ├── resolve.py             # merge duplicate entities
-│   ├── judge.py               # [PoC] LLM judge: claim support (7.8) + eval relevance (10.3)
-│   ├── search.py              # expansion, hybrid search, RRF, grouping, fairness
+│   ├── judge.py               # [PoC] LLM judge: claim support (7.8)
+│   ├── search.py              # keyword + semantic chunk search, RRF
+│   ├── expand.py              # query expansion (8.1)
+│   ├── rank.py                # chunks → entities, fairness cap, no-result (8.4–8.7)
+│   ├── results.py             # Result objects, the shown() rule
 │   ├── explain.py             # "why it matches" sentences
-│   ├── agent.py               # [PoC] LangGraph chat agent
-│   ├── api.py                 # FastAPI app: /api/search, /api/chat, /api/feedback, /api/stats
-│   └── cli.py                 # typer CLI
-├── frontend/                  # Vue 3 + PrimeVue app (section 9)
+│   ├── agent.py               # [PoC] LangGraph chat agent (8.10)
+│   ├── api.py                 # FastAPI app (8.9; full route list in docs/FRONTEND_API.md)
+│   ├── cli.py                 # typer CLI (section 11)
+│   │   # added during the hackathon (section 9.1 and later):
+│   ├── cases.py, analysis.py, case_state.py, pitch.py, documents.py   # case board
+│   ├── ingest.py, rules.py, pages.py                                  # sources page: add / re-crawl a source
+│   ├── evaluate.py, eval_judge.py, case_eval.py                       # section 10
+│   └── models.py, chunks_db.py
+├── frontend/                  # Vue 3 app (section 9)
 │   ├── vite.config.ts         # proxies /api to BACKEND_URL (default http://localhost:8000)
 │   └── src/
-│       ├── api/client.ts      # all backend calls go through here
-│       ├── stores/chat.ts     # Pinia: session_id, turns, filters
-│       ├── views/HomeView.vue
-│       └── components/        # ResultCard.vue, ChatTurn.vue, FilterPanel.vue
+│       ├── api/client.ts      # all backend calls go through here; types.ts mirrors models.py
+│       ├── stores/            # cases.ts, sources.ts (Pinia)
+│       ├── views/             # BoardView.vue (case board), SourcesView.vue
+│       └── components/        # CaseCard, CaseDrawer, CaseChat, EvidenceList, CitedText, ui/Base*.vue, ...
+├── scripts/demo.sh            # whole demo in one command (6.3)
 ├── eval/
-│   ├── gold.yaml
+│   ├── gold.yaml, report.md   # 10.1–10.3
+│   ├── cases.yaml, case_report.md   # 10.4
 │   └── run_eval.py
 └── tests/
     ├── test_verify.py
@@ -262,6 +273,8 @@ docker compose run --rm app uv run navigator ingest --source dcb
 docker compose run --rm app uv run navigator eval
 docker compose up app frontend                                 # UI at http://localhost:5173, API at http://localhost:8000/api
 ```
+
+Demo without an ingest: `scripts/demo.sh setup` (build, restore `checkpoints/demo.dump` + `init-db`, `navigator warm`, start, print the URLs; the full ingest if there is no dump) and `scripts/demo.sh dump` (snapshot). Under the hood: `docker compose run --rm restore` (profile `demo`, `pg_restore` of the git-ignored `checkpoints/demo.dump`). The packaged stack for someone else to run is in `docs/HANDOFF.md`.
 
 For fast local development, people MAY also run `uv run navigator ...` on the host with `DATABASE_URL=postgresql://navigator:navigator@localhost:5432/navigator`, and `npm run dev` in `frontend/` (it proxies `/api` to `localhost:8000`).
 
@@ -711,11 +724,14 @@ class Result(BaseModel):
 | `POST /api/feedback` [PoC] | `{session_id, query, entity_id, claim_id?, rating, comment?}` | `{ok: true}` |
 | `GET /api/stats` | — | counts per source (pages, chunks, entities, shown claims) + feedback counts |
 
+As built, the API also serves the case board (`/api/cases…`: upload, analysis, references, pitch, review, notes, documents), the sources page (`/api/sources…`: add, re-crawl, rules) and the ranked pages (`/api/pages…`, #78). The contract for all routes is `docs/FRONTEND_API.md`.
+
 Rules:
 - `/api/chat` is **not streaming** (one JSON answer). Streaming (SSE) is later.
 - `filters` in a chat request is optional: the UI sends it when the user changes a filter in the side panel. The server writes it into the graph state before the agent runs, so UI and state stay in sync.
 - `/api/feedback` writes one `feedback` row (with the text snapshot). It never changes results.
 - Load the embedding model at startup (FastAPI lifespan), not on the first request.
+- With `API_TOKEN` set, every `/api` call needs `Authorization: Bearer <token>` (section 3).
 
 ### 8.10 Chat agent (`agent.py`, LangGraph) — [PoC]
 
@@ -754,7 +770,7 @@ START → agent ──(tool calls)──▶ tools ──▶ agent      (max 3 to
 ```
 
 - `tools` is a custom node (not the prebuilt `ToolNode`), because tools must read and write `filters` and `last_results` in the state.
-- Checkpointer: `MemorySaver()`. `config={"configurable": {"thread_id": session_id}}`. State is lost when the server restarts. That is OK for the PoC.
+- Checkpointer: none (as built, #131). The state is rebuilt for each message from the session's last `chat_turn` row (#103): its query, filters and results. `#2` is the 2nd card of the previous turn.
 
 **System prompt (draft):**
 
@@ -777,15 +793,22 @@ Guardrails:
 - **Reply check:** the same citation check as 8.6. If the reply cites an id that is not in `last_results`, or names an entity with no citation → replace it with a template: `"Showing <n> results for '<query>'<filters>."`
 - `no_result` (8.7) works the same as in search.
 
+As built (`agent.py`, #97, PR #131), tested on the gateway with the section 14 flow:
+- The context (last search, numbered results, the previous user message) is part of the ONE system message: the gateway rejects a second system message (`400 Invalid message role`). The previous exchange goes in as text, because as chat messages the model copied the earlier reply and called no tool.
+- `related` ignores an invented `rel` ("people") and returns all relations, instead of failing the call.
+- A call the model writes as text (`set_filters(source="dcb")`, "related with result #2") is turned into the real call; its arguments are still checked.
+- The reply is the model's sentence only if it passes the check (also against the previous turn's names); otherwise the template ("Showing 9 results similar to #1 DCB Research AG (source: dcb).").
+- The chat example buttons in the case drawer ("Only people at DCB", "More like #1", "Who works with #2?") each call one tool (#132).
+
 ---
 
-## 9. UI (`frontend/`, Vue 3 + PrimeVue)
+## 9. UI (`frontend/`, Vue 3)
 
-*Pending teammate review: stack and layout below. The card content is fixed (section 1).*
+**As built, the case board (9.1) is the primary UI**: `BoardView.vue` (cases in columns, a drawer per case with references, evidence, chat and pitch) and `SourcesView.vue` (sources, crawl graph, ranked pages, rules). The standalone search page below was not built: search runs inside the case drawer's chat, and `GET /api/search` and `navigator search` (section 11) serve debugging and the eval. The card content of section 1 is unchanged: `EvidenceList.vue` shows the evidence rows with "partial" tags and the "wrong fact" button.
 
-Stack: Vue 3 + Vite + TypeScript, PrimeVue 5 (`@primeuix/themes`), Pinia, vue-router. All backend calls go through `src/api/client.ts` (`/api/...`). Types in `src/api/types.ts` mirror the Pydantic models in 8.8.
+Stack: Vue 3 + Vite + TypeScript, Pinia, vue-router, no component library (own `components/ui/Base*.vue`). All backend calls go through `src/api/client.ts` (`/api/...`). Types in `src/api/types.ts` mirror the Pydantic models in 8.8.
 
-**One page** (`HomeView.vue`), chat layout:
+*Original design (not built, kept for the decisions it records):* **One page** (`HomeView.vue`), chat layout:
 - Title: "Bern Research & Expertise Navigator".
 - Chat input at the bottom (PrimeVue `InputText` + `Button`). The first message runs a search. Follow-ups refine it (section 8.10).
 - Example query buttons: the 9 gold queries (section 10). They send a first message.
@@ -889,7 +912,7 @@ For each query, run the full search (including expansion, without the explanatio
 
 Output: a Markdown table printed to stdout and saved to `eval/report.md`. Put the numbers in the pitch.
 
-As built (`evaluate.py`, `navigator eval`, `eval/run_eval.py`): the PoC rows (judged precision, judge gold agreement) are not implemented yet (10.3); judge verdict and feedback counts are. Name matching: people match when every word of the gold name is in the result name (titles like "Dr.-Ing." are kept by `norm_name`), units on `norm_unit`. Gold candidates were found with SQL over shown claims by topic (not from search results), then confirmed by a human.
+As built (`evaluate.py`, `navigator eval`, `eval/run_eval.py`): every row above, including the PoC rows (judged precision and judge gold agreement, with the eval judge of 10.3 in `eval_judge.py`), judge verdicts and feedback counts. Name matching: people match when every word of the gold name is in the result name (titles like "Dr.-Ing." are kept by `norm_name`), units on `norm_unit`. Gold candidates were found with SQL over shown claims by topic (not from search results), then confirmed by a human.
 
 Baseline (2026-10-18, 8B extraction, expansion on): **recall@10 14%** (target 80%), traceability 100%, drop rate 13%. Main causes (see the ranking issue): umbrella units ("ARTORG Center", in two spellings) have claims on nearly every page and take top slots; the expected labs and their heads are pushed out (surgery 0%).
 
@@ -917,7 +940,7 @@ Topic match with person profiles, #75 (2026-10-18). The deeper crawl (340 pages,
 - Recall@10 60% / 48% → **64% / 58%**; lay-term 61% / 49% → **67% / 61%**. Case eval: shared 17 → 18 of 31 matches and 6 → 3 false matches; deeper crawl unchanged (15 of 31, 2 false). Swept: `TOPIC_MIN` 0.5–0.65, `TOPIC_WEIGHT` 0.15–0.4, person share 0–1, top-k 1–3; with 9 queries a ±2-point difference is noise.
 - Left on the deeper crawl, outside ranking: duplicates the resolver keeps ("Marco Osterwalder" and "Ass. Prof. Dr. Marco Osterwalder"; "Neuro Robotic(s) Group"; three "Acoustic Robotic(s) Systems Lab"), which take top-10 places, and a profile's expertise stored on the lab (Dr. Debeire's causal-discovery topics on "AI in Health and Nutrition").
 
-### 10.3 Eval judge (`judge.py`) — [PoC]
+### 10.3 Eval judge (`eval_judge.py`) — [PoC]
 
 The gold set only gives recall. The eval judge gives a precision number without more human labels.
 
@@ -948,6 +971,14 @@ As built (`eval_judge.py`, not `judge.py`, so it does not collide with the claim
 With lab topics (#42): the judge sees `lab topic (via <unit>)` rows first (the 8-row cap used to cut them off), and the prompt says a person is relevant if their unit's topics match. Judge gold agreement 85% → 95–100% (3 runs), judged precision@10 63% → 65%. It still rejects people whose lab doesn't match (e.g. Daniel Ahmed, micro/nanorobotics, for "surgical robots").
 First run (2026-10-18): **judged precision@10 47%** over 9 queries, judge gold agreement 100% (6 / 6). Results vary between runs because the expansion terms vary, and the result lists change with them.
 
+### 10.4 Case eval (`case_eval.py`, `navigator case-eval`) — added during the hackathon
+
+The case analysis (section 9.1) has its own eval (#73): four fictional business models in `docs/examples`. Three fit Bern (Glucora: diabetes tech, Repolar: cardiac arrhythmia, Precisa: ear surgery robots), and one does not (Vinora: vineyards).
+- `eval/cases.yaml` pins each case's needs, so a matching change is measured on the same input. It also lists the entities that must and must not count as matches, and a plausible score range.
+- `navigator case-eval` runs the analysis read-only and writes `eval/case_report.md`. Per case it reports match recall, how many expected entities are among the references at all, false matches, score in range and uncovered needs.
+- It measured the reranker for need matching (#74): false matches 17 → 6, scores in range 3/4 → 4/4. The low-fit case scores 0.
+- The expected entities were picked from the database's claims by an agent and still need a human review (like the gold set, #60).
+
 ---
 
 ## 11. CLI (`cli.py`, typer)
@@ -966,7 +997,12 @@ First run (2026-10-18): **judged precision@10 47%** over 9 queries, judge gold a
 | `navigator search "query" [--source ID] [--type T] [--limit N] [--json] [--no-explain]` | ranked results like `GET /api/search`, as text or JSON (debugging, demos without the UI) |
 | `navigator serve [--host H] [--port P] [--workers N]` | start the API (section 8.9) |
 | `navigator eval [--no-judge]` | run section 10.2 (with the eval judge unless `--no-judge`) |
+| `navigator case-eval` | run section 10.4 (case analysis on the example PDFs, read-only) |
 | `navigator stats` | counts per source, incl. judge verdicts and feedback |
+| `navigator reverify` | re-run the quote checks (7.6) on the stored extractions, no LLM calls, then resolve |
+| `navigator resolve` | rebuild entities, claims and relations (7.7); resets the judge verdicts, so run `judge` after |
+| `navigator warm` | download bge-m3 and the case reranker into the model cache before first use |
+| `navigator llm-speed [--model M]` | time to first token and tokens/s per gateway model (section 3) |
 
 ---
 
@@ -1041,6 +1077,6 @@ Fallback if behind at hour 5, in this order: (1) drop the chat [PoC] (keep the s
 - Gateway rate limit and JSON-mode support: test in hour 1 (Person A).
 - Organisers may provide a UniBE subdomain inventory later. If it appears: add a loader that turns the list into `unibe` seeds, filtered to medicine / life-science hosts. Config change only.
 - Organisers' rule on a separate embedding model: we assume a local open model (bge-m3) next to Apertus is allowed. Confirm with organisers if possible.
-- [PoC] Frontend stack and chat layout (sections 3, 6.1, 9): confirm with the teammate who made the Vue scaffold.
 - [PoC] Judge calibration (after the hackathon): label ~30 claims by hand (supported / partial / unsupported, all 3 verdicts present), include the "wrong fact" feedback rows and spot-checks from `eval/judge_log.jsonl`, and report how often the judge agrees with the labels. Until then, the judge numbers are indicative only.
-- [PoC] Later: `PostgresSaver` for chat state, streaming chat (SSE), reranker.
+- [PoC] Later: streaming chat (SSE). Done since: chat state in Postgres (#103), the chat agent (#97), the reranker for case matching (#74).
+- Deeper crawl of person profiles (#75): measured on a separate database and not swapped in yet (recall@10 58% against 64%); see the issue.
