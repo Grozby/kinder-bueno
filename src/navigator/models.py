@@ -137,6 +137,9 @@ class NewSource(BaseModel):
     follow_outbound: bool = False       # also follow links to other hosts
 
 
+PageKind = Literal["team", "lab", "project", "infrastructure", "other"]
+
+
 CaseStatus = Literal["new", "in_review", "accepted", "rejected"]
 AnalysisStatus = Literal["pending", "done", "failed"]
 
@@ -174,3 +177,39 @@ class Pitch(BaseModel):
     text: str
     entity_ids: list[int]
     generated_at: datetime
+
+
+class ResourcePage(BaseModel):
+    """A crawled page and what it gives the search (FRONTEND_API "Resources", #78)."""
+    id: int
+    source_id: str
+    url: str
+    title: str
+    kind: PageKind              # a guess from the URL, else from the entity types on the page
+    status: PageStatus          # always "crawled": failed fetches are not stored
+    score: int                  # 0-100: yield 40 %, precision 30 %, verification 20 %, feedback 10 %
+    score_breakdown: list[ScoreItem]  # the four parts, in that order
+    entities: int               # entities with a shown claim from the page
+    verified_claims: int        # shown claims from the page
+    judge_supported: float | None  # share of judged claims marked "supported", 0-1; None: none judged
+    drop_rate: float | None     # share of raw claims that failed quote verification, 0-1; None: none extracted
+    feedback_up: int            # on entities whose results cite the page
+    feedback_down: int
+    crawled_at: datetime | None
+    blocked_by: str | None      # first exclude pattern of the source that matches the URL
+    prioritised_by: str | None  # first priority pattern of the source that matches the URL
+
+
+class PageFact(BaseModel):
+    claim_id: int
+    entity_id: int
+    entity_name: str
+    entity_type: EntityType
+    field: str
+    value: str
+    quote: str
+    judge_verdict: JudgeVerdict | None
+
+
+class PageDetail(ResourcePage):
+    facts: list[PageFact]       # the shown claims from the page

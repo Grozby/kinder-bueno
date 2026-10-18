@@ -15,7 +15,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import analysis, cases, chunks_db, ingest, pitch
+from navigator import analysis, cases, chunks_db, ingest, pages, pitch
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -32,8 +32,10 @@ from navigator.models import (
     FeedbackCounts,
     FeedbackRequest,
     FeedbackResponse,
+    PageDetail,
     Pitch,
     PitchRequest,
+    ResourcePage,
     Result,
     SearchResponse,
     NewSource,
@@ -105,6 +107,14 @@ def get_seeds() -> dict[str, str]:
     return {s.id: s.seeds[0] for s in load_sources(get_settings().sources_file).sources}
 
 
+def get_page_rules() -> dict[str, pages.SourceRules]:
+    """Exclude and priority patterns per source in config/sources.yaml (stored rules: #79)."""
+    return {
+        s.id: pages.SourceRules(s.exclude_patterns, s.priority_patterns)
+        for s in load_sources(get_settings().sources_file).sources
+    }
+
+
 def get_analyze(request: Request) -> Callable[[str], None]:
     """The case analysis (#53), run after the upload response on its own connection (the request's is closed
     by then). Background tasks of sync routes run in a worker thread, so the LLM calls run on the main loop."""
@@ -168,6 +178,7 @@ def get_write_pitch(request: Request) -> Callable[[tuple, list[Result]], str]:
 
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 Seeds = Annotated[dict[str, str], Depends(get_seeds)]
+PageRules = Annotated[dict[str, pages.SourceRules], Depends(get_page_rules)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
 Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
 Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_explain)]
@@ -383,6 +394,21 @@ def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewS
     conn.commit()  # the background ingest reads the source on another connection
     background.add_task(run, source_id)
     return _sources(conn, seeds, source_id)[0]
+
+
+@app.get("/api/pages")
+def list_pages(conn: Conn, rules: PageRules) -> list[ResourcePage]:
+    """Every crawled page with its score, by id (the UI sorts)."""
+    return pages.list_pages(conn, rules)
+
+
+@app.get("/api/pages/{page_id}")
+def get_page(conn: Conn, rules: PageRules, page_id: int) -> PageDetail:
+    """One page with the shown facts extracted from it."""
+    found = pages.get_page(conn, rules, page_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return found
 
 
 @app.post("/api/cases")
