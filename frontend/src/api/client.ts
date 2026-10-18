@@ -15,7 +15,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: isForm ? init?.headers : { 'Content-Type': 'application/json', ...init?.headers },
   })
   if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText}`)
+    // FastAPI says why in `detail` (e.g. 409 "Another source is being ingested", 422 "include_patterns: ...")
+    const body = await res.json().catch(() => null)
+    const detail = typeof body?.detail === 'string' ? body.detail : res.statusText
+    throw new Error(`${res.status} ${detail}`)
   }
   return res.json() as Promise<T>
 }
