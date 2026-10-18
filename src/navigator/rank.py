@@ -17,12 +17,17 @@ DEFAULT_TYPES = ["person", "unit"]  # projects / infrastructure only when the fi
 MAX_RESULTS = 10
 MAX_PER_UNIT = 3      # fairness cap (8.5)
 MIN_SIM = 0.45        # below this, and with no keyword hit, there is no reliable result (8.7)
-# Tuned on the eval set (#29, recall@10 14% -> 46%). Re-run `navigator eval` after changing any of these.
+# Tuned on the eval set (#29, recall@10 14% -> 46%; #59, 46% -> 59%). Re-run `navigator eval` after changing any of these.
 BEST_CHUNKS = 1       # plan 8.4 said the best 3: that favours entities on long pages with many matching chunks
 PAGE_ONLY_WEIGHT = 0.25
 USE_IDF = True        # an entity with claims on many pages ("ARTORG Center") is linked to every query on them
 INHERIT = 0.5         # a person gets this share of their unit's score (people have almost no topic claims)
-SENIOR_BOOST = 0.1    # heads and professors first among a unit's members
+SENIOR_BOOST = 0.3    # heads and professors first among a unit's members
+TOPIC_WEIGHT = 0.3    # entities whose own topic claims (expertise, description) match the query (#59)
+TOPIC_MIN = 0.5       # cosine similarity below this adds nothing
+TOPIC_FIELDS = ("expertise", "description")
+TOPICS_PER_PAGE = 8   # an entity's first topic claims per page: 8B sometimes loops into long generic lists
+SECTION_WEIGHT = 1.0  # a unit with a member page owns the pages under its home folder (#59), as if named there
 CHUNK_SHARE = 0.5     # a chunk's score is split among the entities it names: / (number named) ** CHUNK_SHARE
 SENIOR_ROLE = re.compile(r"\b(head|director|professor|prof|chair|leader|lead|principal investigator|pi)\b", re.I)
 
@@ -73,6 +78,27 @@ def inherit(scores: dict[int, float], members: list[tuple[int, int]], share: flo
     out = dict(scores)
     for person, unit_score in best.items():
         out[person] = out.get(person, 0.0) + share * unit_score
+    return out
+
+
+def home_folder(member_page_url: str) -> str:
+    """".../research/aihn/group_members/index_eng.html" -> ".../research/aihn/": the folder above the member page's."""
+    folder = member_page_url.rsplit("/", 1)[0]
+    return folder.rsplit("/", 1)[0] + "/"
+
+
+def section_scores(hits: list[ChunkHit], homes: list[tuple[int, str]], weight: float) -> dict[int, float]:
+    """Score of each unit (unit id, home folder) from its best chunk on a page under its home folder.
+    When folders nest, the deepest owner wins (a lab, not the whole site)."""
+    out: dict[int, float] = {}
+    for hit in hits:
+        owners = [(len(home), unit) for unit, home in homes if hit.url.startswith(home)]
+        if not owners:
+            continue
+        deepest = max(n for n, _ in owners)
+        for n, unit in owners:
+            if n == deepest:
+                out[unit] = max(out.get(unit, 0.0), hit.score * weight)
     return out
 
 
@@ -128,6 +154,68 @@ def _members(conn: psycopg.Connection, unit_ids: list[int], sources: list[str]) 
     ).fetchall()
 
 
+def _embed_query(text: str) -> np.ndarray:
+    from navigator.embed import embed_query  # imported lazily: loads torch
+
+    return embed_query(text)
+
+
+_topic_vecs: dict[str, np.ndarray] = {}  # claim value -> bge-m3 embedding, per process
+
+
+def topic_scores(
+    claims: list[tuple[int, str]], query_vecs: list[np.ndarray], vec_of: Callable[[str], np.ndarray]
+) -> dict[int, float]:
+    """Best cosine similarity between each entity's topic claims (entity id, value) and any query vector."""
+    out: dict[int, float] = {}
+    for entity_id, value in claims:
+        v = vec_of(value)
+        sim = max(float(np.dot(v, q)) for q in query_vecs)
+        out[entity_id] = max(out.get(entity_id, -1.0), sim)
+    return out
+
+
+def _topic_claims(conn: psycopg.Connection, types: list[str], sources: list[str]) -> list[tuple[int, str]]:
+    return conn.execute(
+        f"""
+        SELECT DISTINCT entity_id, value FROM (
+          SELECT c.entity_id, c.value,
+                 row_number() OVER (PARTITION BY c.entity_id, c.page_id, c.field ORDER BY c.id) AS n
+          FROM claim c JOIN entity e ON e.id = c.entity_id JOIN page p ON p.id = c.page_id
+          WHERE c.field = ANY(%s) AND {shown("c")} AND e.type = ANY(%s)
+            AND (cardinality(%s::text[]) = 0 OR p.source_id = ANY(%s))
+        ) t WHERE n <= %s
+        """,
+        (list(TOPIC_FIELDS), types, sources, sources, TOPICS_PER_PAGE),
+    ).fetchall()
+
+
+def _topic_vec_of(embed: Callable[[str], np.ndarray] | None, values: list[str]) -> Callable[[str], np.ndarray]:
+    """Embeddings of topic values. With the default model, the missing ones are embedded in one batch and
+    cached per process (~500 short values: a few seconds on the first search); a given `embed` is called directly."""
+    if embed is not None:
+        return embed
+    missing = [v for v in dict.fromkeys(values) if v not in _topic_vecs]
+    if missing:
+        from navigator.embed import embed_documents  # imported lazily: loads torch
+
+        _topic_vecs.update(zip(missing, embed_documents(missing)))
+    return _topic_vecs.__getitem__
+
+
+def _homes(conn: psycopg.Connection, sources: list[str]) -> list[tuple[int, str]]:
+    """(unit id, home folder) for units with a member page (the pages their listed_in relations come from)."""
+    rows = conn.execute(
+        f"""
+        SELECT DISTINCT r.to_id, p.url FROM relation r JOIN page p ON p.id = r.page_id
+        WHERE r.rel = 'listed_in' AND {shown("r")}
+          AND (cardinality(%s::text[]) = 0 OR p.source_id = ANY(%s))
+        """,
+        (sources, sources),
+    ).fetchall()
+    return [(unit, home_folder(url)) for unit, url in rows]
+
+
 def _senior(conn: psycopg.Connection, person_ids: list[int]) -> set[int]:
     roles = conn.execute(
         f"SELECT c.entity_id, c.value FROM claim c WHERE c.entity_id = ANY(%s) AND c.field = 'role' AND {shown('c')}",
@@ -168,7 +256,21 @@ def rank_entities(
     # Units are scored even when the filter hides them: their members inherit from them.
     claims = _shown_claims(conn, list({h.page_id for h in hits}), sorted({*types, "unit"}), sources)
     linked = list({c[0] for c in claims})
-    scores = entity_scores(hits, claims, _idf_weights(conn, linked) if USE_IDF else None)
+    weights = _idf_weights(conn, linked) if USE_IDF else None
+    scores = entity_scores(hits, claims, weights)
+    if TOPIC_WEIGHT:
+        topic_claims = _topic_claims(conn, sorted({*types, "unit"}), sources)
+        queries = [query] + ([f"{query}, {', '.join(extra_terms[:4])}"] if extra_terms else [])
+        query_vecs = [(embed or _embed_query)(q) for q in queries]
+        sims = topic_scores(topic_claims, query_vecs, _topic_vec_of(embed, [v for _, v in topic_claims]))
+        topic_idf = _idf_weights(conn, list(sims)) if USE_IDF else {}
+        for entity_id, sim in sims.items():
+            if sim > TOPIC_MIN:
+                bonus = TOPIC_WEIGHT * (sim - TOPIC_MIN) * topic_idf.get(entity_id, 1.0)
+                scores[entity_id] = scores.get(entity_id, 0.0) + bonus
+    if SECTION_WEIGHT:
+        for unit, s in section_scores(hits, _homes(conn, sources), SECTION_WEIGHT).items():
+            scores[unit] = max(scores.get(unit, 0.0), s)
     if INHERIT and "person" in types:
         scores = inherit(scores, _members(conn, list(scores), sources), INHERIT)
     if SENIOR_BOOST:
