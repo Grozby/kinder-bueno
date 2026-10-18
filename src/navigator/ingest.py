@@ -1,15 +1,22 @@
-"""Add a website from the UI and ingest it in the background (POST /api/sources, #55).
+"""Add a website from the UI (POST /api/sources, #55) or re-crawl a source (POST /api/sources/{id}/crawl,
+#80), and ingest it in the background.
 
-The source's config lives in the database (`source.config`), not in config/sources.yaml, so it shows as
-not validated. The ingest is the CLI pipeline for one source: crawl → embed → extract → resolve → judge.
-Every URL the crawler meets is written to `crawl_url` as it goes, for the live crawl graph.
+A source added from the UI keeps its config in the database (`source.config`), not in
+config/sources.yaml, so it shows as not validated. Either way, the crawl uses the rules edited in the UI
+(#79). The ingest is the CLI pipeline for one source: crawl → embed → extract → resolve → judge. Every URL
+the crawler meets is written to `crawl_url` as it goes, for the live crawl graph.
+
+The slow steps (crawl, embeddings, LLM extraction) run in memory; the source's pages, chunks and raw rows
+are then swapped in and resolved in one short transaction. So until the swap, search keeps serving the
+previous data, and a failure anywhere (more than half the pages failing extraction counts as a failure)
+leaves it untouched.
 
 - One ingest at a time (process-wide lock); the API answers 409 while one runs.
 - Server caps: MAX_PAGES pages, MAX_DEPTH link depth; robots.txt and the per-host delay as for every source.
 - Only public hosts: the start URL must resolve to public IP addresses, and with `follow_outbound` the
   crawler only follows links to host names, never to IP addresses or `localhost`.
-- A failure before resolve deletes the source's pages (and with them its chunks and raw rows), so no half
-  source is left; the source row stays, with status "failed" and the error, so the UI can show it.
+- On a failure the source row gets status "failed" and the error, so the UI can show it; a first-time
+  source then has no pages, a re-crawled one keeps its previous pages and facts.
 - resolve rebuilds the claims of every source, which resets every judge verdict, so the judge then runs
   on all sources, not only the new one (minutes on the shared DB). Judge errors do not fail the ingest.
 """
@@ -26,7 +33,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from navigator import chunks_db
-from navigator.sources import CrawlDefaults, SourceConfig
+from navigator.sources import CrawlDefaults, SourceConfig, SourcesFile
 
 log = logging.getLogger(__name__)
 
@@ -85,15 +92,19 @@ def finish() -> None:
     _lock.release()
 
 
+def _recover_interrupted(conn: psycopg.Connection) -> None:
+    """Called holding the slot, so no ingest runs: a source still 'crawling' was cut off by an API restart."""
+    conn.execute("UPDATE source SET status = 'failed', stage = NULL, error = 'interrupted: the API restarted' "
+                 "WHERE status = 'crawling'")
+
+
 def add_source(conn: psycopg.Connection, url: str, name: str | None, max_depth: int, max_pages: int,
                follow_outbound: bool) -> str:
     """Store the source with status 'crawling' and return its id. A failed source added from the UI with
     the same id is replaced; anything else gets a new id. Call it holding the ingest slot (try_start)."""
     url = url.strip()
     host = check_url(url)
-    # We hold the slot, so no ingest runs: a source still 'crawling' was cut off by an API restart
-    conn.execute("UPDATE source SET status = 'failed', stage = NULL, error = 'interrupted: the API restarted' "
-                 "WHERE status = 'crawling'")
+    _recover_interrupted(conn)
     rows = conn.execute("SELECT id, config IS NOT NULL AND status = 'failed' FROM source").fetchall()
     retry = source_id_for(host, set())
     reusable = dict(rows).get(retry, False)
@@ -125,64 +136,99 @@ def record_url(conn: psycopg.Connection, source_id: str):
     return on_url
 
 
-def embed_source(conn: psycopg.Connection, source_id: str) -> int:
-    """Chunk and embed the source's pages, as `navigator embed --source`."""
-    from navigator.chunk import chunk_page
-    from navigator.embed import embed_documents
+MAX_EXTRACT_FAILURES = 0.5  # share of pages whose extraction may fail (gateway errors) before the run fails
 
-    rows = [(page_id, i, text) for page_id, title, page_text in chunks_db.pages(conn, source_id)
-            for i, text in enumerate(chunk_page(title, page_text))]
-    vectors = embed_documents([text for _, _, text in rows])
-    chunks_db.replace_chunks(conn, source_id, [(*row, vec) for row, vec in zip(rows, vectors)])
-    return len(rows)
+
+def crawl_config(conn: psycopg.Connection, sources: SourcesFile, source_id: str) -> tuple[SourceConfig, int] | None:
+    """The source's crawl config with the stored rules (#79) and its link depth; None for an unknown source."""
+    from navigator.rules import with_stored
+
+    row = conn.execute("SELECT config FROM source WHERE id = %s", (source_id,)).fetchone()
+    if row is None:
+        return None
+    if row[0]:
+        return with_stored(conn, SourceConfig(**row[0]["source"])), row[0]["max_depth"]
+    try:
+        return with_stored(conn, sources.get(source_id)), sources.defaults.max_depth
+    except KeyError:
+        return None  # a source row without config and not in sources.yaml (e.g. removed from it)
+
+
+def start_recrawl(conn: psycopg.Connection, sources: SourcesFile, source_id: str) -> bool:
+    """Mark the source 'crawling' for a re-crawl; False for an unknown source. Call it holding the slot."""
+    if crawl_config(conn, sources, source_id) is None:
+        return False
+    _recover_interrupted(conn)
+    _set(conn, source_id, status="crawling", stage="crawl", error=None)
+    return True
+
+
+def _swap_in(conn: psycopg.Connection, source_id: str, pages: list, chunks: list, results: list,
+             exclude: list[str]) -> None:
+    """Replace the source's pages, chunks and raw rows with the new ones, block pages and resolve, in one
+    transaction. Pages, chunks and results carry the page's index in `pages` instead of its id."""
+    from dataclasses import replace
+
+    from navigator import db
+    from navigator.resolve import resolve
+    from navigator.rules import apply_blocks
+
+    with conn.transaction():
+        conn.execute("DELETE FROM page WHERE source_id = %s", (source_id,))  # cascades to chunks and raw rows
+        ids = [conn.execute("INSERT INTO page (source_id, url, title, text) VALUES (%s, %s, %s, %s) RETURNING id",
+                            (source_id, p.url, p.title, p.text)).fetchone()[0] for p in pages]
+        chunks_db.replace_chunks(conn, source_id, [(ids[i], o, text, vec) for i, o, text, vec in chunks])
+        db.replace_raw_extractions(conn, [replace(r, page_id=ids[r.page_id]) for r in results])
+        apply_blocks(conn, source_id, exclude)
+        resolve(conn)
 
 
 def run_ingest(database_url: str, source_id: str) -> None:
-    """The background ingest. Releases the ingest slot when done."""
-    from navigator import db
+    """The background ingest of a new or re-crawled source. Releases the ingest slot when done."""
+    from navigator.chunk import chunk_page
     from navigator.crawl import crawl_source
+    from navigator.embed import embed_documents
     from navigator.extract import extract_pages
     from navigator.judge import run_judge
     from navigator.llm import LLM
-    from navigator.resolve import resolve
-    from navigator.rules import apply_blocks, with_stored
     from navigator.settings import get_settings
+    from navigator.sources import load_sources
 
     settings = get_settings()
     try:
         with chunks_db.connect(database_url) as conn:
-            conn.autocommit = True  # each step and each crawl_url row is visible to the polling UI at once
+            conn.autocommit = True  # each stage and each crawl_url row is visible to the polling UI at once
             stage = "crawl"
             try:
-                cfg = conn.execute("SELECT config FROM source WHERE id = %s", (source_id,)).fetchone()[0]
-                source = with_stored(conn, SourceConfig(**cfg["source"]))  # rules edited in the UI (#79)
+                source, max_depth = crawl_config(conn, load_sources(settings.sources_file), source_id)
                 conn.execute("DELETE FROM crawl_url WHERE source_id = %s", (source_id,))
-                pages = asyncio.run(crawl_source(source, CrawlDefaults(max_depth=cfg["max_depth"]),
+                pages = asyncio.run(crawl_source(source, CrawlDefaults(max_depth=max_depth),
                                                  on_url=record_url(conn, source_id)))
                 # URLs still queued when the page cap was reached were never fetched
                 conn.execute("UPDATE crawl_url SET status = 'skipped' WHERE source_id = %s AND status = 'queued'",
                              (source_id,))
                 if not pages:
                     raise SourceError("No page with enough text: the site may need JavaScript, block us in robots.txt, or not be HTML")
-                db.replace_pages(conn, source_id, pages)
-                apply_blocks(conn, source_id, source.exclude_patterns)
 
                 stage = "embed"
                 _set(conn, source_id, stage=stage)
-                embed_source(conn, source_id)
+                rows = [(i, o, text) for i, p in enumerate(pages) for o, text in enumerate(chunk_page(p.title, p.text))]
+                vectors = embed_documents([text for _, _, text in rows])
+                chunks = [(*row, vec) for row, vec in zip(rows, vectors)]
 
                 stage = "extract"
                 _set(conn, source_id, stage=stage)
-                rows = db.pages_for_extraction(conn, source_id, None)
-                results = asyncio.run(extract_pages(LLM(settings, settings.extract_model), rows))
-                db.replace_raw_extractions(conn, results)
+                results = asyncio.run(extract_pages(LLM(settings, settings.extract_model),
+                                                    [(i, p.url, p.title, p.text) for i, p in enumerate(pages)]))
+                failed = sum(r.error is not None for r in results)
+                if failed > MAX_EXTRACT_FAILURES * len(results):
+                    raise SourceError(f"{failed} of {len(results)} pages failed (is the LLM gateway up?)")
 
                 stage = "resolve"
                 _set(conn, source_id, stage=stage)
-                resolve(conn)  # one transaction: on an error the old claims stay
+                _swap_in(conn, source_id, pages, chunks, results, source.exclude_patterns)
             except Exception as exc:
                 log.exception("ingest of %s failed at %s", source_id, stage)
-                conn.execute("DELETE FROM page WHERE source_id = %s", (source_id,))
                 _set(conn, source_id, status="failed", stage=None, error=f"{stage}: {exc}"[:500])
                 return
 

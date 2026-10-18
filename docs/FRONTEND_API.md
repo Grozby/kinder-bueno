@@ -188,7 +188,7 @@ with actions to block or prioritise pages.
   else `team` when most shown claims are about people, else `other`. Feedback counts 👍/👎 on entities
   with a shown claim on the page. `blocked_by` / `prioritised_by` read the source's current rules (#79).
   A blocked page keeps its counts here, so the table still shows what blocking it hides.
-- Served since #79: `GET`/`PUT /api/sources/{id}/rules`. Not served yet (the mock answers): re-crawl (#80).
+- Served since #79: `GET`/`PUT /api/sources/{id}/rules`; since #80: `POST /api/sources/{id}/crawl`.
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
@@ -196,7 +196,7 @@ with actions to block or prioritise pages.
 | GET | `/api/pages/{id}` | – | `PageDetail` = `ResourcePage` + `facts: PageFact[]` |
 | GET | `/api/sources/{id}/rules` | – | `CrawlRules` |
 | PUT | `/api/sources/{id}/rules` | `{allow_hosts, include_patterns, exclude_patterns, priority_patterns}` | `CrawlRules` |
-| POST | `/api/sources/{id}/crawl` | – | `Source` with `status: "crawling"` (re-crawl + embed) |
+| POST | `/api/sources/{id}/crawl` | – | `Source` with `status: "crawling"` (re-crawl and ingest, #80) |
 
 **Page score (0–100)**, from data that already exists. `score_breakdown` holds the four parts as
 `ScoreItem`s (criterion, 0–100, one-sentence rationale), in this order:
@@ -232,6 +232,14 @@ Expected behaviour:
 - Rules are stored in the database (`source_rules`), not lost on restart. `changed_at` is set on every
   PUT (`null` while the defaults apply); when it is newer than the source's `last_crawled_at`, the UI
   offers a re-crawl. Include, priority and host rules only change the next crawl.
+- **Re-crawl** (`POST /api/sources/{id}/crawl`, #80): the same background ingest as adding a source, with
+  the source's current rules (stored, else `sources.yaml`; its own page budget; priority patterns first),
+  and `stage` / `discovered` as there. `404` for an unknown source, `409` while another ingest runs.
+  The crawl, embeddings and extraction run in memory; pages, chunks and facts are swapped in at the end,
+  in one transaction. So search serves the previous data until then, and a failed run (including more than
+  half the pages failing extraction) keeps it: `status: "failed"`, previous pages and facts intact.
+  `last_crawled_at` moves on success. Pages excluded by the rules are not fetched, so they leave `GET
+  /api/pages`. The judge then re-checks every source (resolve rebuilds all claims): minutes.
 - `422` names the list and the pattern that does not compile (`exclude_patterns: invalid regex '(x': …`),
   or says `allow_hosts` is empty for a source that has no host regex. `404` for an unknown source.
 - **Shared backend:** a block hides facts for every teammate at once.
