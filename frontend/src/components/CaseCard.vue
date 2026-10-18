@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { FileText, History, MessageSquare, RotateCcw, TriangleAlert } from '@lucide/vue'
+import { FileText, History, RotateCcw, TriangleAlert } from '@lucide/vue'
 import { computed } from 'vue'
 
 import type { Case, CaseStatus } from '@/api'
-import { scoreBand, timeAgo } from '@/utils/format'
+import { scoreBand } from '@/utils/format'
 import ScoreRing from './ScoreRing.vue'
 import BaseButton from './ui/BaseButton.vue'
 
@@ -51,10 +51,6 @@ function onDragStart(e: DragEvent) {
         <p class="file">
           <FileText :size="14" />
           <span class="file-name">{{ item.file_name }}</span>
-          <span>· {{ timeAgo(item.uploaded_at) }}</span>
-          <span v-if="item.notes_count" class="notes" :title="`${item.notes_count} notes`">
-            · <MessageSquare :size="14" /> {{ item.notes_count }}
-          </span>
         </p>
       </div>
       <!-- The reviewer's score leads once there is one; the AI score stays visible -->
@@ -226,12 +222,6 @@ h3 {
   font-size: 13px;
   color: var(--text-muted);
   white-space: nowrap;
-}
-
-.notes {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
 }
 
 /* One row: the industry tag, then the similar earlier case as a quiet link */

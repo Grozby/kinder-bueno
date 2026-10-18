@@ -36,7 +36,8 @@ onMounted(() => {
         </span>
       </RouterLink>
 
-      <nav>
+      <!-- While the discarded pop-up is open, it is the active entry, not the pipeline under it -->
+      <nav :class="{ discarding: store.showDiscarded }">
         <RouterLink to="/" title="Pipeline">
           <LayoutGrid :size="18" />
           <span>Pipeline</span>
@@ -45,6 +46,16 @@ onMounted(() => {
           <Database :size="18" />
           <span>Sources</span>
         </RouterLink>
+        <button
+          class="nav-item"
+          :class="{ active: store.showDiscarded }"
+          title="Discarded cases: restore a card from here"
+          @click="openDiscarded"
+        >
+          <Archive :size="18" />
+          <span>Discarded</span>
+          <span class="count">{{ store.byStatus.rejected.length }}</span>
+        </button>
       </nav>
 
       <div class="sidebar-foot">
@@ -56,21 +67,12 @@ onMounted(() => {
           Demo data
         </span>
         <button
-          class="discarded"
-          title="Discarded cases: restore a card from here"
-          @click="openDiscarded"
-        >
-          <Archive :size="15" />
-          <span>Discarded</span>
-          <span class="count">{{ store.byStatus.rejected.length }}</span>
-        </button>
-        <button
           v-if="reviewerName"
           class="user"
           title="Your name, shown with your scores and notes. Click to change."
           @click="askReviewerName"
         >
-          <UserRound :size="15" />
+          <UserRound :size="16" />
           <span>{{ reviewerName }}</span>
         </button>
       </div>
@@ -134,26 +136,54 @@ nav {
   flex-direction: column;
   gap: 0.25rem;
 }
-nav a {
+nav a,
+.nav-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 0.75rem;
+  border: 0;
   border-left: 3px solid transparent;
   border-radius: 0 var(--radius) var(--radius) 0;
+  background: transparent;
   color: var(--text-muted);
+  font: inherit;
   font-weight: 600;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
-nav a:hover {
+nav a:hover,
+.nav-item:hover {
   background: var(--surface-alt);
   color: var(--text);
 }
-nav a.router-link-exact-active {
+nav a.router-link-exact-active,
+.nav-item.active {
   background: var(--bern-red-tint);
   border-left-color: var(--bern-red);
   color: var(--text);
 }
+nav.discarding a.router-link-exact-active {
+  background: transparent;
+  border-left-color: transparent;
+  color: var(--text-muted);
+}
+.nav-item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.nav-item .count {
+  min-width: 24px;
+  margin-left: auto;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--text);
+  color: #fff;
+  text-align: center;
+  font-size: 14px;
+}
+
 .sidebar-foot {
   margin-top: auto;
   display: flex;
@@ -193,36 +223,6 @@ nav a.router-link-exact-active {
 .user:focus-visible {
   outline: 2px solid var(--focus);
 }
-.discarded {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.discarded:hover {
-  border-color: var(--text);
-  color: var(--text);
-}
-.discarded:focus-visible {
-  outline: 2px solid var(--focus);
-}
-.discarded .count {
-  min-width: 20px;
-  padding: 0 0.3rem;
-  border-radius: var(--radius);
-  background: var(--text);
-  color: #fff;
-  text-align: center;
-  font-size: 14px;
-}
 
 main {
   min-width: 0;
@@ -246,7 +246,7 @@ main {
   }
   .brand-text,
   nav a span,
-  .discarded > span:not(.count),
+  .nav-item > span:not(.count),
   .user span,
   .demo {
     display: none;
@@ -254,9 +254,13 @@ main {
   .sidebar-foot {
     justify-content: center;
   }
-  nav a {
+  nav a,
+  .nav-item {
     justify-content: center;
     padding: 0.65rem;
+  }
+  .nav-item .count {
+    margin-left: 0;
   }
 }
 </style>
