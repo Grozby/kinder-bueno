@@ -11,6 +11,7 @@ import yaml
 
 from navigator.eval_judge import Verdict, judge_all, log_rows, precision
 from navigator.expand import Expansion, expand_query
+from navigator.judge import JUDGED_FIELDS
 from navigator.llm import LLM
 from navigator.models import Result
 from navigator.rank import MAX_RESULTS, rank_entities
@@ -123,7 +124,9 @@ def _db_rows(conn: psycopg.Connection) -> dict:
         ).fetchall(),
         "raw": dict(conn.execute("SELECT verified, count(*) FROM raw_claim GROUP BY verified").fetchall()),
         "verdicts": conn.execute(
-            "SELECT coalesce(judge_verdict, 'not judged'), count(*) FROM claim WHERE verified GROUP BY 1 ORDER BY 1"
+            "SELECT coalesce(judge_verdict, 'not judged'), count(*) FROM claim "
+            "WHERE verified AND field = ANY(%s) GROUP BY 1 ORDER BY 1",
+            (list(JUDGED_FIELDS),),
         ).fetchall(),
         "feedback": conn.execute("SELECT rating, count(*) FROM feedback GROUP BY rating ORDER BY rating").fetchall(),
     }
@@ -194,7 +197,7 @@ def report(
               f"{_pct(db['raw'].get(False, 0) / raw_total if raw_total else None)} ({db['raw'].get(False, 0)} / {raw_total}) | report |"]
     lines += ["", "## Source coverage", "", "| source | pages | entities | shown claims |", "|---|---|---|---|"]
     lines += [f"| {s} | {p} | {e} | {c} |" for s, p, e, c in db["coverage"]]
-    lines += ["", "## Judge verdicts [PoC] (verified claims)", "", "| verdict | claims |", "|---|---|"]
+    lines += ["", "## Claim judge verdicts [PoC] (verified expertise, description, bio, unit_type claims; plan 7.8)", "", "| verdict | claims |", "|---|---|"]
     lines += [f"| {v} | {n} |" for v, n in db["verdicts"]] or ["| – | 0 |"]
     lines += ["", "## Feedback [PoC]", "", "| rating | count |", "|---|---|"]
     lines += [f"| {r} | {n} |" for r, n in db["feedback"]] or ["| – | 0 |"]

@@ -114,3 +114,21 @@ def stats(conn: psycopg.Connection) -> list[tuple]:
         ORDER BY s.id
         """
     ).fetchall()
+
+
+def judge_counts(conn: psycopg.Connection) -> list[tuple]:
+    """Claim judge verdicts per source (plan 7.8): (source, table, verdict or 'not judged', count)."""
+    return conn.execute(
+        """
+        SELECT p.source_id, 'claim', coalesce(c.judge_verdict, 'not judged'), count(*)
+        FROM claim c JOIN page p ON p.id = c.page_id
+        WHERE c.verified AND c.field IN ('expertise', 'description', 'bio', 'unit_type')
+        GROUP BY 1, 3
+        UNION ALL
+        SELECT p.source_id, 'relation', coalesce(r.judge_verdict, 'not judged'), count(*)
+        FROM relation r JOIN page p ON p.id = r.page_id
+        WHERE r.verified
+        GROUP BY 1, 3
+        ORDER BY 1, 2, 3
+        """
+    ).fetchall()

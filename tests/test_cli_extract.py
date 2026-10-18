@@ -1,4 +1,4 @@
-"""`navigator extract` runs resolve afterwards unless --no-resolve. No DB or LLM: both are faked."""
+"""`navigator extract` runs resolve, then the claim judge, unless turned off. No DB or LLM: both are faked."""
 
 from collections import Counter
 from contextlib import contextmanager
@@ -30,13 +30,14 @@ def fakes(monkeypatch):
     monkeypatch.setattr(cli, "extract_pages", extract_pages)
     monkeypatch.setattr(cli, "LLM", lambda *a, **k: "llm")  # no API key needed (CI, worktrees without .env)
     monkeypatch.setattr(cli, "run_resolve", lambda conn: calls.append("resolve") or Counter(claims=3))
+    monkeypatch.setattr(cli, "_run_judge", lambda conn, settings, source: calls.append("judge"))
     return calls
 
 
 def test_extract_runs_resolve_by_default(fakes):
     result = runner.invoke(cli.app, ["extract"])
     assert result.exit_code == 0, result.output
-    assert fakes == ["extract", "store", "resolve"]
+    assert fakes == ["extract", "store", "resolve", "judge"]  # resolve resets verdicts, so judge comes last
     assert "claims" in result.output
 
 
@@ -44,3 +45,21 @@ def test_extract_no_resolve(fakes):
     result = runner.invoke(cli.app, ["extract", "--no-resolve"])
     assert result.exit_code == 0, result.output
     assert fakes == ["extract", "store"]
+
+
+def test_extract_no_judge(fakes):
+    result = runner.invoke(cli.app, ["extract", "--no-judge"])
+    assert result.exit_code == 0, result.output
+    assert fakes == ["extract", "store", "resolve"]
+
+
+def test_extract_judge_disabled_by_setting(fakes, monkeypatch):
+    monkeypatch.setenv("JUDGE_ENABLED", "false")
+    cli.get_settings.cache_clear()
+    try:
+        result = runner.invoke(cli.app, ["extract"])
+    finally:
+        monkeypatch.delenv("JUDGE_ENABLED")
+        cli.get_settings.cache_clear()
+    assert result.exit_code == 0, result.output
+    assert fakes == ["extract", "store", "resolve"]

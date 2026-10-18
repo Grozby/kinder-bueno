@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     explain_model: str | None = None  # model for "why it matches" (plan 8.6); defaults to llm_model
     llm_concurrency: int = 8
     judge_enabled: bool = True
+    judge_model: str | None = None  # model for the claim judge (plan 7.8); defaults to llm_model
     embed_model: str = "BAAI/bge-m3"
     database_url: str = "postgresql://navigator:navigator@localhost:5432/navigator"
     api_token: str = ""  # when set, /api requires `Authorization: Bearer <token>`
