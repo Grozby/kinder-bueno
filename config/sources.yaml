@@ -4,16 +4,23 @@ defaults:
   timeout_seconds: 20
   max_depth: 3
 
+# Priority patterns decide what the page budget is spent on: they must be narrow.
+# A broad pattern (like '/research/') matches everything and the crawl spends
+# the whole budget on the first labs it finds.
+
 sources:
   - id: artorg
     name: "ARTORG Center for Biomedical Engineering Research"
     seeds:
       - https://www.artorg.unibe.ch/research/index_eng.html
-      - https://www.artorg.unibe.ch/index_eng.html
+      - https://www.artorg.unibe.ch/services/index_eng.html
     allow_hosts: ["www.artorg.unibe.ch"]
     include_patterns: ['index_eng\.html$']
-    exclude_patterns: ['/news_and_events/', '/studies/', '/jobs/', '/open_positions/', '/publications/']
-    priority_patterns: ['/group_members/', '/persons/', '/research/', '/facilities/', '/services/']
+    exclude_patterns: ['/news_and_events/', '/studies/', '/jobs/', '/job_vacancies/', '/open_positions/', '/publications/', '/teaching/', '/msc_thesis_projects/', '/about_us/']
+    priority_patterns:
+      - '^https://www\.artorg\.unibe\.ch/research/[a-z0-9_]+/index_eng\.html$'                # lab overview
+      - '^https://www\.artorg\.unibe\.ch/research/[a-z0-9_]+/group_members/index_eng\.html$'  # names, roles, emails
+      - '^https://www\.artorg\.unibe\.ch/services/[a-z0-9_]+/index_eng\.html$'                # infrastructure
     max_pages: 45
 
   - id: dcb
@@ -22,21 +29,25 @@ sources:
       - https://www.dcberne.com/en/team/
       - https://www.dcberne.com/en/projects/
       - https://www.dcberne.com/en/focus-areas/
-      - https://www.dcberne.com/en/
+      - https://www.dcberne.com/en/offering/
     allow_hosts: ["www.dcberne.com"]
     include_patterns: ['^https://www\.dcberne\.com/en/']
-    exclude_patterns: ['/wp-json/', '/wp-content/', '/feed/', '/category/press-release/', '/newsletters/', '/career/', '/data-protection-statement/', '/legal-notice/', '\?']
-    priority_patterns: ['/team/', '/projects/', '/focus-areas/', '/offering/', '/innovation/', '/reserach/']
+    exclude_patterns: ['/wp-json/', '/wp-content/', '/feed/', '/category/', '/page/[0-9]+/', '/newsletters/', '/career/', '/data-protection-statement/', '/legal-notice/', '/community/', '/media/', '/get-involved/', '/dcb-foundation/', '/vision-mission/', '/contact/', '/news/', '\?']
+    priority_patterns: ['/en/project/', '/en/project_category/', '/innovation/$', '/partners-network/$']
     max_pages: 30
 
   - id: unibe
     name: "University of Bern"
+    # Fallback seeds (no subdomain inventory): biomedical research labs and clusters.
     seeds:
-      - https://www.medizin.unibe.ch/index_eng.html
-      - https://www.unibe.ch/facultiesinstitutes/index_eng.html
-    allow_hosts_regex: '^[a-z0-9.-]+\.unibe\.ch$'
-    deny_hosts: ["www.artorg.unibe.ch", "intern.unibe.ch", "karriere.unibe.ch", "teachinghub.unibe.ch", "mediarelations.unibe.ch", "www.ub.unibe.ch"]
+      - https://www.dbmr.unibe.ch/research/research_programs/index_eng.html
+      - https://www.cvrc.unibe.ch/index_eng.html
+      - https://www.sitem.unibe.ch/index_eng.html
+    allow_hosts: ["www.dbmr.unibe.ch", "www.cvrc.unibe.ch", "www.sitem.unibe.ch"]
     include_patterns: ['index_eng\.html$']
-    exclude_patterns: ['/news', '/studies/', '/studium/', '/jobs/', '/legal_notice/', '/imprint/']
-    priority_patterns: ['/research', '/forschung', '/team', '/persons/', '/group', '/institute', '/departement', '/department']
+    exclude_patterns: ['/news', '/media_release', '/studies/', '/jobs/', '/legal_notice/', '/imprint/', '/publications/', '/boris_portal', '_award', '_prize', '/events/', '/seminars', '/conferences']
+    priority_patterns:
+      - '/research_programs/[a-z0-9_]+/index_eng\.html$'        # lab overview
+      - '/research_programs/[a-z0-9_]+/team/index_eng\.html$'   # names, roles
+      - '^https://www\.(cvrc|sitem)\.unibe\.ch/[a-z0-9_]+/index_eng\.html$'
     max_pages: 25

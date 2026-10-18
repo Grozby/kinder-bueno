@@ -139,52 +139,14 @@ All three sources are treated as one information ecosystem. Each source is one b
 
 Budgets live in config (`max_pages`). Scale to ~2000 total later by changing config only.
 
-### 4.3 `config/sources.yaml` (create exactly this, then tune)
+### 4.3 `config/sources.yaml`
 
-```yaml
-defaults:
-  user_agent: "HackApertus-ExpertiseNavigator/0.1 (research prototype; contact: team)"
-  delay_seconds: 1.0          # per host
-  timeout_seconds: 20
-  max_depth: 3
+The live file is `config/sources.yaml`. Lessons from the first crawl (already applied there):
 
-sources:
-  - id: artorg
-    name: "ARTORG Center for Biomedical Engineering Research"
-    seeds:
-      - https://www.artorg.unibe.ch/research/index_eng.html
-      - https://www.artorg.unibe.ch/index_eng.html
-    allow_hosts: ["www.artorg.unibe.ch"]
-    include_patterns: ['index_eng\.html$']
-    exclude_patterns: ['/news_and_events/', '/studies/', '/jobs/', '/open_positions/', '/publications/']
-    priority_patterns: ['/group_members/', '/persons/', '/research/', '/facilities/', '/services/']
-    max_pages: 45
-
-  - id: dcb
-    name: "Diabetes Center Berne"
-    seeds:
-      - https://www.dcberne.com/en/team/
-      - https://www.dcberne.com/en/projects/
-      - https://www.dcberne.com/en/focus-areas/
-      - https://www.dcberne.com/en/
-    allow_hosts: ["www.dcberne.com"]
-    include_patterns: ['^https://www\.dcberne\.com/en/']
-    exclude_patterns: ['/wp-json/', '/wp-content/', '/feed/', '/category/press-release/', '/newsletters/', '/career/', '/data-protection-statement/', '/legal-notice/', '\?']
-    priority_patterns: ['/team/', '/projects/', '/focus-areas/', '/offering/', '/innovation/', '/reserach/']
-    max_pages: 30
-
-  - id: unibe
-    name: "University of Bern"
-    seeds:
-      - https://www.medizin.unibe.ch/index_eng.html
-      - https://www.unibe.ch/facultiesinstitutes/index_eng.html
-    allow_hosts_regex: '^[a-z0-9.-]+\.unibe\.ch$'
-    deny_hosts: ["www.artorg.unibe.ch", "intern.unibe.ch", "karriere.unibe.ch", "teachinghub.unibe.ch", "mediarelations.unibe.ch", "www.ub.unibe.ch"]
-    include_patterns: ['index_eng\.html$']
-    exclude_patterns: ['/news', '/studies/', '/studium/', '/jobs/', '/legal_notice/', '/imprint/']
-    priority_patterns: ['/research', '/forschung', '/team', '/persons/', '/group', '/institute', '/departement', '/department']
-    max_pages: 25
-```
+- **Priority patterns must be narrow and anchored to the site root.** A broad pattern like `/research/` matched every page, so the whole budget went to the first 2 labs. With anchored patterns, the crawl now gets every lab overview, every member list and every service page first.
+- **UniBE fallback seeds:** `www.medizin.unibe.ch` led mostly to psychiatry and admin pages. The working seeds are DBMR research programs (~40 biomedical labs, incl. cardiology), the Cardiovascular Research Cluster (`www.cvrc.unibe.ch`) and sitem-insel (`www.sitem.unibe.ch`). Hosts are an explicit allow list.
+- **DCB:** paginated news listings (`/category/`, `/page/N/`) are excluded; project pages are priority.
+- **ARTORG IGT** (image-guided therapy) is a *former* chair. Its member list is not linked and is not crawled on purpose (outdated people would break the accuracy rule). The surgery use case uses AIMI (surgical instrument tracking) and ARSL (surgical robotics) instead.
 
 ---
 
@@ -235,7 +197,7 @@ Delete the placeholder `main.py`.
 ### Dependencies (`uv add ...`)
 
 ```
-httpx[http2] trafilatura selectolax psycopg[binary] pgvector sentence-transformers
+httpx[http2] selectolax psycopg[binary] pgvector sentence-transformers
 openai pydantic pydantic-settings pyyaml typer streamlit tenacity unidecode rapidfuzz
 ```
 
@@ -405,9 +367,9 @@ Entities with no verified claims left after a re-ingest SHOULD be deleted by a c
 
 ### 7.3 Clean (`clean.py`)
 
-1. Main text: `trafilatura.extract(html, include_links=False, include_tables=True, favor_recall=True)`. If the result is shorter than 200 characters, fall back to the full visible text from `selectolax` (drop `script`, `style`, `nav`, `footer`, `header`).
+1. Main text: visible text of the main container (`main`, `[role=main]`, `#main-content`, `#main`, `#content`, `article`, else `body`) with `selectolax`, after dropping `script`, `style`, `nav`, `header`, `footer`, `form`, `svg`, `iframe`, `button`. One line per text block. **Do not use trafilatura:** on team pages it dropped almost all names and emails (DCB team page: 597 of 4,243 characters kept).
 2. **Decode hidden emails.** In the raw HTML, find `String.fromCharCode(<numbers>)` and decode to characters. Also find plain `mailto:` links. Ignore `mailto:?body=` share links.
-3. Find the visible link text for each email when possible. Append to the cleaned text a section:
+3. If the link text is not the email (DCB shows "Mail"), replace the link text with the email **inline**, so the name, role and email stay together in one quotable block. Emails that are not in the main text are appended in a section:
    ```
    Contact emails on this page:
    - <link text or "email">: <email>

@@ -25,6 +25,17 @@ def init_db(conn: psycopg.Connection, sources: SourcesFile) -> None:
             )
 
 
+def replace_pages(conn: psycopg.Connection, source_id: str, pages: list) -> None:
+    """Delete a source's old pages (cascades to chunks and claims), then store the new ones."""
+    with conn.transaction():
+        conn.execute("DELETE FROM page WHERE source_id = %s", (source_id,))
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO page (source_id, url, title, text) VALUES (%s, %s, %s, %s)",
+                [(source_id, p.url, p.title, p.text) for p in pages],
+            )
+
+
 def stats(conn: psycopg.Connection) -> list[tuple]:
     """Counts per source: pages, chunks, entities with verified claims, verified claims."""
     return conn.execute(
