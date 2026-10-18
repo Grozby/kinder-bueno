@@ -19,7 +19,7 @@ async function openDiscarded() {
   store.showDiscarded = true
 }
 
-// Load the cases at start, so the discarded count is right on every page
+// Load the cases at start, whichever page opens first
 onMounted(() => {
   if (!store.cases.length) store.load()
 })
@@ -54,7 +54,6 @@ onMounted(() => {
         >
           <Archive :size="18" />
           <span>Discarded</span>
-          <span class="count">{{ store.byStatus.rejected.length }}</span>
         </button>
       </nav>
 
@@ -173,17 +172,6 @@ nav.discarding a.router-link-exact-active {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
-.nav-item .count {
-  min-width: 24px;
-  margin-left: auto;
-  padding: 0 0.4rem;
-  border-radius: 999px;
-  background: var(--text);
-  color: #fff;
-  text-align: center;
-  font-size: 0.875rem;
-}
-
 .sidebar-foot {
   margin-top: auto;
   display: flex;
