@@ -74,9 +74,9 @@ def parse_verdicts(data: dict, entity_ids: set[int]) -> dict[int, Verdict]:
 async def _judge_one(llm: LLM, query: str, result: Result, timeout: float) -> dict[int, Verdict]:
     user = f"Query: {query}\nResults:\n{format_results([result])}"
     try:
-        data = await asyncio.wait_for(llm.chat_json(SYSTEM, user, max_tokens=300), timeout)
+        data = await llm.chat_json(SYSTEM, user, max_tokens=300, timeout=timeout)  # per request (#148)
     except Exception as e:  # LLM, network or timeout: this result is left out of the mean
-        log.warning("eval judge failed for %r, %s: %s", query, result.name, e or type(e).__name__)
+        log.warning("eval judge failed for %r, %s: %s %s", query, result.name, type(e).__name__, e)
         return {}
     return parse_verdicts(data, {result.entity_id})
 

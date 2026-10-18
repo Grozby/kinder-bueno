@@ -30,9 +30,9 @@ class FakeLLM:
         self.answer, self.error, self.delay = answer, error, delay
         self.prompts: list[str] = []
 
-    async def chat_json(self, system: str, user: str, max_tokens: int = 4096) -> dict:
+    async def chat_json(self, system: str, user: str, max_tokens: int = 4096, timeout: float | None = None) -> dict:
         self.prompts.append(user)
-        await asyncio.sleep(self.delay)
+        await asyncio.wait_for(asyncio.sleep(self.delay), timeout)  # like LLM: the timeout is per request
         if self.error:
             raise self.error
         return self.answer

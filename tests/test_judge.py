@@ -26,7 +26,7 @@ class FakeLLM:
         self.answer, self.error = answer, error
         self.prompts: list[str] = []
 
-    async def chat_json(self, system: str, user: str, max_tokens: int = 4096) -> dict:
+    async def chat_json(self, system: str, user: str, max_tokens: int = 4096, timeout: float | None = None) -> dict:
         self.prompts.append(user)
         if self.error:
             raise self.error

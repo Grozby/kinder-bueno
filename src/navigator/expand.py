@@ -73,7 +73,7 @@ async def expand_query(llm: LLM, query: str, timeout: float = TIMEOUT) -> Expans
     try:
         data = await asyncio.wait_for(llm.chat_json(SYSTEM, f"Query: {query}", max_tokens=400), timeout)
     except Exception as e:  # LLM, network or timeout: never fail the search because of expansion
-        log.warning("query expansion failed for %r: %s", query, e or type(e).__name__)
+        log.warning("query expansion failed for %r: %s %s", query, type(e).__name__, e)
         return Expansion()
     expansion = parse_expansion(data, query)
     _cache[key] = expansion

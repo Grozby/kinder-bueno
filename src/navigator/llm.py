@@ -57,16 +57,16 @@ class LLM:
         stop=stop_after_attempt(5),
         reraise=True,
     )
-    async def _complete(self, messages: list[dict], max_tokens: int) -> str:
-        async with self.semaphore:
+    async def _complete(self, messages: list[dict], max_tokens: int, timeout: float | None = None) -> str:
+        async with self.semaphore:  # the timeout starts here: time spent waiting for a slot does not count (#148)
             try:
-                return await self._stream(messages, max_tokens)
+                return await asyncio.wait_for(self._stream(messages, max_tokens), timeout)
             except openai.BadRequestError:
                 if not self.json_mode:
                     raise
                 log.warning("gateway rejected JSON mode; continuing without it")
                 self.json_mode = False
-                return await self._stream(messages, max_tokens)
+                return await asyncio.wait_for(self._stream(messages, max_tokens), timeout)
 
     async def _stream(self, messages: list[dict], max_tokens: int) -> str:
         """Streaming keeps the gateway connection busy: long answers otherwise end in 504 timeouts."""
@@ -86,11 +86,15 @@ class LLM:
             log.warning("answer cut off at max_tokens=%d", max_tokens)
         return "".join(parts)
 
-    async def chat_json(self, system: str, user: str, max_tokens: int = 4096) -> dict:
-        """One JSON-object answer. A response that does not parse is retried once."""
+    async def chat_json(self, system: str, user: str, max_tokens: int = 4096, timeout: float | None = None) -> dict:
+        """One JSON-object answer. A response that does not parse is retried once.
+
+        `timeout` limits each request once it has an LLM_CONCURRENCY slot, so batch jobs (claim judge, eval judge)
+        do not time out while queued (#148). Interactive calls that must answer within a wall-clock budget (query
+        expansion, explanations, case reading) wrap the call in asyncio.wait_for instead, queue time included."""
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         for attempt in (1, 2):
-            text = await self._complete(messages, max_tokens)
+            text = await self._complete(messages, max_tokens, timeout)
             try:
                 return parse_json_object(text)
             except LLMError:
