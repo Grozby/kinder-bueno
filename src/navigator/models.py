@@ -1,5 +1,6 @@
 """API data models (plan 8.8, 8.9). `frontend/src/api/types.ts` mirrors them: keep both in sync."""
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
@@ -78,3 +79,28 @@ class FeedbackRequest(BaseModel):
 
 class FeedbackResponse(BaseModel):
     ok: bool = True
+
+
+SourceStatus = Literal["ready", "crawling", "failed"]
+PageStatus = Literal["queued", "crawled", "skipped", "failed"]
+
+
+class CrawledPage(BaseModel):
+    url: str
+    parent: str | None          # page that linked here; not stored yet (#55), so None
+    depth: int                  # not stored yet (#55), so 0
+    status: PageStatus
+
+
+class Source(BaseModel):
+    """A crawled website (docs/FRONTEND_API.md "Sources")."""
+    id: str
+    name: str
+    root_url: str               # first seed in config/sources.yaml
+    validated: bool             # listed in config/sources.yaml
+    status: SourceStatus
+    pages: int
+    entities: int               # entities with at least one shown claim, as in /api/stats
+    verified_claims: int        # shown claims, as SourceStats.shown_claims
+    last_crawled_at: datetime | None
+    discovered: list[CrawledPage]  # a sample of the stored pages, for the graph

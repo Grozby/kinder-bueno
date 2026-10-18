@@ -18,6 +18,7 @@ from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
 from navigator.llm import LLM
 from navigator.models import (
+    CrawledPage,
     EntityType,
     Expansion,
     FeedbackCounts,
@@ -25,12 +26,14 @@ from navigator.models import (
     FeedbackResponse,
     Result,
     SearchResponse,
+    Source,
     SourceStats,
     StatsResponse,
 )
 from navigator.rank import rank_entities
 from navigator.results import build_results, shown
 from navigator.settings import get_settings
+from navigator.sources import load_sources
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +89,13 @@ def get_explain(request: Request) -> Callable[[str, list[Result]], dict[int, str
     return lambda q, results: anyio.from_thread.run(explain_results, llm, q, results)
 
 
+def get_seeds() -> dict[str, str]:
+    """First seed URL per source in config/sources.yaml (the validated sources)."""
+    return {s.id: s.seeds[0] for s in load_sources(get_settings().sources_file).sources}
+
+
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
+Seeds = Annotated[dict[str, str], Depends(get_seeds)]
 Embed = Annotated[Callable[[str], np.ndarray], Depends(get_embed)]
 Expand = Annotated[Callable[[str], TermExpansion], Depends(get_expand)]
 Explain = Annotated[Callable[[str, list[Result]], dict[int, str]], Depends(get_explain)]
@@ -179,3 +188,55 @@ def feedback(conn: Conn, body: FeedbackRequest) -> FeedbackResponse:
         (body.session_id, body.query, body.entity_id, body.claim_id, entity[0], claim_text, body.rating, body.comment),
     )
     return FeedbackResponse()
+
+
+DISCOVERED_SAMPLE = 60  # pages per source for the crawl graph
+
+
+def _sources(conn: psycopg.Connection, seeds: dict[str, str], source_id: str | None = None) -> list[Source]:
+    """Sources with the /api/stats counts; all of them, or the one with `source_id`."""
+    rows = conn.execute(
+        f"""
+        SELECT s.id, s.name,
+               count(DISTINCT p.id),
+               count(DISTINCT cl.entity_id) FILTER (WHERE {shown("cl")}),
+               count(DISTINCT cl.id) FILTER (WHERE {shown("cl")}),
+               max(p.fetched_at)
+        FROM source s
+        LEFT JOIN page p   ON p.source_id = s.id
+        LEFT JOIN claim cl ON cl.page_id = p.id
+        WHERE %(id)s::text IS NULL OR s.id = %(id)s
+        GROUP BY s.id
+        ORDER BY s.id
+        """,
+        {"id": source_id},
+    ).fetchall()
+    discovered: dict[str, list[CrawledPage]] = {r[0]: [] for r in rows}
+    for sid, url in conn.execute(
+        "SELECT source_id, url FROM (SELECT source_id, url, row_number() OVER (PARTITION BY source_id ORDER BY id) n "
+        "FROM page WHERE source_id = ANY(%s)) p WHERE n <= %s ORDER BY source_id, n",
+        (list(discovered), DISCOVERED_SAMPLE),
+    ):
+        discovered[sid].append(CrawledPage(url=url, parent=None, depth=0, status="crawled"))
+    return [
+        Source(
+            id=sid, name=name, root_url=seeds.get(sid) or next((d.url for d in discovered[sid]), ""),
+            validated=sid in seeds, status="ready", pages=pages, entities=entities, verified_claims=claims,
+            last_crawled_at=crawled, discovered=discovered[sid],
+        )
+        for sid, name, pages, entities, claims, crawled in rows
+    ]
+
+
+@app.get("/api/sources")
+def list_sources(conn: Conn, seeds: Seeds) -> list[Source]:
+    """All crawled sources with their counts (status is always "ready" until POST /api/sources, #55)."""
+    return _sources(conn, seeds)
+
+
+@app.get("/api/sources/{source_id}")
+def get_source(conn: Conn, seeds: Seeds, source_id: str) -> Source:
+    found = _sources(conn, seeds, source_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return found[0]
