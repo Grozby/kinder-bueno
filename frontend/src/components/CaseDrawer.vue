@@ -20,6 +20,7 @@ import {
   Sparkles,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   TriangleAlert,
   User,
   X,
@@ -63,6 +64,10 @@ const refsError = ref<string | null>(null)
 const pitchLoading = ref(false)
 const pitchError = ref<string | null>(null)
 const copied = ref(false)
+// Deleting asks first, inline in the drawer (not a second modal, so Escape keeps closing the drawer)
+const confirmDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref<string | null>(null)
 
 const refs = computed(() => (props.item ? (store.references[props.item.id] ?? []) : []))
 const selectedIds = computed(() => new Set(props.item ? (store.selected[props.item.id] ?? []) : []))
@@ -133,6 +138,29 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => props.item?.id,
+  () => {
+    confirmDelete.value = false
+    deleteError.value = null
+  },
+)
+
+async function deleteCase() {
+  if (!props.item) return
+  deleting.value = true
+  deleteError.value = null
+  try {
+    await store.remove(props.item.id) // the board drops the card, which closes the drawer
+    confirmDelete.value = false
+    emit('close')
+  } catch (e) {
+    deleteError.value = (e as Error).message
+  } finally {
+    deleting.value = false
+  }
+}
+
 async function generate() {
   if (!props.item) return
   pitchLoading.value = true
@@ -200,6 +228,15 @@ async function copyPitch() {
         </div>
         <div class="actions">
           <BaseButton
+            variant="ghost"
+            :icon="Trash2"
+            :aria-expanded="confirmDelete"
+            title="Delete this case and everything stored for it"
+            @click="confirmDelete = !confirmDelete"
+          >
+            Delete
+          </BaseButton>
+          <BaseButton
             v-if="item.status !== 'rejected'"
             variant="danger"
             :icon="X"
@@ -241,6 +278,18 @@ async function copyPitch() {
     </template>
 
     <template v-if="item">
+      <div v-if="confirmDelete" class="notice confirm" role="alert">
+        <TriangleAlert :size="16" />
+        <span class="grow"
+          >Delete this case for good? This removes the PDF text, the analysis, notes, chat,
+          feedback, pitch and partner documents. It cannot be undone.</span
+        >
+        <BaseButton variant="danger" :icon="Trash2" :loading="deleting" @click="deleteCase">
+          Delete permanently
+        </BaseButton>
+        <BaseButton variant="ghost" @click="confirmDelete = false">Cancel</BaseButton>
+      </div>
+      <p v-if="deleteError" class="notice text-error">{{ deleteError }}</p>
       <p v-if="item.analysis_status === 'pending'" class="notice">
         <LoaderCircle class="spin" :size="16" /> The business model is being analysed.
       </p>
@@ -512,6 +561,13 @@ async function copyPitch() {
   padding: 0.75rem 1rem;
   background: var(--surface-alt);
   border-radius: var(--radius);
+}
+.confirm {
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--bern-red);
+}
+.grow {
+  flex: 1;
 }
 .small {
   font-size: 0.9375rem;

@@ -258,3 +258,16 @@ def test_documents_404(client):
         assert http.get(path).status_code == 404
     assert http.post("/api/cases/nope/documents").status_code == 404
     assert http.get("/api/cases/nope/documents/poster").status_code == 422
+
+
+def test_a_case_deleted_while_its_documents_are_made_stores_nothing(test_conn, accepted_case):
+    """#134: the job finds the case gone at the end and stores no files, without failing."""
+    documents.start(test_conn, accepted_case, [1])
+
+    def write_then_delete(ctx):
+        test_conn.execute('DELETE FROM "case" WHERE id = %s', (accepted_case,))  # the user deleted it meanwhile
+        return None, {}
+
+    documents.generate(test_conn, accepted_case, write=write_then_delete)
+    assert test_conn.execute("SELECT count(*) FROM case_document").fetchone()[0] == 0
+    assert documents.status(test_conn, accepted_case) is None

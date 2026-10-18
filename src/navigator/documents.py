@@ -503,6 +503,11 @@ def generate(conn: psycopg.Connection, case_id: str,
         now = datetime.now(UTC)
         files = {"report": render_report(ctx, summary, profiles, now), "slides": render_slides(ctx, now)}
         with conn.transaction():
+            # The case may have been deleted while the texts were written (#134): then store nothing.
+            # FOR KEY SHARE keeps a delete from running between this check and the inserts.
+            if conn.execute('SELECT 1 FROM "case" WHERE id = %s FOR KEY SHARE', (case_id,)).fetchone() is None:
+                log.info("case %s was deleted while its documents were made", case_id)
+                return
             for kind, content in files.items():
                 conn.execute(
                     "INSERT INTO case_document (case_id, kind, content) VALUES (%s, %s, %s) "

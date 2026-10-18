@@ -783,6 +783,12 @@ export const mockBackend = {
     c.status = status
     return clone(c)
   },
+  async deleteCase(id: string): Promise<{ ok: boolean }> {
+    await wait(200)
+    readCase(id) // 404 for an unknown case
+    for (const m of [cases, selections, addedRefs, chatTurns, mockDocuments, caseFeedback]) m.delete(id)
+    return { ok: true }
+  },
   async setReview(id: string, input: ReviewInput): Promise<Case> {
     await wait(200)
     if (!input.reason.trim()) throw new Error('422 A reason is required')

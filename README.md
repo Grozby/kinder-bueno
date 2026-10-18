@@ -221,6 +221,10 @@ Keep `priority_patterns` narrow and anchored to the site root: they decide what 
 - Every result card links to its source pages, so each fact can be checked at the source.
 - Uploaded business model PDFs are company data: only their text is stored (table `"case"`), never the file,
   and it is only sent to the Apertus gateway for the case analysis.
+- A case can be deleted ("Delete" in the case drawer, `DELETE /api/cases/{id}`, #134). This removes everything
+  stored for it at once: the PDF text and analysis, the review and notes, the pitch, the partner report and
+  slides, and the chat and feedback of its session. It cannot be undone. Database snapshots (`checkpoints/*.dump`)
+  taken before keep the case: delete or retake them too.
 - The partner report and slides of an accepted case (#96) include the company's summary and needs from that
   text. They are made to be sent to research partners, so the reviewer checks them before sending. Internal notes
   are never in them.

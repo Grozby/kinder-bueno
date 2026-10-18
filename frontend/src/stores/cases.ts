@@ -249,6 +249,20 @@ export const useCasesStore = defineStore('cases', () => {
     countNotes(id)
   }
 
+  // Delete the case and everything stored for it (#134), then forget it here too
+  async function remove(id: string) {
+    await backend.deleteCase(id)
+    cases.value = cases.value.filter((c) => c.id !== id)
+    delete references.value[id]
+    delete selected.value[id]
+    delete pitches.value[id]
+    delete documents.value[id]
+    delete chats.value[id]
+    delete ratings.value[id]
+    delete flagged.value[id]
+    delete notes.value[id]
+  }
+
   async function deleteNote(id: string, noteId: string) {
     await backend.deleteNote(id, noteId)
     notes.value[id] = (notes.value[id] ?? []).filter((n) => n.id !== noteId)
@@ -273,6 +287,7 @@ export const useCasesStore = defineStore('cases', () => {
     load,
     upload,
     move,
+    remove,
     loadReferences,
     toggleReference,
     addReference,

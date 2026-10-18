@@ -107,3 +107,29 @@ def test_unrelated_earlier_case_is_not_similar(client, test_conn, case_id):  # n
     test_conn.execute("""UPDATE "case" SET company_name = 'Glucora Health AG' WHERE id = 'vinora'""")
     found = client.get(f"/api/cases/{case_id}").json()["similar_cases"]
     assert [(s["case_id"], s["duplicate"], s["similarity"]) for s in found] == [("vinora", True, 0.0)]
+
+
+def test_delete_case_removes_everything_stored_for_it(client, test_conn, case_id, graph):  # noqa: F811
+    """#134: the case row, its documents and notes (cascade), and its session's chat turns and feedback."""
+    other = upload(client, GLUCORA.read_bytes(), name="other.pdf").json()["id"]
+    client.put(f"/api/cases/{case_id}/review", json={"score": 70, "reason": "Good"})
+    client.post(f"/api/cases/{case_id}/notes", json={"text": SECRET})
+    test_conn.execute("INSERT INTO case_document (case_id, kind, content) VALUES (%s, 'report', 'x')", (case_id,))
+    for session in (f"case-{case_id}", f"case-{other}", "search-1"):
+        test_conn.execute(
+            "INSERT INTO chat_turn (session_id, message, query, reply, filters) VALUES (%s, 'q', 'q', 'r', '{}')",
+            (session,))
+        client.post("/api/feedback", json={"session_id": session, "query": "q", "entity_id": graph["alice"],
+                                           "rating": "up"})
+
+    assert client.delete(f"/api/cases/{case_id}").json() == {"ok": True}
+    assert client.get(f"/api/cases/{case_id}").status_code == 404
+    for table in ("case_document", "case_note"):
+        assert test_conn.execute(f"SELECT count(*) FROM {table} WHERE case_id = %s", (case_id,)).fetchone()[0] == 0
+    for table in ("chat_turn", "feedback"):
+        sessions = {r[0] for r in test_conn.execute(f"SELECT session_id FROM {table}")}
+        assert sessions == {f"case-{other}", "search-1"}  # other sessions are kept
+    assert [c["id"] for c in client.get("/api/cases").json()] == [other]
+    assert client.get(f"/api/cases/{other}").json()["similar_cases"] == []  # the deleted duplicate is gone
+
+    assert client.delete(f"/api/cases/{case_id}").status_code == 404

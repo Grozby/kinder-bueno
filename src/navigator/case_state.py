@@ -28,6 +28,18 @@ def session_id(case_id: str) -> str:
     return f"{SESSION_PREFIX}{case_id}"
 
 
+def delete_case(conn: psycopg.Connection, case_id: str) -> bool:
+    """Delete the case and everything stored for it (#134): the row (its PDF text, analysis, review, pitch), its
+    documents and notes (ON DELETE CASCADE), and the chat turns and feedback of its session, which have no foreign
+    key. One transaction. False if no such case."""
+    with conn.transaction():
+        if conn.execute('DELETE FROM "case" WHERE id = %s', (case_id,)).rowcount == 0:
+            return False
+        conn.execute("DELETE FROM chat_turn WHERE session_id = %s", (session_id(case_id),))
+        conn.execute("DELETE FROM feedback WHERE session_id = %s", (session_id(case_id),))
+    return True
+
+
 def _exists(conn: psycopg.Connection, case_id: str) -> bool:
     return conn.execute('SELECT 1 FROM "case" WHERE id = %s', (case_id,)).fetchone() is not None
 
