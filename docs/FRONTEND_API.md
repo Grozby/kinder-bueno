@@ -19,7 +19,7 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
 
 1. A user uploads a company's business model PDF → a **case** card in the "New" column.
 2. The backend scores how well Canton Bern fits (0–100, with a breakdown) and proposes the top 25
-   references (`Result[]`, best first). The UI preselects the first 10.
+   references (`Result[]`, best first). The first 10 that match a need are preselected.
 3. The user **refines** the references with the chat (`/api/chat`, one `session_id` per case:
    `case-<case id>`). Chat results can be added to the case; added ones are selected.
 4. The user moves the card to "In review", then "Accepted" — or rejects it.
@@ -65,15 +65,15 @@ The UI talks to the real backend. `VITE_USE_MOCK=true` swaps in an in-memory moc
 - References: `why` starts with the need: `Matches 'continuous glucose monitoring': …` when a claim matched it
   (it counts in the score), `Found for '…'` when the search found the reference but no claim matched,
   then a sentence whose claim citations are checked again on every request. `[]` before the analysis
-  is done.
+  is done, and when no reference matches any need (a 0-fit case, #110): only chat-added ones are listed then.
 - Pitch (#54): plain text, paragraphs separated by a blank line. Every sentence about a reference cites
   claim ids like `[9606]`, all from the selected entities' evidence; sentences that fail the check are
   removed. If none is left, or the gateway fails or takes over 30 s, the text is a template that lists the
   references and their cited topics. Takes ~10–15 s. `404` for an unknown case or entity id, `422` for an
   empty list. The last pitch is stored on the case; the drawer loads it with `GET` when it opens.
 - Drawer state (#81): the backend keeps it, so a reload or a teammate sees the same.
-  - Selection: the references chosen for the pitch. Until the first `PUT` it is the first 10 references;
-    `[]` is a valid selection. Entities gone since a re-ingest are left out. `404` for unknown entity ids.
+  - Selection: the references chosen for the pitch. Until the first `PUT` it is the first 10 references
+    that match a need ("Found for" ones are not preselected, #110); `[]` is a valid selection. Entities gone since a re-ingest are left out. `404` for unknown entity ids.
   - References added from the chat: `GET …/references` returns them after the top 25, with `added: true`.
     `why` is the sentence of the entity's last chat result in the case's session, checked again on every
     request like the others. `DELETE` removes an added reference and deselects it (`404` if it was not added).

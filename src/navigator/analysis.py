@@ -319,12 +319,15 @@ def analyze(
 def references(conn: psycopg.Connection, case_id: str, limit: int) -> list[Result] | None:
     """The case's stored references, rebuilt from the current claims (entities gone since are dropped), then
     the ones added from the chat.
-    None if the case does not exist. A stored sentence is kept only if its citations still check out."""
+    None if the case does not exist. A stored sentence is kept only if its citations still check out.
+    When no reference matches a need (a 0-fit case, #110), only the added ones are listed: the entities merely
+    found for the needs would read as recommendations."""
     row = conn.execute("""SELECT refs, added_refs FROM "case" WHERE id = %s""", (case_id,)).fetchone()
     if row is None:
         return None
-    refs = {r["entity_id"]: r for r in row[0]}
-    results = build_results(conn, [(r["entity_id"], r["score"]) for r in row[0]])[:limit]
+    stored = row[0] if any(r["needs"] for r in row[0]) else []
+    refs = {r["entity_id"]: r for r in stored}
+    results = build_results(conn, [(r["entity_id"], r["score"]) for r in stored])[:limit]
     out = []
     for r in results:
         ref = refs[r.entity_id]

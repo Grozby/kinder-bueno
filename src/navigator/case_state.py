@@ -19,7 +19,7 @@ from navigator.models import (
 )
 from navigator.results import build_results
 
-DEFAULT_SELECTION = 10  # references selected for the pitch until the user changes the selection
+DEFAULT_SELECTION = 10  # matching references selected for the pitch until the user changes the selection
 SESSION_PREFIX = "case-"
 
 
@@ -32,12 +32,15 @@ def _exists(conn: psycopg.Connection, case_id: str) -> bool:
 
 
 def get_selection(conn: psycopg.Connection, case_id: str) -> list[int] | None:
-    """The stored selection without entities gone since, or the first 10 references; None if no such case."""
-    row = conn.execute('SELECT selection FROM "case" WHERE id = %s', (case_id,)).fetchone()
+    """The stored selection without entities gone since, or the first 10 references that match a need (#110: a
+    reference only found for a need is never preselected, so a 0-fit case starts empty); None if no such case."""
+    row = conn.execute('SELECT selection, refs FROM "case" WHERE id = %s', (case_id,)).fetchone()
     if row is None:
         return None
     if row[0] is None:
-        return [r.entity_id for r in analysis.references(conn, case_id, DEFAULT_SELECTION) or []]
+        matched = {r["entity_id"] for r in row[1] if r["needs"]}
+        refs = analysis.references(conn, case_id, len(row[1])) or []
+        return [r.entity_id for r in refs if r.entity_id in matched][:DEFAULT_SELECTION]
     found = {r[0] for r in conn.execute("SELECT id FROM entity WHERE id = ANY(%s)", (row[0],))}
     return [i for i in row[0] if i in found]
 

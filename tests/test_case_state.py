@@ -36,11 +36,14 @@ def chat(client, case_id, message, **kwargs):
     return client.post("/api/chat", json={"session_id": f"case-{case_id}", "message": message, **kwargs}).json()
 
 
-def test_selection_defaults_to_the_first_references_then_is_stored(client, test_conn):
+def test_selection_defaults_to_the_matching_references_then_is_stored(client, test_conn):
     case_id = new_case(test_conn)
     run(test_conn, case_id)
-    refs = [r["entity_id"] for r in client.get(f"/api/cases/{case_id}/references").json()]
-    assert client.get(f"/api/cases/{case_id}/selection").json() == {"entity_ids": refs[:10]}
+    listed = client.get(f"/api/cases/{case_id}/references").json()
+    refs = [r["entity_id"] for r in listed]
+    matching = [r["entity_id"] for r in listed if r["why"].startswith("Matches ")]
+    assert 0 < len(matching) < len(refs)  # the fixture has both kinds
+    assert client.get(f"/api/cases/{case_id}/selection").json() == {"entity_ids": matching}  # "Found for": not preselected
 
     res = client.put(f"/api/cases/{case_id}/selection", json={"entity_ids": [refs[1], refs[0], refs[1]]})
     assert res.json() == {"entity_ids": [refs[1], refs[0]]}
@@ -130,3 +133,16 @@ def test_case_feedback(client, test_conn, graph):
     assert body == {"ratings": {str(graph["bob"]): "down", str(graph["alice"]): "up"},
                     "flagged": [graph["alice_glucose"]]}
     assert client.get("/api/cases/nope/feedback").status_code == 404
+
+
+def test_zero_fit_case_lists_and_preselects_nothing(client, test_conn, graph):
+    """#110: when no reference matches a need, the nearest entities are not shown as references nor selected."""
+    case_id = new_case(test_conn)
+    run(test_conn, case_id)
+    test_conn.execute(
+        """UPDATE "case" SET refs = (SELECT jsonb_agg(r || '{"needs": []}') FROM jsonb_array_elements(refs) r)
+           WHERE id = %s""", (case_id,))
+    assert client.get(f"/api/cases/{case_id}/references").json() == []
+    assert client.get(f"/api/cases/{case_id}/selection").json() == {"entity_ids": []}
+    added = client.post(f"/api/cases/{case_id}/references", json={"entity_id": graph["bob"]}).json()
+    assert [r["entity_id"] for r in client.get(f"/api/cases/{case_id}/references").json()] == [added["entity_id"]]
