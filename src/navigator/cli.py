@@ -210,10 +210,13 @@ def resolve() -> None:
 @app.command("eval")
 def evaluate(
     expand: bool = typer.Option(True, help="Use query expansion, like /api/search."),
+    judge: bool = typer.Option(True, help="Run the eval judge [PoC] for judged precision@10 (plan 10.3)."),
     gold: str = typer.Option("eval/gold.yaml", help="Gold set (plan 10.1)."),
     out: str = typer.Option("eval/report.md", help="Where to save the Markdown report."),
+    judge_log: str = typer.Option("eval/judge_log.jsonl", help="Where to save the eval judge verdicts."),
 ) -> None:
     """Run the gold queries and report the plan 10.2 metrics (stdout and eval/report.md)."""
+    import json
     from pathlib import Path
 
     from navigator import chunks_db
@@ -221,10 +224,13 @@ def evaluate(
 
     settings = get_settings()
     with chunks_db.connect(settings.database_url) as conn:
-        text = run(conn, LLM(settings) if expand else None, load_gold(Path(gold)))
+        text, verdicts = run(conn, lambda: LLM(settings), load_gold(Path(gold)), expand=expand, judge=judge)
     Path(out).write_text(text)
     typer.echo(text)
     typer.echo(f"Saved to {out}")
+    if judge:
+        Path(judge_log).write_text("".join(json.dumps(v, ensure_ascii=False) + "\n" for v in verdicts))
+        typer.echo(f"Saved {len(verdicts)} judge verdicts to {judge_log}")
 
 
 if __name__ == "__main__":
