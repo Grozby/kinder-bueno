@@ -54,6 +54,7 @@ export interface Result {
   score: number
   sources: string[] // public pages backing this result
   evidence: Evidence[]
+  added?: boolean // case references only: added from the chat, not found by the analysis (#81)
 }
 
 // --- Chat and feedback: docs/PLAN.md section 8.9 ---
@@ -93,6 +94,26 @@ export interface Pitch {
   text: string
   entity_ids: number[]
   generated_at: string
+}
+
+// --- Case drawer state kept by the backend (#81) ---
+
+// The references chosen for the pitch; the first 10 until the user changes it
+export interface Selection {
+  entity_ids: number[]
+}
+
+// A stored turn of the case chat (session `case-<id>`), results rebuilt from the current claims
+export interface CaseChatTurn {
+  message: string
+  response: ChatResponse
+  created_at: string
+}
+
+// The last 👍/👎 per entity id and the claim ids flagged as wrong facts in the case chat session
+export interface CaseFeedback {
+  ratings: Record<number, 'up' | 'down'>
+  flagged: number[]
 }
 
 export type SourceStatus = 'ready' | 'crawling' | 'failed'

@@ -2,6 +2,8 @@
 // All names are placeholders ("Muster" = Swiss "example"); none of this is real data.
 import type {
   Case,
+  CaseChatTurn,
+  CaseFeedback,
   CaseStatus,
   ChatRequest,
   ChatResponse,
@@ -18,6 +20,7 @@ import type {
   ResourcePage,
   Result,
   RuleKind,
+  Selection,
   Source,
 } from './types'
 import { isValidPattern, matches } from '@/utils/patterns'
@@ -622,6 +625,13 @@ function readSource(id: string): Source {
   return s
 }
 
+// Case drawer state (#81), kept per case like the backend keeps it in the DB
+const selections = new Map<string, number[]>()
+const addedRefs = new Map<string, Result[]>()
+const chatTurns = new Map<string, CaseChatTurn[]>()
+const caseFeedback = new Map<string, CaseFeedback>()
+const caseOf = (sessionId: string) => (sessionId.startsWith('case-') ? sessionId.slice(5) : null)
+
 export const mockBackend = {
   async listCases(): Promise<Case[]> {
     await wait(250)
@@ -663,6 +673,46 @@ export const mockBackend = {
     return REFERENCE_POOL.map((_, i) => toResult(i, why, rand()))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
+      .concat(addedRefs.get(id) ?? [])
+      .filter((r, i, all) => all.findIndex((x) => x.entity_id === r.entity_id) === i)
+  },
+  async getSelection(id: string): Promise<Selection> {
+    const stored = selections.get(id)
+    if (stored) return { entity_ids: [...stored] }
+    const refs = await mockBackend.listReferences(id, 10)
+    return { entity_ids: refs.map((r) => r.entity_id) }
+  },
+  async setSelection(id: string, entityIds: number[]): Promise<Selection> {
+    await wait(100)
+    selections.set(id, [...new Set(entityIds)])
+    return { entity_ids: [...selections.get(id)!] }
+  },
+  async addReference(id: string, entityId: number): Promise<Result> {
+    await wait(150)
+    if (!REFERENCE_POOL[entityId - 1]) throw new Error('404 Not Found')
+    const fromChat = (chatTurns.get(id) ?? [])
+      .flatMap((t) => t.response.results)
+      .reverse()
+      .find((r) => r.entity_id === entityId)
+    const ref = { ...(fromChat ?? toResult(entityId - 1, '', 0)), added: true }
+    const list = (addedRefs.get(id) ?? []).filter((r) => r.entity_id !== entityId)
+    addedRefs.set(id, [...list, ref])
+    return clone(ref)
+  },
+  async removeReference(id: string, entityId: number): Promise<Selection> {
+    await wait(150)
+    addedRefs.set(id, (addedRefs.get(id) ?? []).filter((r) => r.entity_id !== entityId))
+    const stored = selections.get(id)
+    if (stored) selections.set(id, stored.filter((e) => e !== entityId))
+    return mockBackend.getSelection(id)
+  },
+  async getCaseChat(id: string): Promise<CaseChatTurn[]> {
+    await wait(150)
+    return clone(chatTurns.get(id) ?? [])
+  },
+  async getCaseFeedback(id: string): Promise<CaseFeedback> {
+    await wait(100)
+    return clone(caseFeedback.get(id) ?? { ratings: {}, flagged: [] })
   },
   // The store keeps the pitches the mock generates, so there is nothing stored to reload
   async getPitch(_id: string): Promise<Pitch | null> {
@@ -697,17 +747,30 @@ export const mockBackend = {
     )
     const rand = rng(hash(req.session_id + req.message))
     const results = (hits.length ? hits : all.filter(() => rand() < 0.2)).slice(0, 6)
-    return {
+    const response: ChatResponse = {
       reply: `Showing ${results.length} results for '${req.message}'.`,
       results: results.map((r, i) => ({ ...r, score: 1 - i * 0.1 })),
       filters: req.filters ?? { source: null, type: null },
       expansion: { en: words, de: [] },
       no_result: results.length === 0,
     }
+    const caseId = caseOf(req.session_id)
+    if (caseId) {
+      const turn = { message: req.message, response, created_at: new Date().toISOString() }
+      chatTurns.set(caseId, [...(chatTurns.get(caseId) ?? []), clone(turn)])
+    }
+    return response
   },
   async feedback(req: FeedbackRequest): Promise<{ ok: boolean }> {
     await wait(150)
     console.info('[mock] feedback', req)
+    const caseId = caseOf(req.session_id)
+    if (caseId) {
+      const stored = caseFeedback.get(caseId) ?? { ratings: {}, flagged: [] }
+      if (req.rating === 'wrong_fact' && req.claim_id != null) stored.flagged.push(req.claim_id)
+      else if (req.rating !== 'wrong_fact') stored.ratings[req.entity_id] = req.rating
+      caseFeedback.set(caseId, stored)
+    }
     return { ok: true }
   },
 

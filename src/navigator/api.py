@@ -15,13 +15,16 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import analysis, cases, chunks_db, ingest, pages, pitch
+from navigator import analysis, case_state, cases, chunks_db, ingest, pages, pitch
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
 from navigator.llm import LLM
 from navigator.models import (
+    AddReference,
     Case,
+    CaseChatTurn,
+    CaseFeedback,
     CaseStatusUpdate,
     ChatFilters,
     ChatRequest,
@@ -39,6 +42,7 @@ from navigator.models import (
     Result,
     SearchResponse,
     NewSource,
+    Selection,
     Source,
     SourceStats,
     StatsResponse,
@@ -238,6 +242,9 @@ def chat(conn: Conn, embed: Embed, expand: Expand, explain: Explain, sessions: S
     """Plain refinement chat (#50): each message is a new search with the session's filters; a blank
     message with new `filters` re-runs the last query. The LangGraph agent (plan 8.10) is a follow-up."""
     session = sessions.get(body.session_id)
+    stored = body.session_id.startswith(case_state.SESSION_PREFIX)  # case drawer chats are kept in the DB (#81)
+    if stored and session.query is None and (last := case_state.last_query(conn, body.session_id)):
+        session.query, session.filters = last  # after an API restart
     query = body.message.strip() or session.query
     if query is None:
         raise HTTPException(status_code=422, detail="Type a search first")
@@ -247,10 +254,13 @@ def chat(conn: Conn, embed: Embed, expand: Expand, explain: Explain, sessions: S
         [filters.source] if filters.source else [], [filters.type] if filters.type else [],
     )
     session.query, session.filters, session.results = query, filters, found.results
-    return ChatResponse(
+    response = ChatResponse(
         reply=chat_reply(len(found.results), query, filters), results=found.results, filters=filters,
         expansion=found.expansion, no_result=found.no_result,
     )
+    if stored:
+        case_state.save_turn(conn, body.session_id, body.message, query, response)
+    return response
 
 
 @app.get("/api/stats")
@@ -445,6 +455,62 @@ def get_case(conn: Conn, case_id: str) -> Case:
 def case_references(conn: Conn, case_id: str, limit: Annotated[int, Query(ge=1, le=50)] = 25) -> list[Result]:
     """The case's references, best first; empty until the analysis is done."""
     found = analysis.references(conn, case_id, limit)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return found
+
+
+@app.post("/api/cases/{case_id}/references")
+def add_case_reference(conn: Conn, case_id: str, body: AddReference) -> Result:
+    """Add a chat result to the case's references (#81); it then comes after the top 25, marked `added`."""
+    if cases.get_case(conn, case_id) is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    added = case_state.add_reference(conn, case_id, body.entity_id)
+    if added is None:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return added
+
+
+@app.delete("/api/cases/{case_id}/references/{entity_id}")
+def remove_case_reference(conn: Conn, case_id: str, entity_id: int) -> Selection:
+    """Remove a chat-added reference; it is also deselected. Returns the selection."""
+    if not case_state.remove_reference(conn, case_id, entity_id):
+        raise HTTPException(status_code=404, detail="No such added reference")
+    return Selection(entity_ids=case_state.get_selection(conn, case_id) or [])
+
+
+@app.get("/api/cases/{case_id}/selection")
+def get_selection(conn: Conn, case_id: str) -> Selection:
+    """The references chosen for the pitch (#81); the first 10 until the user changes it."""
+    found = case_state.get_selection(conn, case_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return Selection(entity_ids=found)
+
+
+@app.put("/api/cases/{case_id}/selection")
+def set_selection(conn: Conn, case_id: str, body: Selection) -> Selection:
+    if unknown := pitch.unknown_entities(conn, body.entity_ids):
+        raise HTTPException(status_code=404, detail=f"Unknown entity ids: {unknown}")
+    found = case_state.set_selection(conn, case_id, body.entity_ids)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return Selection(entity_ids=found)
+
+
+@app.get("/api/cases/{case_id}/chat")
+def case_chat(conn: Conn, case_id: str) -> list[CaseChatTurn]:
+    """The chat turns of the case's session `case-<id>`, oldest first (#81)."""
+    turns = case_state.chat_history(conn, case_id)
+    if turns is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return turns
+
+
+@app.get("/api/cases/{case_id}/feedback")
+def case_feedback(conn: Conn, case_id: str) -> CaseFeedback:
+    """The 👍/👎 and flagged facts given in the case's session (#81)."""
+    found = case_state.feedback(conn, case_id)
     if found is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return found

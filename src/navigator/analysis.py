@@ -25,7 +25,7 @@ import numpy as np
 import psycopg
 from psycopg.types.json import Jsonb
 
-from navigator.explain import check_sentence, prompt_claims
+from navigator.explain import recheck
 from navigator.llm import LLM
 from navigator.models import Result, ScoreItem
 from navigator.rank import MAX_PER_UNIT, _units, fairness_cap, rank_entities
@@ -304,9 +304,10 @@ def analyze(
 
 
 def references(conn: psycopg.Connection, case_id: str, limit: int) -> list[Result] | None:
-    """The case's stored references, rebuilt from the current claims (entities gone since are dropped).
+    """The case's stored references, rebuilt from the current claims (entities gone since are dropped), then
+    the ones added from the chat.
     None if the case does not exist. A stored sentence is kept only if its citations still check out."""
-    row = conn.execute("""SELECT refs FROM "case" WHERE id = %s""", (case_id,)).fetchone()
+    row = conn.execute("""SELECT refs, added_refs FROM "case" WHERE id = %s""", (case_id,)).fetchone()
     if row is None:
         return None
     refs = {r["entity_id"]: r for r in row[0]}
@@ -314,9 +315,15 @@ def references(conn: psycopg.Connection, case_id: str, limit: int) -> list[Resul
     out = []
     for r in results:
         ref = refs[r.entity_id]
-        sentence = ref.get("why") and check_sentence(ref["why"], {e.claim_id: e for e in prompt_claims(r.evidence)})
+        sentence = ref.get("why") and recheck(ref["why"], r)
         # "Matches" only when a claim matched the need (it then counts in the score), else it was only found for it
         label = f"{'Matches' if ref['need'] in ref['needs'] else 'Found for'} '{ref['need']}'"
         why = f"{label}: {sentence}" if sentence else f"{label}. {r.why}"
         out.append(r.model_copy(update={"why": why}))
+    # References added from the chat (#81), after the analysis' ones, with their chat sentence checked again
+    found = {r.entity_id for r in out}
+    added = {a["entity_id"]: a for a in row[1] if a["entity_id"] not in found}
+    for r in build_results(conn, [(i, a["score"]) for i, a in added.items()]):
+        sentence = recheck(added[r.entity_id].get("why"), r)
+        out.append(r.model_copy(update={"why": sentence or r.why, "added": True}))
     return out

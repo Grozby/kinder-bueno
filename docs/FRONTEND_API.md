@@ -34,6 +34,12 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
 | GET | `/api/cases/{id}/references?limit=25` | – | `Result[]` (section 8.8), best first |
 | POST | `/api/cases/{id}/pitch` | `{"entity_ids": [1, 2, …]}` | `{text, entity_ids, generated_at}` |
 | GET | `/api/cases/{id}/pitch` | – | the last pitch, `404` if none yet |
+| POST | `/api/cases/{id}/references` | `{"entity_id": n}` | `Result` with `added: true` |
+| DELETE | `/api/cases/{id}/references/{entity_id}` | – | `{entity_ids}`, the selection |
+| GET | `/api/cases/{id}/selection` | – | `{entity_ids}` |
+| PUT | `/api/cases/{id}/selection` | `{"entity_ids": [1, 2, …]}` | `{entity_ids}` |
+| GET | `/api/cases/{id}/chat` | – | `[{message, response: ChatResponse, created_at}]`, oldest first |
+| GET | `/api/cases/{id}/feedback` | – | `{ratings: {entity_id: "up" \| "down"}, flagged: [claim_id, …]}` |
 
 - Upload returns at once. The analysis runs in the background; the frontend polls
   `GET /api/cases/{id}` every 1.5 s until `analysis_status` is `done` or `failed`.
@@ -63,6 +69,16 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
   removed. If none is left, or the gateway fails or takes over 30 s, the text is a template that lists the
   references and their cited topics. Takes ~10–15 s. `404` for an unknown case or entity id, `422` for an
   empty list. The last pitch is stored on the case; the drawer loads it with `GET` when it opens.
+- Drawer state (#81): the backend keeps it, so a reload or a teammate sees the same.
+  - Selection: the references chosen for the pitch. Until the first `PUT` it is the first 10 references;
+    `[]` is a valid selection. Entities gone since a re-ingest are left out. `404` for unknown entity ids.
+  - References added from the chat: `GET …/references` returns them after the top 25, with `added: true`.
+    `why` is the sentence of the entity's last chat result in the case's session, checked again on every
+    request like the others. `DELETE` removes an added reference and deselects it (`404` if it was not added).
+  - Chat: the turns of the session `case-<id>` are stored by `POST /api/chat`; their results are rebuilt from
+    the current claims when read. After an API restart, the session's last query and filters are restored
+    from them, so a blank message with `filters` still works.
+  - Feedback: the last 👍/👎 per entity and the claims flagged in the session `case-<id>`.
 
 ## Chat and feedback (section 8.9)
 
@@ -74,7 +90,8 @@ Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, 
     `message` with `filters` re-runs the last query (`422` if the session has none yet).
   - `reply` is a template: `"Showing <n> results for '<query>' (source: dcb, type: person)."`.
     The response also has `filters` (the ones the server used) and `expansion`.
-  - Sessions live in the API's memory: they are lost when the API restarts.
+  - Sessions live in the API's memory: they are lost when the API restarts, except case sessions
+    (`case-<id>`), which are stored (see "Cases").
 - `POST /api/feedback` with `{session_id, query, entity_id, claim_id?, rating, comment?}`.
   `query` is the company name.
   - `rating` is `"up"` or `"down"` for the 👍/👎 buttons on a reference.

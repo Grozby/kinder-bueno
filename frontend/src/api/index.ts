@@ -5,6 +5,8 @@ import { api } from './client'
 import { mockBackend } from './mock'
 import type {
   Case,
+  CaseChatTurn,
+  CaseFeedback,
   CaseStatus,
   ChatRequest,
   ChatResponse,
@@ -16,6 +18,7 @@ import type {
   ResourcePage,
   Result,
   RuleKind,
+  Selection,
   Source,
 } from './types'
 
@@ -44,6 +47,23 @@ const realBackend = {
       if (e.message.startsWith('404')) return null
       throw e
     }),
+  getSelection: (id: string) => api<Selection>(`/cases/${id}/selection`),
+  setSelection: (id: string, entityIds: number[]) =>
+    api<Selection>(`/cases/${id}/selection`, {
+      method: 'PUT',
+      body: JSON.stringify({ entity_ids: entityIds }),
+    }),
+  // A chat result kept as a reference of the case; returns it with `added: true`
+  addReference: (id: string, entityId: number) =>
+    api<Result>(`/cases/${id}/references`, {
+      method: 'POST',
+      body: JSON.stringify({ entity_id: entityId }),
+    }),
+  // Also deselects it; returns the selection
+  removeReference: (id: string, entityId: number) =>
+    api<Selection>(`/cases/${id}/references/${entityId}`, { method: 'DELETE' }),
+  getCaseChat: (id: string) => api<CaseChatTurn[]>(`/cases/${id}/chat`),
+  getCaseFeedback: (id: string) => api<CaseFeedback>(`/cases/${id}/feedback`),
 
   chat: (req: ChatRequest) =>
     api<ChatResponse>('/chat', { method: 'POST', body: JSON.stringify(req) }),
