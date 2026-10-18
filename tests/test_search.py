@@ -5,7 +5,7 @@ import psycopg
 import pytest
 
 from navigator import chunks_db
-from navigator.search import keyword_search, rrf, search_chunks
+from navigator.search import keyword_search, query_words, rrf, search_chunks
 from navigator.settings import get_settings
 
 DIM = 1024
@@ -70,13 +70,27 @@ def test_replace_chunks_replaces_old_ones(conn, test_source):
     assert rows == [("T\n\nnew",)]
 
 
-def test_keyword_search_ors_terms_and_matches_phrases(conn, test_source):
-    ids = keyword_search(conn, ["quuxglucose sensors"])
-    assert len(ids) == 1
-    assert len(keyword_search(conn, ["sensors quuxglucose"])) == 0  # phrase order matters
-    assert len(keyword_search(conn, ["zzwidgets"])) == 2
-    assert len(keyword_search(conn, ["nomatchzz", "quuxglucose"])) == 1
-    assert keyword_search(conn, ["", "  "]) == []
+def test_query_words_drops_stopwords(conn):
+    assert sorted(query_words(conn, "Who works on the heart valves?")) == ["heart", "valves", "works"]
+    assert sorted(query_words(conn, "Forschung mit der Herzklappe und dem Herz")) == ["forschung", "herz", "herzklappe"]
+    assert query_words(conn, "the") == ["the"]  # only stopwords: keep them
+    assert query_words(conn, "  ") == []
+
+
+def test_keyword_search_matches_query_words_in_any_order(conn, test_source):
+    # Regression for #2: a multi-word query used to be one exact phrase, so this found nothing.
+    ids = keyword_search(conn, "zzwidgets quuxglucose nomatchzz")
+    assert len(ids) == 2
+    first_text = conn.execute("SELECT text FROM chunk WHERE id = %s", (ids[0],)).fetchone()[0]
+    assert "quuxglucose" in first_text  # matches more of the words, so it ranks first
+    assert keyword_search(conn, "the nomatchzz") == []  # "the" would match almost every chunk
+    assert keyword_search(conn, "") == []
+
+
+def test_keyword_search_keeps_extra_terms_as_phrases(conn, test_source):
+    assert len(keyword_search(conn, "nomatchzz", ["quuxglucose sensors"])) == 1
+    assert keyword_search(conn, "nomatchzz", ["sensors quuxglucose"]) == []  # phrase order matters
+    assert len(keyword_search(conn, "nomatchzz", ["nomatch2zz", "zzwidgets"])) == 2
 
 
 def test_search_chunks_fuses_keyword_and_semantic(conn, test_source):
