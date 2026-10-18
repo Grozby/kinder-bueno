@@ -71,7 +71,8 @@ def source_id_for(host: str, taken: set[str]) -> str:
 
 def source_config(source_id: str, name: str, url: str, host: str, follow_outbound: bool,
                   max_pages: int) -> SourceConfig:
-    allow = {"allow_hosts_regex": PUBLIC_HOST} if follow_outbound else {"allow_hosts": [host]}
+    bare = host.removeprefix("www.")  # sites often redirect www <-> bare host: allow both
+    allow = {"allow_hosts_regex": PUBLIC_HOST} if follow_outbound else {"allow_hosts": [bare, f"www.{bare}"]}
     return SourceConfig(id=source_id, name=name, seeds=[url], max_pages=min(max_pages, MAX_PAGES), **allow)
 
 
@@ -87,9 +88,12 @@ def finish() -> None:
 def add_source(conn: psycopg.Connection, url: str, name: str | None, max_depth: int, max_pages: int,
                follow_outbound: bool) -> str:
     """Store the source with status 'crawling' and return its id. A failed source added from the UI with
-    the same id is replaced; anything else gets a new id."""
+    the same id is replaced; anything else gets a new id. Call it holding the ingest slot (try_start)."""
     url = url.strip()
     host = check_url(url)
+    # We hold the slot, so no ingest runs: a source still 'crawling' was cut off by an API restart
+    conn.execute("UPDATE source SET status = 'failed', stage = NULL, error = 'interrupted: the API restarted' "
+                 "WHERE status = 'crawling'")
     rows = conn.execute("SELECT id, config IS NOT NULL AND status = 'failed' FROM source").fetchall()
     retry = source_id_for(host, set())
     reusable = dict(rows).get(retry, False)
@@ -158,7 +162,7 @@ def run_ingest(database_url: str, source_id: str) -> None:
                 conn.execute("UPDATE crawl_url SET status = 'skipped' WHERE source_id = %s AND status = 'queued'",
                              (source_id,))
                 if not pages:
-                    raise SourceError("No page with enough text was found (robots.txt, or not HTML?)")
+                    raise SourceError("No page with enough text: the site may need JavaScript, block us in robots.txt, or not be HTML")
                 db.replace_pages(conn, source_id, pages)
 
                 stage = "embed"

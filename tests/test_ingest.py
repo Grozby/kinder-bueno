@@ -54,9 +54,16 @@ def test_check_url_accepts_public_host(public_dns):
 
 def test_source_config_caps_pages_and_host_rule():
     own = source_config("x", "X", "https://lab.test/", "lab.test", False, 500)
-    assert own.max_pages == ingest.MAX_PAGES and own.allow_hosts == ["lab.test"]
+    assert own.max_pages == ingest.MAX_PAGES and own.allow_hosts == ["lab.test", "www.lab.test"]
     outbound = source_config("x", "X", "https://lab.test/", "lab.test", True, 10)
     assert outbound.allow_hosts_regex == ingest.PUBLIC_HOST and outbound.max_pages == 10
+
+
+def test_add_source_marks_an_interrupted_ingest_failed(test_conn, public_dns):
+    test_conn.execute("INSERT INTO source (id, name, config, status, stage) VALUES ('old', 'Old', '{}', 'crawling', 'extract')")
+    add_source(test_conn, "https://lab.test/", None, 2, 50, False)
+    assert test_conn.execute("SELECT status, stage, error FROM source WHERE id = 'old'").fetchone() == \
+        ("failed", None, "interrupted: the API restarted")
 
 
 def test_add_source_reuses_only_a_failed_ui_source(test_conn, public_dns):
@@ -65,8 +72,9 @@ def test_add_source_reuses_only_a_failed_ui_source(test_conn, public_dns):
     row = test_conn.execute("SELECT name, status, stage, root_url, config FROM source WHERE id = 'lab_2'").fetchone()
     assert row[:4] == ("lab.test", "crawling", "crawl", "https://lab.test/")
     assert row[4]["max_depth"] == ingest.MAX_DEPTH and row[4]["source"]["seeds"] == ["https://lab.test/"]
-    test_conn.execute("UPDATE source SET status = 'failed' WHERE id = 'lab_2'")
-    assert add_source(test_conn, "https://lab.test/", "Lab", 2, 50, False) == "lab_3"  # only the base id is reused
+    assert add_source(test_conn, "https://lab.test/", "Lab", 2, 50, False) == "lab_3"  # lab_2 is marked failed
+    # only the base id is reused: lab_2 failed, but a new one is lab_4
+    assert add_source(test_conn, "https://lab.test/", "Lab", 2, 50, False) == "lab_4"
     test_conn.execute("DELETE FROM source WHERE id = 'lab'")
     test_conn.execute("INSERT INTO source (id, name, config, status) VALUES ('lab', 'old', '{}', 'failed')")
     assert add_source(test_conn, "https://lab.test/", "Lab", 2, 50, False) == "lab"

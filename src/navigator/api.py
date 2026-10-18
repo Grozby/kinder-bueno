@@ -380,6 +380,7 @@ def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewS
     except Exception:
         ingest.finish()
         raise
+    conn.commit()  # the background ingest reads the source on another connection
     background.add_task(run, source_id)
     return _sources(conn, seeds, source_id)[0]
 
