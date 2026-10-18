@@ -6,11 +6,12 @@ The Vue frontend (`frontend/`) calls JSON endpoints under `/api`. Types are in
 - **From `PLAN.md` section 8.9 (used as specified):** `POST /api/chat`, `POST /api/feedback`.
   The frontend uses the `Result` / `Evidence` models from section 8.8 everywhere a person, unit,
   project or infrastructure is shown.
-- **Added by the frontend (not in the plan yet):** the case endpoints (PDF upload, scoring,
-  references, pitch) and the source endpoints below.
+- **The case board (`PLAN.md` section 9.1):** the case endpoints (PDF upload, scoring, references,
+  pitch, drawer state) and the source and page endpoints below.
 
-Until the backend serves them, the frontend uses an in-memory mock (`frontend/src/api/mock.ts`).
-Start the frontend with `VITE_USE_MOCK=false` to call the real backend. In dev, Vite proxies
+`docker compose up` serves the UI on the real backend. `npm run dev` uses an in-memory mock
+(`frontend/src/api/mock.ts`) unless started with `VITE_USE_MOCK=false`; the mock is for UI work on
+routes the backend does not serve yet (the crawl rules and re-crawl, #79 and #80). In dev, Vite proxies
 `/api` to `BACKEND_URL` (default `http://localhost:8000`).
 
 ## Flow

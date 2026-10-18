@@ -39,9 +39,11 @@ Tomorrow: the same pipeline (crawl → verified facts → search) feeds location
 
 ### Non-goals (do NOT build)
 
-- Business reports for companies.
+- Generated business or location reports for companies. The case board (section 9.1) only scores how well
+  our sources fit a company's needs and lists the references; it writes no facts about the company.
 - Supplier or manufacturer data.
-- User accounts, login, admin UI. Chat state is per browser session only (an anonymous `session_id`), never per user.
+- User accounts, login, admin UI. Chat state is per anonymous `session_id`, never per user. The case board
+  stores its chat per case (`case-<id>`), so the whole team sees it.
 - Free-text Q&A chat over the knowledge base. The chat only refines searches; it shows result cards, not free-text facts.
 - Graph database (Neo4j). Postgres only. The schema keeps entities and relations in tables, so Neo4j can be added later.
 - Full crawl of all University of Bern websites.
@@ -806,6 +808,30 @@ Stack: Vue 3 + Vite + TypeScript, PrimeVue 5 (`@primeuix/themes`), Pinia, vue-ro
 
 Empty state: the "No reliable source found" message.
 Footer: "All information comes from public pages of the listed institutions. Click a source link to verify. Not an endorsement."
+
+### 9.1 Case board (added during the hackathon)
+
+The challenge owner's real task: a company sends its business model, and the agency must show what Bern
+offers it. The board turns the search into that workflow. Contract: `docs/FRONTEND_API.md` ("Cases").
+
+1. **Upload** a business model PDF → a case card in "New". Only the PDF's text is stored, never the file.
+2. **Analysis** (background, ~30–60 s, `analysis.py`): Apertus reads the text (company, industry, summary,
+   3–6 needs). Each need runs through the search (section 8). The top 25 entities are the references.
+3. **Score** 0–100 from five fixed criteria (research fit, experts, units, infrastructure, projects). A
+   reference counts only when one of its shown topic claims matches a need. No invented facts (section 1).
+4. **Refine** in the case drawer: the chat (section 8.9, session `case-<id>`) finds more references; the
+   user adds them, selects the ones for the pitch, and rates them (👍 / 👎, "wrong fact").
+5. **Move** the card: "In review", "Accepted" or "Rejected".
+6. **Pitch** (`pitch.py`): Apertus writes a sales pitch from the selected references only. Every sentence
+   about a reference cites claim ids; sentences that fail the check are removed (as in section 8.6).
+
+Rules:
+- The drawer state (selection, added references, chat, ratings) is stored in Postgres, so a reload or a
+  teammate sees the same (#81).
+- Stored "why" sentences are checked again against the current claims on every read: a re-ingest can
+  remove the claims they cite.
+- The sources page shows the crawled sources, their pages ranked by score, and adds a source from the UI
+  (`POST /api/sources`, the same pipeline as section 12).
 
 ---
 
