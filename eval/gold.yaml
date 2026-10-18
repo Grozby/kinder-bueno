@@ -1,7 +1,9 @@
 # Gold set (plan 10.1). 3 use cases x 3 phrasings: (a) the site's own wording, (b) a lay term, (c) a synonym.
 # Expected entities come from crawled pages only and are confirmed by a human (plan 10.1 rules).
 # Candidates suggested by an agent (SQL over shown claims by topic, not from search results);
-# confirmed by the project owner on 2026-10-18, unchanged.
+# confirmed by the project owner on 2026-10-18. Updated by the owner on 2026-10-18 (#60, #70): "implant materials"
+# replaced by "heart valve prostheses"; three ARTORG labs added that surfaced once lab topics were credited to the
+# labs (#70).
 # Matching: people match when every word of `name` is in the result name (titles ignored);
 # units match on the normalised name. `url` is the page that shows the entity, for checking by hand.
 use_cases:
@@ -16,6 +18,7 @@ use_cases:
       - {name: "Thomas Züger", type: person, url: "https://www.dcberne.com/en/project/hypoxanthine-project/"}
       - {name: "Christoph Stettler", type: person, url: "https://www.dcberne.com/en/team/"}
       - {name: "Stavroula Mougiakakou", type: person, url: "https://www.artorg.unibe.ch/research/aihn/index_eng.html"}
+      - {name: "AI in Health and Nutrition", type: unit, url: "https://www.artorg.unibe.ch/research/aihn/index_eng.html"}
   - id: surgery
     queries:
       - "computer-assisted surgery"
@@ -28,13 +31,15 @@ use_cases:
       - {name: "Manuela Eugster", type: person, url: "https://www.artorg.unibe.ch/research/nrg/index_eng.html"}
       - {name: "Hearing Research Laboratory", type: unit, url: "https://www.artorg.unibe.ch/research/hrl/index_eng.html"}
       - {name: "Philipp Aebischer", type: person, url: "https://www.artorg.unibe.ch/research/hrl/index_eng.html"}
+      - {name: "Artificial Intelligence in Medical Imaging", type: unit, url: "https://www.artorg.unibe.ch/research/aimi/index_eng.html"}
   - id: cardio
     queries:
       - "cardiovascular engineering"
       - "heart valve research"
-      - "implant materials"
+      - "heart valve prostheses"
     expected:
       - {name: "Dominik Obrist", type: person, url: "https://www.artorg.unibe.ch/research/cve/index_eng.html"}
+      - {name: "Cardiovascular Engineering", type: unit, url: "https://www.artorg.unibe.ch/research/cve/index_eng.html"}
       - {name: "Cardiovascular Research Cluster Bern", type: unit, url: "https://www.cvrc.unibe.ch/index_eng.html"}
       - {name: "Odening Lab", type: unit, url: "https://www.dbmr.unibe.ch/research/research_programs/odening_lab/index_eng.html"}
       - {name: "Longnus Lab", type: unit, url: "https://www.dbmr.unibe.ch/research/research_programs/longnus_lab/index_eng.html"}

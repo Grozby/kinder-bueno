@@ -16,21 +16,22 @@ Numbers come from `eval/report.md` (9 gold queries, 100 pages; run after #44) an
      example and list labels like "Alumni".
    - Traceability in the eval: **100%** of displayed facts are verified and link to their source.
 4. **Results (honest).**
-   - recall@10: **46%** (target 80%), up from 14% after ranking work. Best on cardio (75–100% for 2 of 3
-     phrasings), weakest on "implant materials" (0%: the 100-page crawl has little on it).
-   - Synonyms: "glucose sensors" and "continuous glucose monitoring" find the same experts (69% overlap of the
-     top 10).
-   - Field fill for people: role 98%, affiliation 100% (249 people linked to their lab from member pages).
-     79% of people show **their lab's topics**, labelled as the lab's and linked to the lab page. Personal
+   - recall@10: **60%** (target 80%), lay-term phrasings 61%, up from 14% after ranking work. Best on cardio
+     (80–100% for all 3 phrasings), weakest on surgery (29–43%: the image-guided therapy chair's head is not in
+     the 100 crawled pages).
+   - Synonyms: "glucose sensors" and "continuous glucose monitoring" share 43% of their top 10; both find the
+     Diabetes Center Berne, Lilian Witthauer and the AI in Health and Nutrition lab.
+   - Field fill for people: role 100%, affiliation 100% (249 people linked to their lab from member pages).
+     97% of people show **their lab's topics**, labelled as the lab's and linked to the lab page. Personal
      expertise is 0%: the pages state topics for labs, not for each person, and we don't pretend otherwise.
-   - Precision (LLM judge, PoC): 59% of the top-10 results judged relevant; the judge agrees with the human
-     gold set on 80% of gold hits.
+   - Precision (LLM judge, PoC): 60% of the top-10 results judged relevant. The judge agrees with the human
+     gold set on only 73% of gold hits, so treat this as a signal, not a measurement.
 5. **Sovereign and cheap to run.** Apertus (Swiss open LLM), local bge-m3 embeddings, Postgres, one
    `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
    and, measured on the same pages, not better); quote verification is what makes the small model safe to use. A new site is
    one config block (`config/sources.yaml`).
 6. **Next.** Scale from 100 to ~2,000 pages (config only, crawling personal profile pages for person-level
-   expertise), recall from 46% towards 80%, and the same pipeline for company location reports: suppliers,
+   expertise), recall from 60% towards 80%, and the same pipeline for company location reports: suppliers,
    manufacturers and advisors in Canton Bern, with every claim sourced.
 
 ## Demo (3 minutes)

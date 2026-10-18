@@ -7,7 +7,13 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from navigator import db
 from navigator.resolve import (
-    acronym_aliases, looks_like_person, norm_name, norm_unit, parent_url, resolve, site_name,
+    acronym_aliases,
+    looks_like_person,
+    norm_name,
+    norm_unit,
+    parent_url,
+    resolve,
+    site_name,
 )
 from navigator.results import build_results
 from navigator.settings import PROJECT_ROOT, get_settings

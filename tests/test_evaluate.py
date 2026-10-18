@@ -71,7 +71,7 @@ def test_gold_file_follows_the_plan_rules():
     assert len(gold) == 3
     for uc in gold:
         assert len(uc.queries) == 3
-        assert 3 <= len(uc.expected) <= 6
+        assert 3 <= len(uc.expected) <= 7
         assert all(e.type in ("person", "unit") and e.url.startswith("https://") for e in uc.expected)
 
 
@@ -82,7 +82,7 @@ def test_report_has_per_query_rows_and_metrics():
     runs["glucose sensors"] = [_result("Lilian Witthauer"), _result("Diabetes Center Berne", type="unit")]
     db = {"coverage": [("dcb", 30, 127, 352)], "raw": {True: 3, False: 1}, "verdicts": [], "feedback": []}
     text = report(gold, runs, {q: Expansion() for q in queries}, db, conn=None)
-    assert "| glucose | glucose sensors | 2 | Diabetes Center Berne, Lilian Witthauer | 40% | – | 0 |" in text
+    assert "| glucose | glucose sensors | 2 | Diabetes Center Berne, Lilian Witthauer | 33% | – | 0 |" in text
     assert "judged precision" not in text  # judge off
     assert "| extraction drop rate (unverified raw claims) | 25% (1 / 4) | report |" in text
     assert "| dcb | 30 | 127 | 352 |" in text
@@ -104,8 +104,8 @@ def test_report_with_judge_verdicts():
     verdicts["glucose sensors"] = {1: Verdict(True, "x"), 2: Verdict(False, "x"), 3: Verdict(False, "x")}
     db = {"coverage": [], "raw": {}, "verdicts": [], "feedback": []}
     text = report(gold, runs, {q: Expansion() for q in queries}, db, conn=None, verdicts=verdicts)
-    assert "| 40% | 1/3 | 0 |" in text  # glucose sensors: one of three judged relevant
-    assert "| surgery | surgical robots | 1 | Manuela Eugster | 17% | not judged | 0 |" in text
+    assert "| 33% | 1/3 | 0 |" in text  # glucose sensors: one of three judged relevant
+    assert "| surgery | surgical robots | 1 | Manuela Eugster | 14% | not judged | 0 |" in text
     assert "| judged precision@10 [PoC] (mean of 1 judged queries) | 33% | report |" in text
     # gold hits Witthauer (relevant) and Diabetes Center Berne (not relevant): 1 of 2
     assert "| judge gold agreement [PoC] (gold hits judged relevant) | 50% (1 / 2) | judge not reliable |" in text

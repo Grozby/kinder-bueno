@@ -834,14 +834,14 @@ use_cases:
     queries:
       - "cardiovascular engineering"
       - "heart valve research"
-      - "implant materials"
+      - "heart valve prostheses"   # was "implant materials" (#60)
     expected: []
 ```
 
 Rules:
 - Expected entities MUST be chosen by a human, by reading the crawled pages (`SELECT url, title FROM page`). An agent MAY suggest candidates, but a human confirms them.
 - Only pick entities that are on crawled pages. With 100 pages, some use cases may have few matches. If a use case has fewer than 2 expected entities after the crawl, either add 2–3 seed URLs for it to `sources.yaml` and re-ingest, or replace the use case with one the crawled data supports. Write down the change.
-- 3–6 expected entities per use case.
+- 3–7 expected entities per use case (7 since #60: surgery got a lab the owner confirmed).
 
 ### 10.2 Metrics (`eval/run_eval.py`, also `navigator eval`)
 
@@ -873,6 +873,8 @@ Ranking, #59 (2026-10-18): **recall@10 46% → 59%**, lay-term 47% → 54%, unit
 - `SENIOR_BOOST` 0.1 → 0.3. A bigger inherited share for heads (tried) lowered recall.
 
 Judged precision fell 63% → 48%, but judge gold agreement fell too (90% → 60%, "not reliable"): the judge rejects new gold hits (Odening Lab and CVRC for "heart valve research", Mougiakakou for CGM). Real noise remains: Motor Learning lab and Acoustic Robotics for surgery queries, and umbrella topics shown as a person's lab topics. Still missed: Stefan Weber (not in the DB), Hearing Research Laboratory, Züger and Stettler for 2 of 3 glucose phrasings.
+
+Lab topics, #70, and gold set update, #60 (2026-10-18): `resolve` moves topic claims that the extractor credited to the umbrella ("ARTORG Center …", named only in the page title) on a lab's own pages to that lab (158 claims). The right labs now surface (AI in Health and Nutrition for glucose, Cardiovascular Engineering for cardio), which first lowered recall against the old gold set (59% → 46%) while judged precision rose (48% → 66%). The owner then confirmed three labs as gold entities (Cardiovascular Engineering, AI in Health and Nutrition, Artificial Intelligence in Medical Imaging) and replaced "implant materials" with "heart valve prostheses" (#60). Result: **recall@10 60%, lay-term 61%**, unit_topics fill 97%, traceability 100%, judged precision 60%, judge gold agreement 73%.
 
 ### 10.3 Eval judge (`judge.py`) — [PoC]
 
