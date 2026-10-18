@@ -48,3 +48,23 @@ def test_pages_for_extraction_filters(conn):
         assert urls(url_like="%/group_members/%", limit=1) == ["https://t.test/a/group_members/x"]
         assert urls(url_like="%nothing%") == []
         assert urls(source="dcb", url_like="https://t.test/%") == []  # both filters apply
+
+
+def test_relation_accepts_listed_in_and_rejects_unknown(conn):
+    sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+    db.init_db(conn, sources)
+    db.init_db(conn, sources)  # re-creating the constraint is idempotent
+    with conn.transaction(force_rollback=True):  # test rows never reach the real data
+        conn.execute("INSERT INTO source (id, name) VALUES ('t_src', 'Test')")
+        page_id = conn.execute(
+            "INSERT INTO page (source_id, url, title, text) VALUES ('t_src', 'https://t.test/m', 'T', 'x') RETURNING id"
+        ).fetchone()[0]
+        person, unit = (
+            conn.execute("INSERT INTO entity (type, name, norm_key) VALUES (%s, %s, %s) RETURNING id", row).fetchone()[0]
+            for row in (("person", "Ann Lee", "t:ann"), ("unit", "Lab X", "t:labx"))
+        )
+        insert = "INSERT INTO relation (from_id, rel, to_id, quote, page_id, verified) VALUES (%s, %s, %s, 'Ann Lee', %s, true)"
+        conn.execute(insert, (person, "listed_in", unit, page_id))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with conn.transaction():
+                conn.execute(insert, (person, "friend_of", unit, page_id))

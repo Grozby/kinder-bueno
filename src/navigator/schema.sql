@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS claim_page_idx ON claim(page_id);
 CREATE TABLE IF NOT EXISTS relation (
   id          serial PRIMARY KEY,
   from_id     int NOT NULL REFERENCES entity(id) ON DELETE CASCADE,
-  rel         text NOT NULL CHECK (rel IN ('member_of','part_of','works_on','provides')),
+  rel         text NOT NULL CHECK (rel IN ('member_of','part_of','works_on','provides','listed_in')),
   to_id       int NOT NULL REFERENCES entity(id) ON DELETE CASCADE,
   quote       text NOT NULL,
   page_id     int NOT NULL REFERENCES page(id) ON DELETE CASCADE,
@@ -61,6 +61,13 @@ ALTER TABLE claim    ADD COLUMN IF NOT EXISTS judge_verdict text CHECK (judge_ve
 ALTER TABLE claim    ADD COLUMN IF NOT EXISTS judge_reason  text;
 ALTER TABLE relation ADD COLUMN IF NOT EXISTS judge_verdict text CHECK (judge_verdict IN ('supported','partial','unsupported'));
 ALTER TABLE relation ADD COLUMN IF NOT EXISTS judge_reason  text;
+
+-- listed_in (person -> unit): the person is listed on the unit's member page (#23). Not member_of:
+-- the quote (the person's name on that page) supports "listed on", not "is a member of".
+-- Created by resolve, never by the extractor. Re-created here so existing databases accept it.
+ALTER TABLE relation DROP CONSTRAINT IF EXISTS relation_rel_check;
+ALTER TABLE relation ADD CONSTRAINT relation_rel_check
+  CHECK (rel IN ('member_of','part_of','works_on','provides','listed_in'));
 
 -- Raw extraction output, one row per claim / relation, before entity merging (resolve).
 -- Kept so resolve can be re-run without new LLM calls.
