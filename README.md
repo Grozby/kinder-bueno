@@ -65,7 +65,21 @@ docker compose up -d app frontend                          # API + UI
 
 ### Demo
 
-A demo does not need `ingest`: load a snapshot of a database that is known to work.
+**One command** sets up the whole demo from a clean checkout:
+
+```bash
+scripts/demo.sh setup              # build, DB, data, models, API + UI; prints the URLs when ready
+scripts/demo.sh setup --ingest     # build the data from scratch instead of a snapshot (~1 h, mostly Apertus)
+scripts/demo.sh dump               # snapshot the stack's DB to checkpoints/demo.dump (the old one is kept)
+```
+
+- `setup` loads `checkpoints/demo.dump` when it is there (a few minutes), otherwise it runs the full ingest.
+  After a restore it runs `init-db`, so a snapshot older than the code still works.
+- It also runs `navigator warm` (bge-m3 and the case reranker, ~4.5 GB, into the `hf_cache` volume, once).
+- It works for the packaged stack too (`COMPOSE_FILE` in `.env`, [`docs/HANDOFF.md`](docs/HANDOFF.md)).
+- It stops with a message when `.env` or `KEERA_API_KEY` is missing.
+
+The steps it runs, by hand: a demo does not need `ingest`: load a snapshot of a database that is known to work.
 
 ```bash
 # Once, on the machine with the good data: snapshot it (read-only on the database)

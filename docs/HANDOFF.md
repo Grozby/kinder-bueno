@@ -46,6 +46,9 @@ The UI's proxy adds `API_TOKEN` to every API call. You never type it, and the br
 
 ## 3. Load the data and the models (once)
 
+`scripts/demo.sh setup` runs steps 3 and 4 in one go and prints the URL when the stack is healthy.
+The commands it runs:
+
 ```bash
 docker compose up -d db                                     # Postgres 16 + pgvector
 docker compose run --rm restore                             # loads checkpoints/demo.dump
