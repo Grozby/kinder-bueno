@@ -813,8 +813,10 @@ export const mockBackend = {
   async getSelection(id: string): Promise<Selection> {
     const stored = selections.get(id)
     if (stored) return { entity_ids: [...stored] }
-    const refs = await mockBackend.listReferences(id, 10)
-    return { entity_ids: refs.map((r) => r.entity_id) }
+    // Like the backend (#110): only references that match a need are preselected
+    const refs = await mockBackend.listReferences(id, 25)
+    const matching = refs.filter((r) => !r.added && !r.why.startsWith('Found for'))
+    return { entity_ids: matching.slice(0, 10).map((r) => r.entity_id) }
   },
   async setSelection(id: string, entityIds: number[]): Promise<Selection> {
     await wait(100)

@@ -247,6 +247,9 @@ async function copyPitch() {
               <LoaderCircle class="spin" :size="16" /> Loading references…
             </p>
             <p v-else-if="refsError" class="notice text-error">{{ refsError }}</p>
+            <p v-else-if="!refs.length && item.analysis_status === 'done'" class="notice">
+              No references in our sources match these needs.
+            </p>
             <ul v-else class="refs">
               <li
                 v-for="r in visibleRefs"

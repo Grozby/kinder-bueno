@@ -136,7 +136,7 @@ export interface Pitch {
 
 // --- Case drawer state kept by the backend (#81) ---
 
-// The references chosen for the pitch; the first 10 until the user changes it
+// The references chosen for the pitch; the first 10 matching ones until the user changes it
 export interface Selection {
   entity_ids: number[]
 }

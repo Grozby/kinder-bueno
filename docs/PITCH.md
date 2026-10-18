@@ -75,8 +75,8 @@ rehearsed again three times on a fresh stack restored from `checkpoints/demo.dum
    [11218] that point to the evidence rows; sentences about references that cite nothing, or cite facts outside the
    selection, are removed.
 6. *(Optional)* **Honest "no fit".** Drop `vinora-business-model.pdf` (agritech, ~20 s): fit score **0**,
-   every criterion 0, "No matching experts in our sources". Show the score and the breakdown only: its reference
-   list still shows the nearest entities (Diabetes Center Berne "found for" crop analysis), which reads as noise.
+   every criterion 0, "No matching experts in our sources", and the references say "No references in our sources
+   match these needs" (#110): nothing is preselected, so no pitch is offered for a case we can't serve.
 7. *(Optional)* **Sources** page: the crawl graph, then "Ranked pages": the 100 pages ranked by verified
    facts, judge rate and feedback. Block a page (the ⊘ button): "It no longer appears in results", and its
    facts leave search and cases at once (#79). Press "Undo" in the toast right away. Don't start a re-crawl
