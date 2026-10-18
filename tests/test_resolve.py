@@ -6,7 +6,9 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from navigator import db
-from navigator.resolve import acronym_aliases, looks_like_person, norm_name, norm_unit, parent_url, resolve
+from navigator.resolve import (
+    acronym_aliases, looks_like_person, norm_name, norm_unit, parent_url, resolve, site_name,
+)
 from navigator.results import build_results
 from navigator.settings import PROJECT_ROOT, get_settings
 from navigator.sources import load_sources
@@ -226,6 +228,41 @@ def test_member_page_without_parent_page_is_skipped(conn):
     counts = resolve(conn)
     assert _listed(conn) == []
     assert counts["member pages skipped (no parent page)"] == 1
+
+
+def test_umbrella_topics_on_a_lab_page_move_to_the_lab(conn):
+    _member_pages(conn)
+    sub = conn.execute(
+        "INSERT INTO page (source_id, url, title, text) VALUES ('artorg', %s, %s, 'Adaptive Diabetes Management') "
+        "RETURNING id",
+        (AIHN + "research_activities/diabetes/index_eng.html",
+         "Research: Adaptive Diabetes Management - ARTORG Center for Biomedical Engineering Research"),
+    ).fetchone()[0]
+    other = conn.execute(
+        "INSERT INTO page (source_id, url, title, text) VALUES ('artorg', %s, %s, 't') RETURNING id",
+        ("https://www.artorg.unibe.ch/about/index_eng.html", "About - ARTORG Center for Biomedical Engineering Research"),
+    ).fetchone()[0]
+    _claim(conn, sub, "unit", "ARTORG Center", "expertise", "adaptive diabetes management")  # umbrella, lab page
+    _claim(conn, sub, "unit", "ARTORG Center", "name", "ARTORG Center")  # not a topic: stays
+    _claim(conn, sub, "unit", "MELISSA", "description", "an EU project")  # not the umbrella: stays
+    _claim(conn, other, "unit", "ARTORG Center", "expertise", "biomedical engineering")  # not a lab page: stays
+    counts = resolve(conn)
+    rows = conn.execute(
+        "SELECT e.name, c.field, c.value FROM claim c JOIN entity e ON e.id = c.entity_id "
+        "WHERE e.type = 'unit' AND c.field <> 'name' ORDER BY c.value"
+    ).fetchall()
+    assert rows == [
+        ("AI in Health and Nutrition", "expertise", "adaptive diabetes management"),
+        ("MELISSA", "description", "an EU project"),
+        ("ARTORG Center", "expertise", "biomedical engineering"),
+    ]
+    assert counts["lab topics moved from the umbrella"] == 1
+
+
+def test_site_name():
+    assert site_name("Research: X - ARTORG Center for Biomedical Engineering Research") == \
+        "ARTORG Center for Biomedical Engineering Research"
+    assert site_name("Research: Group Members") == ""
 
 
 def test_dcb_team_page_uses_the_fixed_unit_name(conn):
