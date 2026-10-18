@@ -19,6 +19,9 @@ from navigator.sources import load_sources
 TEST_DB_PREFIX = "navigator_test_"
 TEST_DB = f"{TEST_DB_PREFIX}{os.getpid()}"
 
+# The API tests call the routes without a token, whatever API_TOKEN a shared host has in .env
+os.environ["API_TOKEN"] = ""
+
 
 def _alive(pid: int) -> bool:
     try:

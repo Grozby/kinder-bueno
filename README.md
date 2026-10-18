@@ -192,4 +192,27 @@ Keep `priority_patterns` narrow and anchored to the site root: they decide what 
 
 ```bash
 uv run pytest -q              # database tests are skipped when Postgres is not running
+uv run pytest -m integration  # the whole stack in Docker on a checkpoint of the database, ~10–15 min
 ```
+
+The integration tests (`tests/integration/`) start their own compose project, `navigator-it`, on ports 55432,
+18000 and 15173, and remove it at the end. They write only to the stack's own database.
+
+1. On the first run, they take a checkpoint of the current database with `pg_dump` into
+   `checkpoints/it.dump`. That folder is git-ignored, and the dump holds case texts too.
+2. They restore the checkpoint into the stack's database.
+3. They run every route the UI calls through the real gateway and bge-m3: search, chat, feedback, sources, and the
+   whole case flow (Glucora PDF upload → analysis → references → status → pitch → API restart). The Vite proxy
+   with the token is checked too.
+
+The checks follow the traceability rule: every evidence row is a shown claim with its stored quote, and every
+citation in a "why" sentence or a pitch belongs to the cards shown.
+
+| Variable | Effect |
+|---|---|
+| `IT_CHECKPOINT` | path of another dump to use |
+| `IT_SOURCE_DATABASE_URL` | the database to dump (default: `DATABASE_URL`) |
+| `IT_KEEP=1` | leave the stack running after the tests |
+
+Delete `checkpoints/it.dump` to take a new checkpoint. The dump is also a backup of the database before a demo:
+restore it with `pg_restore --clean --if-exists --no-owner -d <database url> checkpoints/it.dump`.

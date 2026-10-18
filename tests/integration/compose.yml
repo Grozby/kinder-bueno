@@ -1,0 +1,19 @@
+# Override for the integration stack (tests/integration/conftest.py), on top of docker-compose.yml.
+# Its own project name, ports and database volume; the bge-m3 cache is reused from the main stack.
+services:
+  db:
+    extra_hosts: ["host.docker.internal:host-gateway"]  # pg_dump of the source database on the host (Linux)
+
+  app:
+    environment:
+      API_TOKEN: ${API_TOKEN}       # a fresh token per run: the tests check the 401s too
+
+  frontend:
+    environment:
+      BACKEND_TOKEN: ${API_TOKEN}   # the Vite proxy adds it, as on a shared backend
+      VITE_USE_MOCK: "false"
+
+volumes:
+  hf_cache:
+    external: true
+    name: ${IT_HF_VOLUME:-kinder-bueno_hf_cache}
