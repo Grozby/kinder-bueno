@@ -12,11 +12,16 @@ from dataclasses import dataclass, field
 import psycopg
 from unidecode import unidecode
 
-from navigator.verify import norm
+from navigator.verify import PageText, norm
 
 TITLES = {"prof", "dr", "pd", "med", "phil", "nat", "rer", "sc", "phd", "md", "msc", "bsc", "dipl", "ing"}
 
 Mention = tuple[str, str, int]  # (entity_type, raw name, page_id)
+
+# Member pages (#23): ".../<lab>/group_members/index_eng.html" or ".../team/". The lab is named on the parent page.
+MEMBER_PAGE = re.compile(r"^(.*/)(?:group_members|team)/(index_eng\.html)?$")
+FIXED_UNITS = {"https://www.dcberne.com/en/team/": "Diabetes Center Berne"}  # its parent page starts with a slogan
+MEMBER_REL = ("member_of", "listed_in")  # both give a person's unit
 
 
 def norm_name(name: str) -> str:
@@ -92,6 +97,67 @@ def person_keys(people: dict[Mention, _Person]) -> dict[Mention, str]:
     return keys
 
 
+def parent_url(url: str) -> str | None:
+    """The unit page a member page belongs to: the URL without `group_members/` or `team/`. None if not a member page."""
+    m = MEMBER_PAGE.match(url)
+    return m.group(1) + (m.group(2) or "") if m else None
+
+
+def looks_like_person(name: str) -> bool:
+    """Guard for listed_in: the extractor sometimes takes headings or labels ("Alumni", "Phone2") for people."""
+    return len(norm_name(name).split()) >= 2 and not re.search(r"\d", name)
+
+
+def first_line(text: str) -> str:
+    return next((line.strip() for line in text.splitlines() if line.strip()), "")
+
+
+def member_page_rows(conn: psycopg.Connection, claims: list) -> tuple[list, list, Counter]:
+    """`listed_in` rows for people with a verified claim on a unit's member page (#23).
+
+    Returns extra claims and relations in the raw row shapes of _load: the unit's name (quote: the first line
+    of the parent page, or the fixed name on the member page), and per person a `listed_in` relation plus a
+    `listed_in` claim as its evidence row (quote: the person's name on the member page).
+    """
+    people: dict[int, set[str]] = defaultdict(set)
+    for etype, name, page_id, *_ in claims:
+        if etype == "person" and looks_like_person(name):
+            people[page_id].add(name)
+    pages = {
+        url: (pid, title or "", text, source)
+        for pid, url, title, text, source in conn.execute("SELECT id, url, title, text, source_id FROM page")
+    }
+    extra_claims, extra_relations, counts = [], [], Counter()
+    for url, (page_id, title, text, source) in pages.items():
+        parent = parent_url(url)
+        if parent is None or not people.get(page_id):
+            continue
+        member_page = PageText(f"{title}\n{text}")
+        if url in FIXED_UNITS:
+            unit, unit_page = FIXED_UNITS[url], page_id
+            unit_quote = member_page.rebuild_quote(unit, "name", unit)
+        elif parent in pages:
+            unit_page, p_title, p_text, _ = pages[parent]
+            unit = first_line(p_text)
+            unit_quote = PageText(f"{p_title}\n{p_text}").find_quote(unit) if unit else None
+        else:
+            counts["member pages skipped (no parent page)"] += 1
+            continue
+        if not unit_quote or not unit_quote.ok:
+            counts["member pages skipped (unit name not found)"] += 1
+            continue
+        extra_claims.append(("unit", unit, unit_page, source, "name", unit, unit_quote.quote))
+        for name in sorted(people[page_id]):
+            quote = member_page.rebuild_quote(name, "name", name)
+            if quote is None:
+                continue
+            extra_relations.append(("person", name, "listed_in", "unit", unit, page_id, source, quote.quote))
+            extra_claims.append(
+                ("person", name, page_id, source, "listed_in", f"listed on the member page of {unit}", quote.quote)
+            )
+    return extra_claims, extra_relations, counts
+
+
 def _load(conn: psycopg.Connection) -> tuple[list, list]:
     claims = conn.execute(
         "SELECT r.entity_type, r.entity_name, r.page_id, p.source_id, r.field, r.value, r.quote "
@@ -124,7 +190,7 @@ def mention_keys(claims: list, relations: list) -> dict[Mention, str]:
     for ftype, fname, rel, ttype, tname, page_id, source, _ in relations:
         m = add(ftype, fname, page_id, source)
         add(ttype, tname, page_id, source)
-        if ftype == "person" and rel == "member_of":
+        if ftype == "person" and rel in MEMBER_REL:
             people[m].units.add(norm_unit(tname))
     return keys | person_keys(people)
 
@@ -132,12 +198,13 @@ def mention_keys(claims: list, relations: list) -> dict[Mention, str]:
 def resolve(conn: psycopg.Connection) -> Counter:
     """Rebuild entity, claim and relation from the raw tables. Returns counts for the report."""
     claims, relations = _load(conn)
+    listed_claims, listed_relations, counts = member_page_rows(conn, claims)
+    claims, relations = claims + listed_claims, relations + listed_relations
     keys = mention_keys(claims, relations)
     names: dict[tuple[str, str], Counter] = defaultdict(Counter)
     for (etype, name, _), key in keys.items():
         names[(etype, key)][name] += 1
 
-    counts: Counter = Counter()
     with conn.transaction():
         conn.execute("DELETE FROM claim")
         conn.execute("DELETE FROM relation")
@@ -176,4 +243,10 @@ def resolve(conn: psycopg.Connection) -> Counter:
             )
     counts["claims"] = len(claim_rows)
     counts["relations"] = conn.execute("SELECT count(*) FROM relation").fetchone()[0]
+    counts["relations (listed_in)"] = conn.execute("SELECT count(*) FROM relation WHERE rel = 'listed_in'").fetchone()[0]
+    counts["people without a unit"] = conn.execute(
+        "SELECT count(*) FROM entity e WHERE e.type = 'person' AND NOT EXISTS "
+        "(SELECT 1 FROM relation r WHERE r.from_id = e.id AND r.rel = ANY(%s))",
+        (list(MEMBER_REL),),
+    ).fetchone()[0]
     return counts

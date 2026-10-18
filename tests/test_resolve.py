@@ -6,9 +6,15 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from navigator import db
-from navigator.resolve import norm_name, norm_unit, resolve
+from navigator.resolve import looks_like_person, norm_name, norm_unit, parent_url, resolve
+from navigator.results import build_results
 from navigator.settings import PROJECT_ROOT, get_settings
 from navigator.sources import load_sources
+
+
+def test_looks_like_person():
+    assert looks_like_person("Prof. Dr. Anna Muster") and looks_like_person("Stefan Bracher, MSc")
+    assert not looks_like_person("Alumni") and not looks_like_person("Phone2") and not looks_like_person("Dr. Muster")
 
 
 def test_norm_name_drops_titles_and_accents():
@@ -147,3 +153,86 @@ def test_entities_gone_from_raw_are_removed(conn):
     conn.execute("DELETE FROM raw_claim")
     resolve(conn)
     assert conn.execute("SELECT count(*) FROM entity").fetchone()[0] == 0
+
+
+def test_parent_url_of_member_pages():
+    base = "https://www.artorg.unibe.ch/research/aihn/"
+    assert parent_url(base + "group_members/index_eng.html") == base + "index_eng.html"
+    assert parent_url("https://www.dbmr.unibe.ch/research/rov_lab/team/index_eng.html") == \
+        "https://www.dbmr.unibe.ch/research/rov_lab/index_eng.html"
+    assert parent_url("https://www.dcberne.com/en/team/") == "https://www.dcberne.com/en/"
+    assert parent_url(base + "group_members/prof_dr_x/index_eng.html") is None  # a person's own page
+    assert parent_url(base + "index_eng.html") is None
+
+
+AIHN = "https://www.artorg.unibe.ch/research/aihn/"
+
+
+def _member_pages(conn, parent: bool = True) -> int:
+    """An ARTORG-like lab page and its member page with two people. Returns the member page id."""
+    if parent:
+        conn.execute(
+            "INSERT INTO page (source_id, url, title, text) VALUES ('artorg', %s, 'Research: AIHN', %s)",
+            (AIHN + "index_eng.html", "\n  AI in Health and Nutrition\nWe study nutrition."),
+        )
+    member = conn.execute(
+        "INSERT INTO page (source_id, url, title, text) VALUES ('artorg', %s, 'Research: Group Members', %s) "
+        "RETURNING id",
+        (AIHN + "group_members/index_eng.html", "Group Members\nProf. Dr. Anna Muster\nHead\nBen Kurz\nPhD student\nAlumni"),
+    ).fetchone()[0]
+    _claim(conn, member, "person", "Prof. Dr. Anna Muster", "role", "Head")
+    _claim(conn, member, "person", "Ben Kurz", "role", "PhD student")
+    _claim(conn, member, "person", "Alumni", "role", "Alumni")  # a heading the extractor took for a person
+    return member
+
+
+def _listed(conn) -> list[tuple]:
+    return conn.execute(
+        "SELECT f.name, t.name, r.quote FROM relation r JOIN entity f ON f.id = r.from_id "
+        "JOIN entity t ON t.id = r.to_id WHERE r.rel = 'listed_in' ORDER BY f.name"
+    ).fetchall()
+
+
+def test_people_on_member_page_are_listed_in_the_lab(conn):
+    member = _member_pages(conn)
+    counts = resolve(conn)
+    assert _listed(conn) == [
+        ("Ben Kurz", "AI in Health and Nutrition", "Ben Kurz"),
+        ("Prof. Dr. Anna Muster", "AI in Health and Nutrition", "Prof. Dr. Anna Muster"),
+    ]
+    assert counts["relations (listed_in)"] == 2  # not the heading "Alumni"
+    # the lab gets a name claim quoting the first line of its own page
+    unit_claim = conn.execute(
+        "SELECT c.value, c.quote, p.url FROM claim c JOIN entity e ON e.id = c.entity_id JOIN page p ON p.id = c.page_id "
+        "WHERE e.type = 'unit' AND c.field = 'name'"
+    ).fetchone()
+    assert unit_claim == ("AI in Health and Nutrition", "AI in Health and Nutrition", AIHN + "index_eng.html")
+    # idempotent
+    resolve(conn)
+    assert len(_listed(conn)) == 2
+    # the result card shows the lab and an evidence row linking the member page
+    ben = conn.execute("SELECT id FROM entity WHERE name = 'Ben Kurz'").fetchone()[0]
+    card = build_results(conn, [(ben, 1.0)])[0]
+    assert card.affiliations == ["AI in Health and Nutrition"]
+    row = next(e for e in card.evidence if e.field == "listed_in")
+    assert (row.value, row.quote, row.url) == (
+        "listed on the member page of AI in Health and Nutrition", "Ben Kurz", AIHN + "group_members/index_eng.html"
+    )
+    assert conn.execute("SELECT page_id FROM claim WHERE id = %s", (row.claim_id,)).fetchone()[0] == member
+
+
+def test_member_page_without_parent_page_is_skipped(conn):
+    _member_pages(conn, parent=False)
+    counts = resolve(conn)
+    assert _listed(conn) == []
+    assert counts["member pages skipped (no parent page)"] == 1
+
+
+def test_dcb_team_page_uses_the_fixed_unit_name(conn):
+    team = conn.execute(
+        "INSERT INTO page (source_id, url, title, text) VALUES ('dcb', 'https://www.dcberne.com/en/team/', "
+        "'Team - Diabetes Center Berne', 'Our team\nLea Weber\nData Scientist') RETURNING id"
+    ).fetchone()[0]
+    _claim(conn, team, "person", "Lea Weber", "role", "Data Scientist")
+    resolve(conn)
+    assert _listed(conn) == [("Lea Weber", "Diabetes Center Berne", "Lea Weber")]

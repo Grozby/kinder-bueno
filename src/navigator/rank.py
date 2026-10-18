@@ -76,13 +76,14 @@ def _shown_claims(conn: psycopg.Connection, page_ids: list[int], types: list[str
 
 
 def _units(conn: psycopg.Connection, entity_ids: list[int]) -> dict[int, int]:
-    """Unit of each entity: a person's first member_of unit, a unit itself."""
+    """Unit of each entity: a person's first member_of unit (else listed_in, #23), a unit itself."""
     unit_of = {
         r[0]: r[0] for r in conn.execute("SELECT id FROM entity WHERE id = ANY(%s) AND type = 'unit'", (entity_ids,))
     }
     for person, unit in conn.execute(
         f"SELECT DISTINCT ON (r.from_id) r.from_id, r.to_id FROM relation r "
-        f"WHERE r.from_id = ANY(%s) AND r.rel = 'member_of' AND {shown('r')} ORDER BY r.from_id, r.id",
+        f"WHERE r.from_id = ANY(%s) AND r.rel IN ('member_of', 'listed_in') AND {shown('r')} "
+        f"ORDER BY r.from_id, r.rel <> 'member_of', r.id",
         (entity_ids,),
     ):
         unit_of[person] = unit

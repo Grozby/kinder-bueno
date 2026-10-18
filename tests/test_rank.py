@@ -3,7 +3,7 @@
 import pytest
 
 from conftest import onehot
-from navigator.rank import entity_scores, fairness_cap, rank_entities
+from navigator.rank import _units, entity_scores, fairness_cap, rank_entities
 from navigator.search import ChunkHit
 
 
@@ -48,3 +48,16 @@ def test_projects_only_when_asked(test_conn, graph):
     assert graph["pancreas"] not in default
     projects = rank_entities(test_conn, "pancreas", types=["project"], embed=embed).ranked
     assert [e for e, _ in projects] == [graph["pancreas"]]
+
+
+def test_unit_from_member_of_first_then_listed_in(test_conn, graph):
+    def listed_in(person: str, unit: str) -> None:
+        test_conn.execute(
+            "INSERT INTO relation (from_id, rel, to_id, quote, page_id, verified) VALUES (%s, 'listed_in', %s, 'q', %s, true)",
+            (graph[person], graph[unit], graph["p1"]),
+        )
+
+    listed_in("alice", "center")  # Alice is member_of the lab: member_of wins
+    test_conn.execute("DELETE FROM relation WHERE from_id = %s", (graph["bob"],))
+    listed_in("bob", "lab")  # Bob has only listed_in
+    assert _units(test_conn, [graph["alice"], graph["bob"]]) == {graph["alice"]: graph["lab"], graph["bob"]: graph["lab"]}
