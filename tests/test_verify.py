@@ -1,3 +1,5 @@
+import pytest
+
 from navigator.verify import PageText, norm, normalise_with_map, verify_claim, verify_relation
 
 PAGE = PageText(
@@ -117,3 +119,28 @@ def test_relation():
     quote = "Professor for Cardiovascular Engineering"
     assert verify_relation(PAGE, "Dominik Obrist", "Cardiovascular Engineering", quote).ok
     assert not verify_relation(PAGE, "Dominik Obrist", "Image-Guided Therapy", quote).ok
+
+
+TEAM_PAGE = PageText("Team Bally Lab\nName / Titel\nDr. med. Lia Bally\nFunktion\nGroup Leader")
+LAB_PAGE = PageText("Odening Lab\nTranslational Cardiology / Electrophysiology\n"
+                    "Our research is focused on advancing the mechanistic understanding of cardiac arrhythmias.")
+
+
+@pytest.mark.parametrize("quote", ["Team Bally Lab", "Group Leader", "Name / Titel"])
+def test_topic_quoted_by_a_heading_that_does_not_name_it_is_rejected(quote):
+    """#149: on a team page 8B copied the prompt example's topics and quoted a heading as evidence."""
+    m = verify_claim(TEAM_PAGE, "Bally Lab", "expertise", "cardiac electrophysiology", quote)
+    assert not m.ok and m.reason == "topic not named in a heading-only quote"
+
+
+def test_topic_with_a_sentence_or_a_heading_that_names_it_is_kept():
+    sentence = "Our research is focused on advancing the mechanistic understanding of cardiac arrhythmias."
+    assert verify_claim(LAB_PAGE, "Odening Lab", "expertise", "arrhythmia mechanisms", sentence).ok
+    assert verify_claim(LAB_PAGE, "Odening Lab", "expertise", "cardiac electrophysiology",
+                        "Translational Cardiology / Electrophysiology").ok
+    assert verify_claim(LAB_PAGE, "Odening Lab", "description", "research on cardiac arrhythmias", sentence).ok
+
+
+def test_short_topic_without_content_words_is_not_judged_by_the_heading_rule():
+    page = PageText("AIMI Lab\nAI\nWe build models.")
+    assert verify_claim(page, "AIMI Lab", "expertise", "AI", "AI").ok

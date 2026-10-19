@@ -4,6 +4,7 @@ Matching happens on normalised text, but the stored quote is always mapped back 
 exact original page text, so the UI shows a literal slice of the source page.
 """
 
+import re
 import unicodedata
 from dataclasses import dataclass
 
@@ -11,6 +12,8 @@ from rapidfuzz import fuzz
 
 FUZZY_MIN_SCORE = 95.0
 VALUE_IN_QUOTE_FIELDS = {"name", "role", "email", "phone"}
+TOPIC_FIELDS = {"expertise", "description"}  # the quote must be a sentence or name the topic (#149)
+MIN_SENTENCE_WORDS = 8
 MAX_PAIR_DISTANCE = 200  # max characters between a person's name and their role/email/phone
 
 _CHAR_MAP = str.maketrans({
@@ -130,11 +133,30 @@ class PageText:
         return best[1], best[2]
 
 
+def names_topic(value: str, quote: str) -> bool:
+    """A content word of the value (its first 5 letters, so "valves" names "valve") is in the quote, or the value
+    has no content words to look for ("AI")."""
+    words = [w[:5] for w in re.findall(r"[^\W\d_]{4,}", norm(value))]
+    q = norm(quote)
+    return not words or any(w in q for w in words)
+
+
+def is_sentence(quote: str) -> bool:
+    """Prose, not a heading or a label: long enough, or with sentence punctuation."""
+    return len(re.findall(r"\w+", quote)) >= MIN_SENTENCE_WORDS or bool(re.search(r"[.;:!?](\s|$)", quote.strip()))
+
+
 def verify_claim(page: PageText, entity_name: str, field: str, value: str, quote: str) -> QuoteMatch:
-    """Checks 1-3 of PLAN 7.6. On success, `quote` is replaced by the exact page text."""
+    """Checks 1-3 of PLAN 7.6. On success, `quote` is replaced by the exact page text.
+    A topic (expertise, description) quoted only by a heading or label that does not name it is rejected: on pages
+    without research text the model copies the prompt's example topics and quotes "Team" or the lab name (#149)."""
     if not page.contains(entity_name):
         return QuoteMatch(False, quote, reason="entity name not on page")
     match = page.find_quote(quote)
+    if field in TOPIC_FIELDS:
+        if match.ok and not is_sentence(match.quote) and not names_topic(value, match.quote):
+            return QuoteMatch(False, match.quote, reason="topic not named in a heading-only quote")
+        return match
     if field not in VALUE_IN_QUOTE_FIELDS:
         return match
     if match.ok and norm(value) in norm(match.quote):
