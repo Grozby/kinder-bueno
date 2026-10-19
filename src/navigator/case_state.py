@@ -20,6 +20,9 @@ from navigator.models import (
 from navigator.results import build_results
 
 DEFAULT_SELECTION = 10  # matching references selected for the pitch until the user changes the selection
+# Fewer covered needs than this: nothing is preselected, so no pitch is offered by default. One weak match
+# ("climate science" for an agritech need) should not make a pitch (#158).
+MIN_COVERED_NEEDS = 2
 SESSION_PREFIX = "case-"
 STANDALONE_DAYS = 30  # standalone chat sessions (search page) are kept this long
 
@@ -46,12 +49,15 @@ def _exists(conn: psycopg.Connection, case_id: str) -> bool:
 
 def get_selection(conn: psycopg.Connection, case_id: str) -> list[int] | None:
     """The stored selection without entities gone since, or the first 10 references that match a need (#110: a
-    reference only found for a need is never preselected, so a 0-fit case starts empty); None if no such case."""
+    reference only found for a need is never preselected, so a 0-fit case starts empty). Empty while fewer than
+    MIN_COVERED_NEEDS needs are covered. None if no such case."""
     row = conn.execute('SELECT selection, refs FROM "case" WHERE id = %s', (case_id,)).fetchone()
     if row is None:
         return None
     if row[0] is None:
         matched = {r["entity_id"] for r in row[1] if r["needs"]}
+        if len({n for r in row[1] for n in r["needs"]}) < MIN_COVERED_NEEDS:
+            return []
         refs = analysis.references(conn, case_id, len(row[1])) or []
         return [r.entity_id for r in refs if r.entity_id in matched][:DEFAULT_SELECTION]
     found = {r[0] for r in conn.execute("SELECT id FROM entity WHERE id = ANY(%s)", (row[0],))}
