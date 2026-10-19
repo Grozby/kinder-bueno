@@ -163,7 +163,8 @@ def test_api_resolves_n_against_the_previous_stored_turn(client, graph):
     """Two requests, as on two workers: the 2nd reads the 1st from chat_turn (#103) and resolves "#n" there."""
     from fake_chat import SearchModel
 
-    from navigator.api import app, get_chat_model
+    from navigator.api import app
+    from navigator.api.deps import get_chat_model
 
     first = client.post("/api/chat", json={"session_id": "s1", "message": "glucose"}).json()
     n = [r["name"] for r in first["results"]].index("Alice Muster") + 1

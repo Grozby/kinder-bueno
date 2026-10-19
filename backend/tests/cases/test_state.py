@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 from test_api import fake_embed
 
 from cases.test_analysis import new_case, run
-from navigator.api import (
-    app,
+from navigator.api import app
+from navigator.api.deps import (
     get_chat_model,
     get_conn,
     get_embed,

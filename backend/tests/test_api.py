@@ -5,8 +5,8 @@ from conftest import onehot
 from fake_chat import SearchModel
 from fastapi.testclient import TestClient
 
-from navigator.api import (
-    app,
+from navigator.api import app
+from navigator.api.deps import (
     get_chat_model,
     get_conn,
     get_embed,

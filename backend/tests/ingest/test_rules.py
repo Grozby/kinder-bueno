@@ -4,7 +4,8 @@ import pytest
 from conftest import onehot
 from fastapi.testclient import TestClient
 
-from navigator.api import app, get_conn, get_embed, get_expand, get_explain
+from navigator.api import app
+from navigator.api.deps import get_conn, get_embed, get_expand, get_explain
 from navigator.core.settings import BACKEND_ROOT
 from navigator.core.sources import load_sources
 from navigator.ingest.rules import RulesError, apply_blocks, get_rules, save_rules, validate, with_stored
