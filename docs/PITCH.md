@@ -68,8 +68,8 @@ track; the slides use the same numbers.
   yet (`docs/FRONTEND_API.md`, "Review, notes and similar cases").
 
 1. **Upload a company** (~25 s). Drop the Glucora PDF on the board. The pop-up shows the analysis; the card
-   lands in "New" with a **fit score of about 60–70**: Apertus reads the PDF afresh on each upload, and the
-   needs it reads move the score (60, 60, 60 and 65 after #160; one earlier upload read 5 of 5 needs covered
+   lands in "New" with a **fit score of about 60–80**: Apertus reads the PDF afresh on each upload, and the
+   needs it reads move the score (60, 60, 60 and 65 after #160, 73 in the v0.2.1 smoke test; one earlier upload read 5 of 5 needs covered
    and scored 81). Read the summary (needle-free
    wearable glucose sensor, Swiss R&D in Bern) and the breakdown: "4 of 5 needs covered … Not covered:
    biocompatibility testing for skin sensors". Say it: the score only counts what our sources prove, and it

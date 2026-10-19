@@ -93,7 +93,7 @@ Open **http://localhost:8080**. The API takes about a minute to load its model; 
    "5 of 5 needs covered", and of its 25 references the top 10 are preselected, each marked "Matches" and linked
    to its source page.
 4. Drop `docs/examples/glucora-business-model.pdf` on the board. The analysis finishes within 1–2 minutes; the score
-   is about 60–70, because Apertus reads the PDF afresh on each upload.
+   is about 60–80, because Apertus reads the PDF afresh on each upload.
 
 ## Day to day
 
