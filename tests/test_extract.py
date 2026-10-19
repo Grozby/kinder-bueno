@@ -1,6 +1,6 @@
 import pytest
 
-from navigator.extract import check_items, is_person_name, parse_items, reverify, salvage_rows, split_text
+from navigator.extract import Claim, check_items, is_person_name, parse_items, reverify, salvage_rows, split_text
 from navigator.llm import LLMError, parse_json_object
 from navigator.verify import PageText
 
@@ -141,3 +141,12 @@ def test_reverify_rechecks_stored_rows_without_llm():
     claim_updates, relation_updates = reverify(rows)
     assert claim_updates == [(False, "Alumni", "not a person name", 1), (True, "CEO\nDerek Brandt", None, 2)]
     assert relation_updates == [(True, "Derek Brandt", None, 7)]
+
+
+def test_copied_example_topics_on_a_team_page_do_not_pass_the_checks():
+    """#149: a team page has no research text; topics quoted by its headings fail verification."""
+    page = PageText("Team Schroeder Lab\nName / Titel\nProf. Dr. Anna Schroeder\nFunktion\nGroup Leader")
+    copied = [Claim(entity_type="unit", entity_name="Schroeder Lab", field="expertise", value=v, quote="Schroeder Lab")
+              for v in ("cardiac arrhythmia", "cardiac electrophysiology")]
+    checked, _ = check_items(page, copied, [])
+    assert [c.verified for c in checked] == [False, False]

@@ -81,16 +81,18 @@ TOPICS_PROMPT = _COMMON + """
 YOUR TASK: extract ONLY units, projects and infrastructure (NOT people) and the relations between them.
 - For each unit, project or infrastructure the page is about: one name claim and one description
   claim (one sentence).
-- 2 to 6 expertise claims per unit or project: short topic phrases (2-5 words) like "continuous glucose
-  monitoring", "surgical robotics", "cardiac arrhythmia". The quote is the sentence that shows the topic.
+- 2 to 6 expertise claims per unit or project: short topic phrases (2-5 words) taken from the page, like
+  "sea ice acoustics" in the example below. The quote is the sentence that shows the topic.
+- No research sentence on the page (a team list, contacts, a menu): no expertise or description claims.
+  Never use a heading, a name or a label ("Team", "Group Members") as the quote for a topic.
 - Relations: part_of (unit -> unit), works_on (unit -> project), provides (unit -> infrastructure).
 
-Example, lab page with the text "Odening Lab\nTranslational Cardiology / Electrophysiology\nOur research
-is focused on advancing the mechanistic understanding of cardiac arrhythmias.":
-{"claims": [["unit", "Odening Lab", "name", "Odening Lab", "Odening Lab"],
-            ["unit", "Odening Lab", "description", "research on the mechanisms of cardiac arrhythmias", "Our research is focused on advancing the mechanistic understanding of cardiac arrhythmias."],
-            ["unit", "Odening Lab", "expertise", "cardiac arrhythmia", "Our research is focused on advancing the mechanistic understanding of cardiac arrhythmias."],
-            ["unit", "Odening Lab", "expertise", "cardiac electrophysiology", "Translational Cardiology / Electrophysiology"]],
+Example (fictional), lab page with the text "Vemlor Lab\nPolar Acoustics\nOur research is focused on how sound
+travels through sea ice and what it reveals about ice thickness.":
+{"claims": [["unit", "Vemlor Lab", "name", "Vemlor Lab", "Vemlor Lab"],
+            ["unit", "Vemlor Lab", "description", "research on sound propagation through sea ice", "Our research is focused on how sound travels through sea ice and what it reveals about ice thickness."],
+            ["unit", "Vemlor Lab", "expertise", "sea ice acoustics", "Our research is focused on how sound travels through sea ice and what it reveals about ice thickness."],
+            ["unit", "Vemlor Lab", "expertise", "ice thickness measurement", "Our research is focused on how sound travels through sea ice and what it reveals about ice thickness."]],
  "relations": []}
 """
 
