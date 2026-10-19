@@ -5,10 +5,10 @@ import socket
 import pytest
 from fastapi.testclient import TestClient
 
-from navigator import ingest
+from navigator.ingest import pipeline
 from navigator.api import app, get_conn, get_ingest, get_ingest_slot, get_seeds
-from navigator.crawl import CrawledPage
-from navigator.ingest import SourceError, add_source, check_url, run_ingest, source_config, source_id_for
+from navigator.ingest.crawl import CrawledPage
+from navigator.ingest.pipeline import SourceError, add_source, check_url, run_ingest, source_config, source_id_for
 
 TEXT = "Dr. Jane Doe leads the Sensor Lab and works on glucose sensors. " * 3
 
@@ -31,13 +31,13 @@ def public_dns(monkeypatch):
 def slot(test_database_url):
     """The ingest slot is free before and after each test; yields a function that takes it."""
     def take():
-        taken = ingest.try_start(test_database_url)
+        taken = pipeline.try_start(test_database_url)
         assert taken is not None, "the ingest slot is taken"
         return taken
 
-    ingest.finish(take())
+    pipeline.finish(take())
     yield take
-    ingest.finish(take())
+    pipeline.finish(take())
 
 
 @pytest.mark.parametrize(("host", "taken", "expected"), [
@@ -62,9 +62,9 @@ def test_check_url_accepts_public_host(public_dns):
 
 def test_source_config_caps_pages_and_host_rule():
     own = source_config("x", "X", "https://lab.test/", "lab.test", False, 500)
-    assert own.max_pages == ingest.MAX_PAGES and own.allow_hosts == ["lab.test", "www.lab.test"]
+    assert own.max_pages == pipeline.MAX_PAGES and own.allow_hosts == ["lab.test", "www.lab.test"]
     outbound = source_config("x", "X", "https://lab.test/", "lab.test", True, 10)
-    assert outbound.allow_hosts_regex == ingest.PUBLIC_HOST and outbound.max_pages == 10
+    assert outbound.allow_hosts_regex == pipeline.PUBLIC_HOST and outbound.max_pages == 10
 
 
 def test_add_source_marks_an_interrupted_ingest_failed(test_conn, public_dns):
@@ -79,7 +79,7 @@ def test_add_source_reuses_only_a_failed_ui_source(test_conn, public_dns):
     assert add_source(test_conn, "https://lab.test/", None, 9, 50, False) == "lab_2"  # yaml source kept
     row = test_conn.execute("SELECT name, status, stage, root_url, config FROM source WHERE id = 'lab_2'").fetchone()
     assert row[:4] == ("lab.test", "crawling", "crawl", "https://lab.test/")
-    assert row[4]["max_depth"] == ingest.MAX_DEPTH and row[4]["source"]["seeds"] == ["https://lab.test/"]
+    assert row[4]["max_depth"] == pipeline.MAX_DEPTH and row[4]["source"]["seeds"] == ["https://lab.test/"]
     assert add_source(test_conn, "https://lab.test/", "Lab", 2, 50, False) == "lab_3"  # lab_2 is marked failed
     # only the base id is reused: lab_2 failed, but a new one is lab_4
     assert add_source(test_conn, "https://lab.test/", "Lab", 2, 50, False) == "lab_4"
@@ -106,7 +106,7 @@ def _fake_pipeline(monkeypatch, pages, fail_at=None):
     async def extract(llm, rows):
         from types import SimpleNamespace
 
-        from navigator.extract import Checked, PageResult
+        from navigator.ingest.extract import Checked, PageResult
 
         steps.append(("extract", len(rows)))
         if fail_at == "extract":
@@ -125,11 +125,11 @@ def _fake_pipeline(monkeypatch, pages, fail_at=None):
         return run
 
     monkeypatch.setattr("navigator.core.llm.LLM", lambda *args, **kwargs: object())  # no gateway key needed (CI)
-    monkeypatch.setattr("navigator.crawl.crawl_source", crawl)
+    monkeypatch.setattr("navigator.ingest.crawl.crawl_source", crawl)
     monkeypatch.setattr("navigator.core.embed.embed_documents", lambda texts: [np.zeros(1024) for _ in texts])
-    monkeypatch.setattr("navigator.extract.extract_pages", extract)
-    monkeypatch.setattr("navigator.resolve.resolve", step("resolve"))
-    monkeypatch.setattr("navigator.judge.run_judge", step("judge"))
+    monkeypatch.setattr("navigator.ingest.extract.extract_pages", extract)
+    monkeypatch.setattr("navigator.ingest.resolve.resolve", step("resolve"))
+    monkeypatch.setattr("navigator.ingest.judge.run_judge", step("judge"))
     return steps
 
 
@@ -140,7 +140,7 @@ def _ingest(test_conn, test_database_url, url="https://lab.test/"):
                                    "max_depth": 2}), url),
     )
     test_conn.commit()
-    run_ingest(ingest.try_start(test_database_url), "lab")
+    run_ingest(pipeline.try_start(test_database_url), "lab")
     return test_conn.execute("SELECT status, stage, error FROM source WHERE id = 'lab'").fetchone()
 
 
@@ -188,8 +188,8 @@ def client(test_conn, test_database_url, public_dns, slot):
     started = []
     app.dependency_overrides[get_conn] = lambda: test_conn
     app.dependency_overrides[get_seeds] = lambda: {}
-    app.dependency_overrides[get_ingest_slot] = lambda: lambda: ingest.try_start(test_database_url)
-    app.dependency_overrides[get_ingest] = lambda: lambda taken, source_id: (started.append(source_id), ingest.finish(taken))
+    app.dependency_overrides[get_ingest_slot] = lambda: lambda: pipeline.try_start(test_database_url)
+    app.dependency_overrides[get_ingest] = lambda: lambda taken, source_id: (started.append(source_id), pipeline.finish(taken))
     yield TestClient(app), started
     app.dependency_overrides.clear()
 
@@ -223,16 +223,16 @@ def test_post_source_while_an_ingest_runs_is_409(client, slot):
         res = http.post("/api/sources", json={"url": "https://lab.test/"})
         assert res.status_code == 409
     finally:
-        ingest.finish(running)
+        pipeline.finish(running)
     assert started == []
 
 
 def test_slot_is_one_per_database_and_freed_when_its_connection_closes(test_database_url, slot):
     first = slot()
-    assert ingest.try_start(test_database_url) is None  # any other connection: another worker or replica
+    assert pipeline.try_start(test_database_url) is None  # any other connection: another worker or replica
     first.close()  # the worker died: Postgres ends the session and frees the lock
     second = slot()
-    ingest.finish(second)
+    pipeline.finish(second)
 
 
 # --- re-crawl (#80) ---
@@ -266,8 +266,8 @@ def test_failed_recrawl_keeps_the_previous_data(test_conn, test_database_url, mo
 
 def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_database_url, monkeypatch, slot):
     from navigator.models import CrawlRulesUpdate
-    from navigator.rules import save_rules
-    from navigator.sources import load_sources
+    from navigator.ingest.rules import save_rules
+    from navigator.core.sources import load_sources
     from navigator.core.settings import BACKEND_ROOT
 
     sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
@@ -282,8 +282,8 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
         return [CrawledPage(source.seeds[0], "ARTORG", TEXT), CrawledPage("https://www.artorg.unibe.ch/team", "T", TEXT)]
 
     _fake_pipeline(monkeypatch, [])
-    monkeypatch.setattr("navigator.crawl.crawl_source", crawl)
-    assert ingest.start_recrawl(test_conn, sources, "artorg")
+    monkeypatch.setattr("navigator.ingest.crawl.crawl_source", crawl)
+    assert pipeline.start_recrawl(test_conn, sources, "artorg")
     test_conn.commit()
     assert test_conn.execute("SELECT status, stage FROM source WHERE id = 'artorg'").fetchone() == ("crawling", "crawl")
     run_ingest(slot(), "artorg")
@@ -294,13 +294,13 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
 
 
 def test_start_recrawl_unknown_source(test_conn):
-    from navigator.sources import load_sources
+    from navigator.core.sources import load_sources
     from navigator.core.settings import BACKEND_ROOT
 
     sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
-    assert not ingest.start_recrawl(test_conn, sources, "nope")
+    assert not pipeline.start_recrawl(test_conn, sources, "nope")
     test_conn.execute("INSERT INTO source (id, name) VALUES ('gone', 'Removed from sources.yaml')")
-    assert not ingest.start_recrawl(test_conn, sources, "gone")
+    assert not pipeline.start_recrawl(test_conn, sources, "gone")
 
 
 def test_recrawl_route(client, test_conn, test_database_url):
@@ -310,10 +310,10 @@ def test_recrawl_route(client, test_conn, test_database_url):
     assert res.status_code == 200 and (res.json()["status"], res.json()["stage"]) == ("crawling", "crawl")
     assert started == ["artorg"]
     assert http.post("/api/sources/nope/crawl").status_code == 404
-    running = ingest.try_start(test_database_url)
+    running = pipeline.try_start(test_database_url)
     try:
         assert http.post("/api/sources/artorg/crawl").status_code == 409
     finally:
-        ingest.finish(running)
+        pipeline.finish(running)
     assert started == ["artorg"]
 

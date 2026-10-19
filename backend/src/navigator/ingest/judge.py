@@ -3,7 +3,7 @@
 Quote verification (7.6) proves a quote is on the page, not that it supports the fact. One Apertus
 call per page judges that page's verified claims (expertise, description, bio, unit_type) and
 verified relations. Verdicts go to judge_verdict / judge_reason; "unsupported" rows are then hidden
-(results.shown). A failed call or a missing item leaves the verdict NULL: the judge never blocks.
+(db.shown). A failed call or a missing item leaves the verdict NULL: the judge never blocks.
 Resolve rebuilds the claim table, so run the judge after it.
 """
 

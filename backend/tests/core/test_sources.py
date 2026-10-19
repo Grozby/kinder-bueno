@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from navigator.core.settings import BACKEND_ROOT
-from navigator.sources import SourcesFile, load_sources
+from navigator.core.sources import SourcesFile, load_sources
 
 
 def test_real_config_loads():

@@ -4,7 +4,7 @@ import numpy as np
 import psycopg
 import pytest
 
-from navigator import chunks_db
+from navigator.ingest import chunks_db
 from navigator.search import (
     ChunkHit,
     cap_per_page,

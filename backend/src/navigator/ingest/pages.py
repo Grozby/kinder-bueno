@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import psycopg
 
 from navigator.models import PageDetail, PageFact, PageKind, ResourcePage, ScoreItem
-from navigator.results import shown
+from navigator.core.db import shown
 
 YIELD_FULL = 40  # shown claims for a full yield score
 

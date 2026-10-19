@@ -9,7 +9,7 @@ from navigator.api import (
     app, get_chat_model, get_conn, get_embed, get_expand, get_explain, get_page_rules, get_seeds,
 )
 from navigator.expand import Expansion
-from navigator.pages import SourceRules, guess_kind
+from navigator.ingest.pages import SourceRules, guess_kind
 
 
 def fake_embed(query: str):

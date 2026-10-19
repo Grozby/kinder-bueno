@@ -10,8 +10,8 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError, field_validator
 
 from navigator.core.llm import LLM, LLMError
-from navigator.resolve import is_person_name
-from navigator.verify import PageText, verify_claim, verify_relation
+from navigator.ingest.resolve import is_person_name
+from navigator.ingest.verify import PageText, verify_claim, verify_relation
 
 log = logging.getLogger(__name__)
 

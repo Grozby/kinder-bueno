@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS source_rules (
   rules       jsonb NOT NULL,         -- {allow_hosts, include_patterns, exclude_patterns, priority_patterns}
   changed_at  timestamptz NOT NULL
 );
--- A page matching a stored exclude pattern: its claims and relations are hidden at once (results.shown).
+-- A page matching a stored exclude pattern: its claims and relations are hidden at once (db.shown).
 ALTER TABLE page ADD COLUMN IF NOT EXISTS blocked boolean NOT NULL DEFAULT false;
 -- shown() checks it inside the ranking queries: a tiny partial index (few pages are blocked)
 CREATE INDEX IF NOT EXISTS page_blocked_idx ON page(id) WHERE blocked;

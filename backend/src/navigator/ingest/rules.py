@@ -5,7 +5,7 @@ the UI (#55). A PUT stores all four lists in `source_rules`; from then on they r
 for the crawler (`with_stored`), so a re-crawl (#80) uses them.
 
 A block applies at once: `page.blocked` is set for every stored page whose URL matches an exclude pattern
-(`re.search`, as the crawler matches). results.shown() skips claims and relations from blocked pages, so
+(`re.search`, as the crawler matches). db.shown() skips claims and relations from blocked pages, so
 search, chat, case references and the eval drop them without a re-crawl. Case scores computed before a
 block are not recomputed.
 """
@@ -17,8 +17,8 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from navigator.models import CrawlRules, CrawlRulesUpdate
-from navigator.pages import SourceRules
-from navigator.sources import SourceConfig, SourcesFile, _compile
+from navigator.ingest.pages import SourceRules
+from navigator.core.sources import SourceConfig, SourcesFile, _compile
 
 KINDS = ("allow_hosts", "include_patterns", "exclude_patterns", "priority_patterns")
 

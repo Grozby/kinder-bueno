@@ -2,7 +2,7 @@
 
 import asyncio
 
-from navigator.judge import (
+from navigator.ingest.judge import (
     MAX_ITEMS,
     Item,
     Page,
