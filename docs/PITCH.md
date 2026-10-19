@@ -2,10 +2,10 @@
 
 Numbers come from `eval/report.md` (gold set v2: 18 queries, 340 pages; last run on 2026-10-19 on main
 `458e2f0`, after the database swap) and `navigator stats`. Re-run `uv run navigator eval` before presenting and update the numbers here,
-in `docs/REPORT.md` and in the slides. Demo timings were measured on the Docker setup on 2026-10-18 (rehearsal, #34), and the script was
-rehearsed again three times on a fresh stack restored from `checkpoints/demo.dump`, on main after #95. Those
-rehearsals used the 100-page database: on the 340-page one the demo's scores and results differ, so rehearse
-again before showing it.
+in `docs/REPORT.md` and in the slides. The demo below was re-rehearsed on 2026-10-19 on the 340-page database
+(main `eb39e41`, a copy of the shared DB): every step was run through the API, with 4 Glucora uploads. The UI
+clicks were last rehearsed on the 100-page database (2026-10-18, #34 and after #95), so click through once more
+before presenting.
 
 ## Slides (5 minutes)
 
@@ -50,6 +50,8 @@ track; the slides use the same numbers.
 ## Demo (4 minutes)
 
 **Before the demo** (README "Demo"):
+- The script below needs the 340-page data. `checkpoints/demo.dump` (the `v0.1.1` handoff snapshot) still holds
+  the 100 pages: present from the shared stack, or first take a new snapshot with `scripts/demo.sh dump`.
 - `docker compose run --rm restore` loads the snapshot (it replaces every case with the snapshot's; take the
   snapshot from a board without a Glucora card, since the demo uploads Glucora live), then
   `docker compose run --rm app uv run navigator init-db` (adds what a snapshot older than the code lacks), then
@@ -63,33 +65,39 @@ track; the slides use the same numbers.
   yet (`docs/FRONTEND_API.md`, "Review, notes and similar cases").
 
 1. **Upload a company** (~25 s). Drop the Glucora PDF on the board. The pop-up shows the analysis; the card
-   lands in "New" with a **fit score of about 55–80**: Apertus reads the PDF afresh on each upload, and the
-   needs it reads move the score (80 in the first rehearsal; 61, 56 and 61 in the later ones, with research fit
-   "2 of 5 needs covered"). Read the summary (needle-free wearable glucose sensor, Swiss R&D in
-   Bern) and the breakdown: "4 of 5 needs covered … Not covered: wearable biosensor signal processing". Say it:
-   the score only counts what our sources prove, and it shows the gap.
-2. **References.** Open the card: 25 references, the first 10 preselected. Point at the two kinds of "why":
-   "Matches 'closed-loop artificial pancreas systems': …" (a verified topic claim matches a need, so it counts
-   in the score) and "Found for '…'" (the search found it, but no claim matches, so it does not count).
-3. **Traceability.** Open Prof. Lilian Witthauer's evidence. Each row is a quote from a public page, e.g. her
-   role from dcberne.com/en/team/. Click the link and find the same text on the live page. The flag button on a
-   row reports a wrong fact; nothing is changed automatically.
+   lands in "New" with a **fit score of about 60–70**: Apertus reads the PDF afresh on each upload, and the
+   needs it reads move the score (60, 69, 69 and 69 in the 340-page rehearsal). Read the summary (needle-free
+   wearable glucose sensor, Swiss R&D in Bern) and the breakdown: "4 of 5 needs covered … Not covered:
+   biocompatibility testing for skin sensors". Say it: the score only counts what our sources prove, and it
+   shows the gap.
+2. **References.** Open the card: 25 references; only the 7–10 marked "Matches" are preselected. Point at the
+   two kinds of "why": "Matches 'closed-loop artificial pancreas systems': …" (a verified topic claim matches a
+   need, so it counts in the score) and "Found for '…'" (the search found it, but no claim matches, so it does
+   not count and is never preselected).
+3. **Traceability.** Open Dr. med. Dr. phil. Lia Bally's evidence (a preselected reference, rank 7–10). Each row
+   is a quote from a public page: her role "Group Leader" from the Bally Lab team page on dbmr.unibe.ch, and her
+   lab's "closed-loop automated insulin delivery systems" from the Bally Lab page. Click the link and find the
+   same text on the live page. The flag button on a row reports a wrong fact; nothing is changed automatically.
 4. **Refine with chat.**
-   - `continuous glucose monitoring`, then `glucose sensors`: other words, same core (DCB Research AG, AI in
-     Health and Nutrition, University Clinic for Diabetology). Apertus expands each query with synonyms and
-     German terms (e.g. CGM, biosensors) before searching.
-   - `More like #1` (~5 s), then `Who works with #2?` (~1 s): the chat agent (#131) reads the numbers as earlier
-     results, finding similar people and units, then the people linked to result #2 (e.g. DCB and Tidepool →
-     Andrea Celoria, Thomas Züger). Add one of them as a reference.
+   - `continuous glucose monitoring`, then `glucose sensors` (~3–4 s each): other words, same core (DCB
+     Research AG, Diabetes Center Berne, University Clinic for Diabetology, DCB and Tidepool). Apertus expands
+     each query with synonyms and German terms (e.g. CGM, biosensors) before searching.
+   - `More like #2` (~4–6 s), then `Who works with #2?` (~1 s): the chat agent (#131) reads the numbers as
+     earlier results. "More like" Diabetes Center Berne brings DCB and Tidepool, Prof. Lilian Witthauer and
+     Prof. Maria Luisa Balmer; then the people linked to the new #2, DCB and Tidepool: Andrea Celoria, Thomas
+     Züger, José García-Tirado, Lilian Witthauer. Add one of them as a reference. Use exactly this order:
+     `More like #1` after `continuous glucose monitoring` drifts into rehabilitation groups.
    - `quantum cryptography`: "Showing 0 results": no reliable source, so nothing is made up.
-5. **Pitch** (~10 s). Deselect a weak reference (e.g. Acoustic Robotics Systems Lab: "Found for", no matching
-   claim), move the card to "Accepted", generate the pitch. Statements about references carry small numbered
-   citations (#109): click one to show the cited fact, its quote and the source page. Sentences about references
-   that cite nothing, or cite facts outside the selection, are removed.
-6. *(Optional)* **Honest "no fit".** Drop `vinora-business-model.pdf` (agritech, ~20 s): fit score **0**,
-   every criterion 0, "No matching experts in our sources", and the references say "No references in our sources
-   match these needs" (#110): nothing is preselected, so no pitch is offered for a case we can't serve.
-7. *(Optional)* **Sources** page: the crawl graph, then "Ranked pages": the 100 pages ranked by verified
+5. **Pitch** (~12 s). Only "Matches" references are preselected, so there is no weak one to remove; to show
+   the selection, deselect one (e.g. Artificial Intelligence in Medical Imaging). Move the card to "Accepted",
+   generate the pitch. Statements about references carry small numbered citations (#109): click one to show the
+   cited fact, its quote and the source page. Sentences about references that cite nothing, or cite facts
+   outside the selection, are removed.
+6. *(Optional, skip for now)* **Honest "no fit".** On the 340-page data `vinora-business-model.pdf` (agritech,
+   ~16 s) no longer scores 0 but **12**: one weak match, Dr. Kevin Debeire's "climate science" for the need "soil
+   science irrigation climate adaptation", is preselected, so a pitch would be offered. The other four needs
+   are uncovered. Show it only once that false match is fixed.
+7. *(Optional)* **Sources** page: the crawl graph, then "Ranked pages": the 340 pages ranked by verified
    facts, judge rate and feedback. Block a page (the ⊘ button): "It no longer appears in results", and its
    facts leave search and cases at once (#79). Press "Undo" in the toast right away. Don't start a re-crawl
    (#80): it re-fetches and re-extracts the whole source, which takes minutes.

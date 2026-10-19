@@ -148,7 +148,7 @@ the same ranking, so v1 results are not compared with v2.
 All four scores are in range; 19 of 31 expected matches are found (20 of 31 among the references), with 2 false
 matches. Vinora's 12 comes from one weak match: its need "soil science irrigation climate adaptation" matched a
 climate scientist's "climate science". A live upload reads the PDF afresh, so the needs Apertus reads, and the
-score, vary between uploads (Glucora gave 55–80 across rehearsals on the 100-page database).
+score, vary between uploads (Glucora gave 60–69 in 4 uploads on the 340-page database; 55–80 on the 100 pages).
 
 ## 5. How it scales
 
