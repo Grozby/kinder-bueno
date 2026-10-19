@@ -51,9 +51,10 @@ track; the slides use the same numbers.
 ## Demo (4 minutes)
 
 **Before the demo** (README "Demo"):
-- The script below needs the 340-page data. `checkpoints/demo.dump` (the `v0.1.1` handoff snapshot) still holds
-  the 100 pages: present from the shared stack, or restore a 340-page snapshot (`scripts/demo.sh setup --snapshot
-  demo-340.dump`; it is git-ignored, ask for it, or take one with `scripts/demo.sh dump demo-340.dump`).
+- The script below needs the 340-page data: present from the shared stack, or restore a 340-page snapshot with
+  `scripts/demo.sh setup --snapshot <file>`. Either `demo-340.dump` (empty board) or `demo-340-precisa.dump` (the
+  `v0.2.1` handoff snapshot, with one Precisa card); both are git-ignored, so ask for them, or take one with
+  `scripts/demo.sh dump demo-340.dump`.
 - `docker compose run --rm restore` loads the snapshot (it replaces every case with the snapshot's; take the
   snapshot from a board without a Glucora card, since the demo uploads Glucora live), then
   `docker compose run --rm app uv run navigator init-db` (adds what a snapshot older than the code lacks), then
