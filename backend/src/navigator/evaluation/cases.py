@@ -20,9 +20,9 @@ import numpy as np
 import psycopg
 import yaml
 
-from navigator.analysis import CaseInfo, Scored, score_needs
-from navigator.cases import pdf_text
-from navigator.evaluate import Expected, matches
+from navigator.cases.analysis import CaseInfo, Scored, score_needs
+from navigator.cases.store import pdf_text
+from navigator.evaluation.gold import Expected, matches
 
 
 @dataclass(frozen=True)

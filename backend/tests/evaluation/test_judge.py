@@ -2,7 +2,7 @@
 
 import asyncio
 
-from navigator.eval_judge import (
+from navigator.evaluation.judge import (
     Verdict,
     format_results,
     judge_all,

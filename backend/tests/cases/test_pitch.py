@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from navigator.api import app, get_conn, get_write_pitch
+from navigator.cases.pitch import check_pitch, format_prompt, template, write_pitch
 from navigator.models import Evidence, Result
-from navigator.pitch import check_pitch, format_prompt, template, write_pitch
 
 
 def _ev(claim_id: int, field: str, value: str = "v", via_unit: str | None = None) -> Evidence:

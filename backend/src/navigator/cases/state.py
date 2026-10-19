@@ -7,7 +7,7 @@ The chat session of a case is "case-<id>" (frontend/src/stores/cases.ts). Result
 import psycopg
 from psycopg.types.json import Jsonb
 
-from navigator import analysis
+from navigator.cases import analysis
 from navigator.models import (
     CaseChatTurn,
     CaseFeedback,

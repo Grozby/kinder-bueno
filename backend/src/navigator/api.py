@@ -12,7 +12,7 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import analysis, case_state, cases, documents, pitch
+from navigator.cases import analysis, documents, pitch, state, store
 from navigator.core.db import shown
 from navigator.core.llm import LLM
 from navigator.core.settings import get_settings
@@ -233,7 +233,7 @@ def chat(
     """The chat agent (plan 8.10, #97): the model picks tools (search, set_filters, more_like, related) and
     "#2" means the 2nd result of the previous turn. A blank message with new `filters` re-runs the last query
     without the model. Every turn is stored in `chat_turn` (#103), so any worker can answer the next message."""
-    previous = case_state.last_turn(conn, body.session_id)
+    previous = state.last_turn(conn, body.session_id)
 
     def search_fn(q: str, f: ChatFilters) -> SearchResponse:
         return run_search(conn, embed, expand, explain, q, [f.source] if f.source else [], [f.type] if f.type else [])
@@ -253,7 +253,7 @@ def chat(
         response = ChatResponse(reply=turn.reply, results=turn.results, filters=turn.filters,
                                 expansion=turn.expansion, no_result=turn.no_result)
         query = turn.query
-    case_state.save_turn(conn, body.session_id, body.message, query, response)
+    state.save_turn(conn, body.session_id, body.message, query, response)
     return response
 
 
@@ -476,14 +476,14 @@ def get_page(conn: Conn, rules: PageRules, page_id: int) -> PageDetail:
 @app.post("/api/cases")
 def upload_case(conn: Conn, analyze: Analyze, background: BackgroundTasks, file: UploadFile) -> Case:
     """Store a business model PDF's text and return the case at once; the analysis runs in the background."""
-    data = file.file.read(cases.MAX_PDF_BYTES + 1)
-    if len(data) > cases.MAX_PDF_BYTES:
+    data = file.file.read(store.MAX_PDF_BYTES + 1)
+    if len(data) > store.MAX_PDF_BYTES:
         raise HTTPException(status_code=413, detail="PDF larger than 10 MB")
     try:
-        text = cases.pdf_text(data)
-    except cases.PdfError as exc:
+        text = store.pdf_text(data)
+    except store.PdfError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    case = cases.create_case(conn, file.filename or "upload.pdf", text)
+    case = store.create_case(conn, file.filename or "upload.pdf", text)
     conn.commit()  # the background analysis reads it on another connection
     background.add_task(analyze, case.id)
     return case
@@ -492,12 +492,12 @@ def upload_case(conn: Conn, analyze: Analyze, background: BackgroundTasks, file:
 @app.get("/api/cases")
 def list_cases(conn: Conn) -> list[Case]:
     """Newest first."""
-    return cases.list_cases(conn)
+    return store.list_cases(conn)
 
 
 @app.get("/api/cases/{case_id}")
 def get_case(conn: Conn, case_id: str) -> Case:
-    case = cases.get_case(conn, case_id)
+    case = store.get_case(conn, case_id)
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
@@ -515,9 +515,9 @@ def case_references(conn: Conn, case_id: str, limit: Annotated[int, Query(ge=1, 
 @app.post("/api/cases/{case_id}/references")
 def add_case_reference(conn: Conn, case_id: str, body: AddReference) -> Result:
     """Add a chat result to the case's references (#81); it then comes after the top 25, marked `added`."""
-    if cases.get_case(conn, case_id) is None:
+    if store.get_case(conn, case_id) is None:
         raise HTTPException(status_code=404, detail="Case not found")
-    added = case_state.add_reference(conn, case_id, body.entity_id)
+    added = state.add_reference(conn, case_id, body.entity_id)
     if added is None:
         raise HTTPException(status_code=404, detail="Entity not found")
     return added
@@ -526,15 +526,15 @@ def add_case_reference(conn: Conn, case_id: str, body: AddReference) -> Result:
 @app.delete("/api/cases/{case_id}/references/{entity_id}")
 def remove_case_reference(conn: Conn, case_id: str, entity_id: int) -> Selection:
     """Remove a chat-added reference; it is also deselected. Returns the selection."""
-    if not case_state.remove_reference(conn, case_id, entity_id):
+    if not state.remove_reference(conn, case_id, entity_id):
         raise HTTPException(status_code=404, detail="No such added reference")
-    return Selection(entity_ids=case_state.get_selection(conn, case_id) or [])
+    return Selection(entity_ids=state.get_selection(conn, case_id) or [])
 
 
 @app.get("/api/cases/{case_id}/selection")
 def get_selection(conn: Conn, case_id: str) -> Selection:
     """The references chosen for the pitch (#81); the first 10 until the user changes it."""
-    found = case_state.get_selection(conn, case_id)
+    found = state.get_selection(conn, case_id)
     if found is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return Selection(entity_ids=found)
@@ -544,7 +544,7 @@ def get_selection(conn: Conn, case_id: str) -> Selection:
 def set_selection(conn: Conn, case_id: str, body: Selection) -> Selection:
     if unknown := pitch.unknown_entities(conn, body.entity_ids):
         raise HTTPException(status_code=404, detail=f"Unknown entity ids: {unknown}")
-    found = case_state.set_selection(conn, case_id, body.entity_ids)
+    found = state.set_selection(conn, case_id, body.entity_ids)
     if found is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return Selection(entity_ids=found)
@@ -553,7 +553,7 @@ def set_selection(conn: Conn, case_id: str, body: Selection) -> Selection:
 @app.get("/api/cases/{case_id}/chat")
 def case_chat(conn: Conn, case_id: str) -> list[CaseChatTurn]:
     """The chat turns of the case's session `case-<id>`, oldest first (#81)."""
-    turns = case_state.chat_history(conn, case_id)
+    turns = state.chat_history(conn, case_id)
     if turns is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return turns
@@ -562,7 +562,7 @@ def case_chat(conn: Conn, case_id: str) -> list[CaseChatTurn]:
 @app.get("/api/cases/{case_id}/feedback")
 def case_feedback(conn: Conn, case_id: str) -> CaseFeedback:
     """The 👍/👎 and flagged facts given in the case's session (#81)."""
-    found = case_state.feedback(conn, case_id)
+    found = state.feedback(conn, case_id)
     if found is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return found
@@ -572,7 +572,7 @@ def case_feedback(conn: Conn, case_id: str) -> CaseFeedback:
 def delete_case(conn: Conn, case_id: str) -> dict[str, bool]:
     """Delete the case and everything stored for it (#134): PDF text, analysis, notes, documents, its chat and
     feedback. Cannot be undone; snapshots taken before keep it."""
-    if not case_state.delete_case(conn, case_id):
+    if not state.delete_case(conn, case_id):
         raise HTTPException(status_code=404, detail="Case not found")
     return {"ok": True}
 
@@ -580,7 +580,7 @@ def delete_case(conn: Conn, case_id: str) -> dict[str, bool]:
 @app.patch("/api/cases/{case_id}")
 def update_case(conn: Conn, case_id: str, body: CaseStatusUpdate) -> Case:
     """Move the case to another board column."""
-    case = cases.set_status(conn, case_id, body.status)
+    case = store.set_status(conn, case_id, body.status)
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
@@ -589,7 +589,7 @@ def update_case(conn: Conn, case_id: str, body: CaseStatusUpdate) -> Case:
 @app.put("/api/cases/{case_id}/review")
 def set_review(conn: Conn, case_id: str, body: ReviewInput) -> Case:
     """The reviewer's own score (#108), clamped to 0-100, next to the AI score. `reason` is required."""
-    case = cases.set_review(conn, case_id, body)
+    case = store.set_review(conn, case_id, body)
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
@@ -597,7 +597,7 @@ def set_review(conn: Conn, case_id: str, body: ReviewInput) -> Case:
 
 @app.delete("/api/cases/{case_id}/review")
 def clear_review(conn: Conn, case_id: str) -> Case:
-    case = cases.set_review(conn, case_id, None)
+    case = store.set_review(conn, case_id, None)
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return case
@@ -606,7 +606,7 @@ def clear_review(conn: Conn, case_id: str) -> Case:
 @app.get("/api/cases/{case_id}/notes")
 def list_notes(conn: Conn, case_id: str) -> list[CaseNote]:
     """Internal notes (#108), oldest first. They never reach the pitch, the documents or an LLM prompt."""
-    notes = cases.list_notes(conn, case_id)
+    notes = store.list_notes(conn, case_id)
     if notes is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return notes
@@ -614,7 +614,7 @@ def list_notes(conn: Conn, case_id: str) -> list[CaseNote]:
 
 @app.post("/api/cases/{case_id}/notes")
 def add_note(conn: Conn, case_id: str, body: NoteInput) -> CaseNote:
-    note = cases.add_note(conn, case_id, body)
+    note = store.add_note(conn, case_id, body)
     if note is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return note
@@ -622,7 +622,7 @@ def add_note(conn: Conn, case_id: str, body: NoteInput) -> CaseNote:
 
 @app.delete("/api/cases/{case_id}/notes/{note_id}")
 def delete_note(conn: Conn, case_id: str, note_id: str) -> dict[str, bool]:
-    if not cases.delete_note(conn, case_id, note_id):
+    if not store.delete_note(conn, case_id, note_id):
         raise HTTPException(status_code=404, detail="Note not found")
     return {"ok": True}
 
@@ -655,7 +655,7 @@ def get_pitch(conn: Conn, case_id: str) -> Pitch:
 def generate_documents(conn: Conn, make: MakeDocuments, background: BackgroundTasks, case_id: str) -> CaseDocuments:
     """Start the partner report (.docx) and slides (.pptx) from the case's selected references, in the background.
     Only for accepted cases. While a job runs, returns it instead of starting another; poll GET .../documents."""
-    case = cases.get_case(conn, case_id)
+    case = store.get_case(conn, case_id)
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
     if case.status != "accepted":
@@ -663,7 +663,7 @@ def generate_documents(conn: Conn, make: MakeDocuments, background: BackgroundTa
     current = documents.status(conn, case_id)
     if current and current.status == "pending":
         return current
-    selection = case_state.get_selection(conn, case_id) or []
+    selection = state.get_selection(conn, case_id) or []
     if not selection:
         raise HTTPException(status_code=422, detail="Select at least one reference")
     job = documents.start(conn, case_id, selection)

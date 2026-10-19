@@ -5,11 +5,11 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from pypdf import PdfWriter
-from test_analysis import fake_embed_many, fake_read, fake_rerank, no_explain
 from test_api import fake_embed
 
-from navigator import analysis, cases
+from cases.test_analysis import fake_embed_many, fake_read, fake_rerank, no_explain
 from navigator.api import app, get_analyze, get_conn
+from navigator.cases import analysis, store
 from navigator.core.settings import REPO_ROOT
 
 GLUCORA = REPO_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
@@ -62,7 +62,7 @@ def test_references_unknown_case(client):
 
 @pytest.mark.parametrize(
     ("data", "status"),
-    [(b"hello, not a pdf", 422), (b"%PDF-1.7 broken", 422), (blank_pdf(), 422), (b"%PDF-" + b"x" * cases.MAX_PDF_BYTES, 413)],
+    [(b"hello, not a pdf", 422), (b"%PDF-1.7 broken", 422), (blank_pdf(), 422), (b"%PDF-" + b"x" * store.MAX_PDF_BYTES, 413)],
 )
 def test_upload_rejected(client, test_conn, data, status):
     assert upload(client, data).status_code == status
@@ -94,4 +94,4 @@ def test_patch_status(client):
     [("glucora-business-model.pdf", "Glucora Business Model"), ("acme_AG.pdf", "Acme AG"), (".pdf", "Unnamed company")],
 )
 def test_name_from_file(file_name, expected):
-    assert cases.name_from_file(file_name) == expected
+    assert store.name_from_file(file_name) == expected

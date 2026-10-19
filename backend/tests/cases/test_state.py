@@ -3,9 +3,9 @@
 import pytest
 from fake_chat import SearchModel
 from fastapi.testclient import TestClient
-from test_analysis import new_case, run
 from test_api import fake_embed
 
+from cases.test_analysis import new_case, run
 from navigator.api import (
     app,
     get_chat_model,

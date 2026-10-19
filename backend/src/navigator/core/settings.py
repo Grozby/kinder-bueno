@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     judge_enabled: bool = True
     judge_model: str | None = None  # model for the claim judge (plan 7.8); defaults to llm_model
     embed_model: str = "BAAI/bge-m3"
-    rerank_model: str = "BAAI/bge-reranker-v2-m3"  # case need matching (analysis.py)
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"  # case need matching (cases/analysis.py)
     database_url: str = "postgresql://navigator:navigator@localhost:5432/navigator"
     api_token: str = ""  # when set, /api requires `Authorization: Bearer <token>`
     sources_file: Path = BACKEND_ROOT / "config" / "sources.yaml"

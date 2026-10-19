@@ -2,13 +2,13 @@
 
 from pathlib import Path
 
-from test_analysis import result
+from cases.test_analysis import result
 
-from navigator.analysis import Match, Scored
-from navigator.case_eval import GoldCase, Outcome, load_cases, report
-from navigator.cases import pdf_text
+from navigator.cases.analysis import Match, Scored
+from navigator.cases.store import pdf_text
 from navigator.core.settings import BACKEND_ROOT
-from navigator.evaluate import Expected
+from navigator.evaluation.cases import GoldCase, Outcome, load_cases, report
+from navigator.evaluation.gold import Expected
 from navigator.models import ScoreItem
 
 

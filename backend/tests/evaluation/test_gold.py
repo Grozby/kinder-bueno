@@ -3,7 +3,7 @@
 import pytest
 
 from navigator.core.settings import BACKEND_ROOT
-from navigator.evaluate import (
+from navigator.evaluation.gold import (
     Expected,
     field_fill,
     found,
@@ -90,7 +90,7 @@ def test_report_has_per_query_rows_and_metrics():
 
 
 def test_report_with_judge_verdicts():
-    from navigator.eval_judge import Verdict
+    from navigator.evaluation.judge import Verdict
 
     gold = load_gold(BACKEND_ROOT / "eval" / "gold_v1.yaml")  # fixed expectations: the report format, not the gold set
     queries = [q for uc in gold for q in uc.queries]
