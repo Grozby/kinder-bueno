@@ -4,8 +4,8 @@ takes table locks and writes the schema of whatever branch runs the tests. Skipp
 import psycopg
 import pytest
 
-from navigator import db
-from navigator.settings import BACKEND_ROOT
+from navigator.core import db
+from navigator.core.settings import BACKEND_ROOT
 from navigator.sources import load_sources
 
 

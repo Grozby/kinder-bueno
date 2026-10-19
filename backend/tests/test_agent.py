@@ -149,7 +149,7 @@ def test_describe_and_template():
 
 def test_tool_schemas_bind_to_the_real_model():
     """The production model takes the four tool schemas (no gateway call)."""
-    from navigator.settings import Settings
+    from navigator.core.settings import Settings
 
     model = agent.chat_model(Settings(keera_api_key="test"))
     names_bound = [t["function"]["name"] for t in model.kwargs["tools"]]

@@ -12,8 +12,9 @@ import pytest
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from navigator import chunks_db, db
-from navigator.settings import BACKEND_ROOT, get_settings
+from navigator import chunks_db
+from navigator.core import db
+from navigator.core.settings import BACKEND_ROOT, get_settings
 from navigator.sources import load_sources
 
 TEST_DB_PREFIX = "navigator_test_"

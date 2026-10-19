@@ -12,7 +12,7 @@ import yaml
 from navigator.eval_judge import Verdict, judge_all, log_rows, precision
 from navigator.expand import Expansion, expand_query
 from navigator.judge import JUDGED_FIELDS
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.models import Result
 from navigator.rank import MAX_RESULTS, rank_entities
 from navigator.resolve import norm_name, norm_unit

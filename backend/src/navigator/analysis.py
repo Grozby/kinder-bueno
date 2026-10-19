@@ -28,11 +28,11 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from navigator.explain import recheck
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.models import Result, ScoreItem
 from navigator.rank import MAX_PER_UNIT, _units, fairness_cap, rank_entities
 from navigator.results import build_results
-from navigator.settings import get_settings
+from navigator.core.settings import get_settings
 
 log = logging.getLogger(__name__)
 

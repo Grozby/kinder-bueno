@@ -5,7 +5,7 @@ from functools import lru_cache
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from navigator.settings import get_settings
+from navigator.core.settings import get_settings
 
 BATCH_SIZE = 16
 

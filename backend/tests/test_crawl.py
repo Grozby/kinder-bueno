@@ -3,7 +3,7 @@ import asyncio
 import httpx
 
 from navigator.crawl import LinkFilter, crawl_source
-from navigator.settings import BACKEND_ROOT
+from navigator.core.settings import BACKEND_ROOT
 from navigator.sources import CrawlDefaults, SourceConfig, load_sources
 
 SOURCES = load_sources(BACKEND_ROOT / "config" / "sources.yaml")

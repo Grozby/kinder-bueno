@@ -16,7 +16,7 @@ from navigator import agent, analysis, case_state, cases, chunks_db, documents, 
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.models import (
     AddReference,
     Case,
@@ -53,7 +53,7 @@ from navigator.models import (
 )
 from navigator.rank import rank_entities, warm_topic_vectors
 from navigator.results import build_results, shown
-from navigator.settings import get_settings
+from navigator.core.settings import get_settings
 from navigator.sources import load_sources
 
 log = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Load the embedding model at startup, not on the first search (plan 8.9). One LLM client for the
     whole process: it is bound to this event loop."""
-    from navigator.embed import get_model
+    from navigator.core.embed import get_model
 
     get_model()
     settings = get_settings()
@@ -99,7 +99,7 @@ def get_conn() -> Iterator[psycopg.Connection]:
 
 
 def get_embed() -> Callable[[str], np.ndarray]:
-    from navigator.embed import embed_query
+    from navigator.core.embed import embed_query
 
     return embed_query
 
@@ -134,7 +134,7 @@ def get_page_rules(conn: Annotated[psycopg.Connection, Depends(get_conn, scope="
 def get_analyze(request: Request) -> Callable[[str], None]:
     """The case analysis (#53), run after the upload response on its own connection (the request's is closed
     by then). Background tasks of sync routes run in a worker thread, so the LLM calls run on the main loop."""
-    from navigator.embed import embed_documents, embed_query
+    from navigator.core.embed import embed_documents, embed_query
 
     llm, explain_llm = request.app.state.llm, request.app.state.explain_llm
 

@@ -161,7 +161,7 @@ def _members(conn: psycopg.Connection, unit_ids: list[int], sources: list[str]) 
 
 
 def _embed_query(text: str) -> np.ndarray:
-    from navigator.embed import embed_query  # imported lazily: loads torch
+    from navigator.core.embed import embed_query  # imported lazily: loads torch
 
     return embed_query(text)
 
@@ -212,9 +212,9 @@ def _topic_claims(conn: psycopg.Connection, types: list[str], sources: list[str]
 
 
 def _is_real_model(embed: Callable[[str], np.ndarray] | None) -> bool:
-    """None or navigator.embed.embed_query (the API passes it explicitly), without importing torch here."""
+    """None or navigator.core.embed.embed_query (the API passes it explicitly), without importing torch here."""
     return embed is None or (getattr(embed, "__module__", ""), getattr(embed, "__name__", "")) == (
-        "navigator.embed", "embed_query")
+        "navigator.core.embed", "embed_query")
 
 
 def _topic_vec_of(embed: Callable[[str], np.ndarray] | None, values: list[str]) -> Callable[[str], np.ndarray]:
@@ -226,7 +226,7 @@ def _topic_vec_of(embed: Callable[[str], np.ndarray] | None, values: list[str]) 
     missing = [v for v in dict.fromkeys(values) if v not in cache]
     if missing:
         if real:
-            from navigator.embed import embed_documents  # imported lazily: loads torch
+            from navigator.core.embed import embed_documents  # imported lazily: loads torch
 
             cache.update(zip(missing, embed_documents(missing)))
         else:

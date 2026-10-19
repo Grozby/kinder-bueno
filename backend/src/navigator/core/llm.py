@@ -10,7 +10,7 @@ import openai
 from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from navigator.settings import Settings
+from navigator.core.settings import Settings
 
 log = logging.getLogger(__name__)
 

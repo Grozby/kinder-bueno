@@ -11,7 +11,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.models import Evidence, Result
 
 log = logging.getLogger(__name__)

@@ -66,7 +66,7 @@ def test_extract_judge_disabled_by_setting(fakes, monkeypatch):
 
 
 def test_llm_speed_reports_each_model(monkeypatch):
-    from navigator import llm
+    from navigator.core import llm
 
     async def fake(settings, model, max_tokens=300):
         if model == "broken":

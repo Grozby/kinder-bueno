@@ -15,7 +15,7 @@ from navigator.evaluate import (
 )
 from navigator.expand import Expansion
 from navigator.models import Result
-from navigator.settings import BACKEND_ROOT
+from navigator.core.settings import BACKEND_ROOT
 
 
 def _result(name: str, type: str = "person", **fields) -> Result:

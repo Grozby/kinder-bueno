@@ -34,7 +34,7 @@ from psycopg.types.json import Jsonb
 
 from navigator import analysis, case_state
 from navigator.explain import _flat, cited_ids, prompt_claims
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.models import CaseDocuments, DocumentKind, Evidence, Result, ScoreItem
 from navigator.pitch import check_pitch, format_prompt
 from navigator.results import build_results

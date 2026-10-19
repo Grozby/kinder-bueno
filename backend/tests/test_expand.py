@@ -6,7 +6,7 @@ import pytest
 
 from navigator import expand
 from navigator.expand import Expansion, expand_query, parse_expansion
-from navigator.llm import LLMError
+from navigator.core.llm import LLMError
 
 
 class FakeLLM:
