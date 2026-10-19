@@ -3,10 +3,10 @@ import asyncio
 import httpx
 
 from navigator.crawl import LinkFilter, crawl_source
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import BACKEND_ROOT
 from navigator.sources import CrawlDefaults, SourceConfig, load_sources
 
-SOURCES = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+SOURCES = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
 FAST = CrawlDefaults(delay_seconds=0, max_depth=3)
 FILLER = "Research on continuous glucose monitoring and biosensing. " * 3
 

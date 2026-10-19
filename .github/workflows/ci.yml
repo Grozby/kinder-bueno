@@ -13,6 +13,9 @@ concurrency:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     services:
       # Matches the default DATABASE_URL in settings.py; conftest.py creates a test database of its own
       db:
@@ -32,6 +35,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+          cache-dependency-glob: backend/uv.lock
       # Syntax errors and pyflakes only: main is not clean under ruff's wider default set yet
       - name: Lint
         run: uvx ruff@0.17.1 check --select E9,F .

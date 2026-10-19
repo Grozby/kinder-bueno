@@ -268,9 +268,9 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
     from navigator.models import CrawlRulesUpdate
     from navigator.rules import save_rules
     from navigator.sources import load_sources
-    from navigator.settings import PROJECT_ROOT
+    from navigator.settings import BACKEND_ROOT
 
-    sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+    sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     test_conn.execute("INSERT INTO source (id, name) VALUES ('artorg', 'ARTORG')")
     save_rules(test_conn, sources, "artorg", CrawlRulesUpdate(
         allow_hosts=["www.artorg.unibe.ch"], include_patterns=[], exclude_patterns=[r"/team$"], priority_patterns=[]))
@@ -295,9 +295,9 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
 
 def test_start_recrawl_unknown_source(test_conn):
     from navigator.sources import load_sources
-    from navigator.settings import PROJECT_ROOT
+    from navigator.settings import BACKEND_ROOT
 
-    sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+    sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     assert not ingest.start_recrawl(test_conn, sources, "nope")
     test_conn.execute("INSERT INTO source (id, name) VALUES ('gone', 'Removed from sources.yaml')")
     assert not ingest.start_recrawl(test_conn, sources, "gone")

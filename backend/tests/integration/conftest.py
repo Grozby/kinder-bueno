@@ -22,13 +22,13 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from navigator.settings import PROJECT_ROOT, get_settings
+from navigator.settings import REPO_ROOT, get_settings
 
 PROJECT = "navigator-it"
 DB_PORT = int(os.environ.get("IT_DB_PORT", "55432"))
 API_PORT = int(os.environ.get("IT_API_PORT", "18000"))
 UI_PORT = int(os.environ.get("IT_UI_PORT", "15173"))
-CHECKPOINT = Path(os.environ.get("IT_CHECKPOINT", PROJECT_ROOT / "checkpoints" / "it.dump"))
+CHECKPOINT = Path(os.environ.get("IT_CHECKPOINT", REPO_ROOT / "checkpoints" / "it.dump"))
 APP_LOG = CHECKPOINT.parent / "it-app.log"
 API_TIMEOUT = 120.0  # one request; search and chat call the gateway (expansion, explanations)
 
@@ -48,9 +48,9 @@ def compose(token: str, *args: str, check: bool = True, **kwargs) -> subprocess.
     env = {
         **os.environ, "API_TOKEN": token, "DB_PORT": str(DB_PORT), "API_PORT": str(API_PORT), "UI_PORT": str(UI_PORT),
     }
-    files = ["-f", str(PROJECT_ROOT / "docker-compose.yml"), "-f", str(Path(__file__).parent / "compose.yml")]
+    files = ["-f", str(REPO_ROOT / "docker-compose.yml"), "-f", str(Path(__file__).parent / "compose.yml")]
     return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, *files, *args], cwd=PROJECT_ROOT, env=env, check=check, **kwargs
+        ["docker", "compose", "-p", PROJECT, *files, *args], cwd=REPO_ROOT, env=env, check=check, **kwargs
     )
 
 
@@ -89,7 +89,7 @@ def wait_for(url: str, timeout: float, headers: dict | None = None) -> None:
 def stack() -> Stack:
     if shutil.which("docker") is None or subprocess.run(["docker", "info"], capture_output=True, check=False).returncode:
         pytest.skip("Docker is not running")
-    if not (PROJECT_ROOT / ".env").exists():
+    if not (REPO_ROOT / ".env").exists():
         pytest.skip(".env is missing (the app needs KEERA_API_KEY)")
     token = secrets.token_urlsafe(16)
     compose(token, "down", "-v", "--remove-orphans", capture_output=True)  # leftovers of an aborted run

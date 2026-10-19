@@ -15,7 +15,7 @@ from navigator.evaluate import (
 )
 from navigator.expand import Expansion
 from navigator.models import Result
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import BACKEND_ROOT
 
 
 def _result(name: str, type: str = "person", **fields) -> Result:
@@ -68,7 +68,7 @@ def test_field_fill_counts_person_results_only():
 
 @pytest.mark.parametrize(("file", "use_cases"), [("gold.yaml", 6), ("gold_v1.yaml", 3)])
 def test_gold_file_follows_the_plan_rules(file, use_cases):
-    gold = load_gold(PROJECT_ROOT / "eval" / file)
+    gold = load_gold(BACKEND_ROOT / "eval" / file)
     assert len(gold) == use_cases
     for uc in gold:
         assert len(uc.queries) == 3
@@ -77,7 +77,7 @@ def test_gold_file_follows_the_plan_rules(file, use_cases):
 
 
 def test_report_has_per_query_rows_and_metrics():
-    gold = load_gold(PROJECT_ROOT / "eval" / "gold_v1.yaml")  # fixed expectations: the report format, not the gold set
+    gold = load_gold(BACKEND_ROOT / "eval" / "gold_v1.yaml")  # fixed expectations: the report format, not the gold set
     queries = [q for uc in gold for q in uc.queries]
     runs = {q: [] for q in queries}
     runs["glucose sensors"] = [_result("Lilian Witthauer"), _result("Diabetes Center Berne", type="unit")]
@@ -92,7 +92,7 @@ def test_report_has_per_query_rows_and_metrics():
 def test_report_with_judge_verdicts():
     from navigator.eval_judge import Verdict
 
-    gold = load_gold(PROJECT_ROOT / "eval" / "gold_v1.yaml")  # fixed expectations: the report format, not the gold set
+    gold = load_gold(BACKEND_ROOT / "eval" / "gold_v1.yaml")  # fixed expectations: the report format, not the gold set
     queries = [q for uc in gold for q in uc.queries]
     runs = {q: [] for q in queries}
     runs["glucose sensors"] = [

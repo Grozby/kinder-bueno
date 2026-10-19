@@ -7,7 +7,7 @@ protected by a shared bearer token.
 
 ```bash
 echo "API_TOKEN=$(openssl rand -hex 24)" >> .env     # shared secret; send it privately, never commit it
-uv run navigator serve --host 0.0.0.0 --port 8000    # default host 127.0.0.1 is not reachable from the LAN
+cd backend && uv run navigator serve --host 0.0.0.0 --port 8000    # default host 127.0.0.1 is not reachable from the LAN
 ipconfig getifaddr en0                               # macOS: LAN IP to give the teammate
 ```
 

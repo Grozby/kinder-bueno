@@ -1,7 +1,7 @@
 # Pitch and demo script
 
-Numbers come from `eval/report.md` (gold set v2: 18 queries, 340 pages; last run on 2026-10-19 on main
-`f43dd0e`, on the shared DB after #160) and `navigator stats`. Re-run `uv run navigator eval` before presenting and update the numbers here,
+Numbers come from `backend/eval/report.md` (gold set v2: 18 queries, 340 pages; last run on 2026-10-19 on main
+`f43dd0e`, on the shared DB after #160) and `navigator stats`. Re-run `uv run navigator eval` (in `backend/`) before presenting and update the numbers here,
 in `docs/REPORT.md` and in the slides. The demo below was re-rehearsed on 2026-10-19 on the 340-page database
 (main `eb39e41`, a copy of the shared DB): every step was run through the API, with 4 Glucora uploads; steps 1–3
 and 6 again after #160 and #161 (main `f43dd0e`). The UI
@@ -43,7 +43,7 @@ track; the slides use the same numbers.
 5. **Sovereign and cheap to run.** Apertus (Swiss open LLM), local bge-m3 embeddings, Postgres, one
    `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
    and, measured on the same pages, not better); quote verification is what makes the small model safe to use. A new site is
-   one config block (`config/sources.yaml`).
+   one config block (`backend/config/sources.yaml`).
 6. **Next.** Scale from 340 to ~2,000 pages (config only; more profile and facility pages for person-level
    expertise), recall from 60% towards 80%, and widen the case board from research partners to suppliers,
    manufacturers and advisors in Canton Bern, with every claim sourced.

@@ -16,7 +16,7 @@
 
 cases:
   - id: glucora
-    pdf: ../docs/examples/glucora-business-model.pdf
+    pdf: ../../docs/examples/glucora-business-model.pdf
     score: [55, 90]
     needs:
       - clinical validation of sensor accuracy
@@ -48,7 +48,7 @@ cases:
       - {name: "Kuangyu Shi", type: person}
 
   - id: repolar
-    pdf: ../docs/examples/repolar-business-model.pdf
+    pdf: ../../docs/examples/repolar-business-model.pdf
     score: [55, 90]
     needs:
       - transgenic animal models of arrhythmia
@@ -74,7 +74,7 @@ cases:
       - {name: "Rubin Lab", type: unit}
 
   - id: precisa
-    pdf: ../docs/examples/precisa-business-model.pdf
+    pdf: ../../docs/examples/precisa-business-model.pdf
     score: [55, 90]
     needs:
       - image-guided surgical navigation
@@ -105,7 +105,7 @@ cases:
       - {name: "Lilian Witthauer", type: person}
 
   - id: vinora
-    pdf: ../docs/examples/vinora-business-model.pdf
+    pdf: ../../docs/examples/vinora-business-model.pdf
     score: [0, 30]
     needs:
       - plant pathology downy mildew grapevines

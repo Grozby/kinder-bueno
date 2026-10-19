@@ -9,11 +9,11 @@ from navigator.case_eval import GoldCase, Outcome, load_cases, report
 from navigator.cases import pdf_text
 from navigator.evaluate import Expected
 from navigator.models import ScoreItem
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import BACKEND_ROOT
 
 
 def test_gold_file_loads_and_points_at_readable_pdfs():
-    cases = load_cases(PROJECT_ROOT / "eval" / "cases.yaml")
+    cases = load_cases(BACKEND_ROOT / "eval" / "cases.yaml")
     assert [c.id for c in cases] == ["glucora", "repolar", "precisa", "vinora"]
     for c in cases:
         assert c.needs, c.id  # pinned, so matching changes are measured on the same input

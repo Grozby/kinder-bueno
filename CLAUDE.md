@@ -2,6 +2,7 @@
 
 Setup, pipeline order and tests: [`README.md`](README.md). Build plan: [`docs/PLAN.md`](docs/PLAN.md).
 Frontend ↔ backend contract: [`docs/FRONTEND_API.md`](docs/FRONTEND_API.md).
+The Python backend lives in `backend/` (run `uv` commands there); the Vue app in `frontend/`.
 
 ## Shared backend
 

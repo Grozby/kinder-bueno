@@ -8,10 +8,10 @@ from navigator.api import app, get_conn, get_embed, get_expand, get_explain
 from navigator.expand import Expansion
 from navigator.models import CrawlRulesUpdate
 from navigator.rules import RulesError, apply_blocks, get_rules, save_rules, validate, with_stored
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import BACKEND_ROOT
 from navigator.sources import load_sources
 
-SOURCES = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+SOURCES = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
 BLOCK_ALICE = {"allow_hosts": ["artorg.example"], "include_patterns": [], "exclude_patterns": [r"/alice$"],
                "priority_patterns": [r"/lab"]}
 
