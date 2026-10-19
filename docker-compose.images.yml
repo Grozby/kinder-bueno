@@ -1,13 +1,13 @@
 # Pull the released images instead of building them (#101), on top of docker-compose.yml and
 # docker-compose.handoff.yml. In .env:
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.handoff.yml:docker-compose.images.yml
-#   NAVIGATOR_VERSION=0.1.1        # the release to run (git tag without the "v")
+#   NAVIGATOR_VERSION=0.3.0        # the release to run (git tag without the "v")
 # then `docker compose pull` instead of `docker compose build`. The images are public: no login needed.
 services:
   app:
     build: !reset null
-    image: ghcr.io/grozby/kinder-bueno-app:${NAVIGATOR_VERSION:?set NAVIGATOR_VERSION in .env, e.g. 0.1.1}
+    image: ghcr.io/grozby/kinder-bueno-app:${NAVIGATOR_VERSION:?set NAVIGATOR_VERSION in .env, e.g. 0.3.0}
 
   frontend:
     build: !reset null
-    image: ghcr.io/grozby/kinder-bueno-frontend:${NAVIGATOR_VERSION:?set NAVIGATOR_VERSION in .env, e.g. 0.1.1}
+    image: ghcr.io/grozby/kinder-bueno-frontend:${NAVIGATOR_VERSION:?set NAVIGATOR_VERSION in .env, e.g. 0.3.0}

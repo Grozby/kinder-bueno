@@ -1,4 +1,4 @@
-# Running the Navigator (v0.1.1)
+# Running the Navigator (v0.3.0)
 
 How to run the whole Navigator on your own machine: Postgres, the API and the UI, all in Docker. Follow the steps in
 order. Development setup is in the [README](../README.md#local-development-setup).
@@ -10,15 +10,18 @@ order. Development setup is in the [README](../README.md#local-development-setup
 - Internet access. Search, chat, case analysis and pitches call the Apertus gateway (`gateway.keera.ch`), and the
   first start downloads two models from Hugging Face. Nothing connects to cantonal networks.
 - A Keera API key for the Apertus gateway.
-- The database snapshot `demo.dump`, which we send you directly. It is not in the repository because it holds the
-  text of the crawled pages. It contains no cases, chats or feedback.
+- The database snapshot `demo-340-precisa.dump` (340 crawled pages, ~5 MB), which we send you directly with its
+  SHA-256 checksum. It is not in the repository because it holds the text of the crawled pages. It contains one
+  analysed example case, Precisa Surgical (a fictional company, `docs/examples/precisa-business-model.pdf`), and no
+  chats or feedback.
 
 ## 1. Get the code
 
 ```bash
-git clone --branch v0.1.1 https://github.com/Grozby/kinder-bueno.git
+git clone --branch v0.3.0 https://github.com/Grozby/kinder-bueno.git
 cd kinder-bueno
-mkdir -p checkpoints && cp /path/to/demo.dump checkpoints/demo.dump
+shasum -a 256 /path/to/demo-340-precisa.dump      # must match the checksum we sent
+mkdir -p checkpoints && cp /path/to/demo-340-precisa.dump checkpoints/demo.dump
 ```
 
 ## 2. Configure
@@ -52,7 +55,7 @@ Every release is published as ready-made images for Intel/AMD and ARM (`ghcr.io/
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.handoff.yml:docker-compose.images.yml
-NAVIGATOR_VERSION=0.1.1
+NAVIGATOR_VERSION=0.3.0
 ```
 
 Then run `docker compose pull` instead of `docker compose build` in step 3.
@@ -85,9 +88,12 @@ Open **http://localhost:8080**. The API takes about a minute to load its model; 
 ### Check that it works
 
 1. `docker compose ps`: `db` and `app` are `healthy`, and `frontend` is `running`.
-2. The **Sources** page lists `artorg`, `dcb` and `unibe` with their pages.
-3. Drop `docs/examples/glucora-business-model.pdf` on the board. The analysis finishes within 1–2 minutes and lists
-   experts and units for the company's needs, each linked to its source page.
+2. The **Sources** page lists `artorg` (110 pages), `dcb` (30) and `unibe` (200).
+3. The board shows the **Precisa Surgical** card in "New" with a fit score of **85**. Open it: the breakdown reads
+   "5 of 5 needs covered", and of its 25 references the top 10 are preselected, each marked "Matches" and linked
+   to its source page.
+4. Drop `docs/examples/glucora-business-model.pdf` on the board. The analysis finishes within 1–2 minutes; the score
+   is about 60–80, because Apertus reads the PDF afresh on each upload.
 
 ## Day to day
 
@@ -124,7 +130,7 @@ docker compose run --rm app uv run navigator init-db
 ## Building the data from scratch instead of the snapshot
 
 `ingest` crawls the sources in `backend/config/sources.yaml`, embeds the pages and extracts the facts with Apertus. It takes
-about 15–20 minutes for 100 pages.
+about 15–20 minutes per 100 pages, most of it Apertus calls.
 
 ```bash
 docker compose up -d db
