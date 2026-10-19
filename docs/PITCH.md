@@ -1,9 +1,11 @@
 # Pitch and demo script
 
-Numbers come from `eval/report.md` (9 gold queries, 100 pages; last run on 2026-10-18 on main `ad33a2a`,
-after #130) and `navigator stats`. Re-run `uv run navigator eval` before presenting and update the numbers here,
+Numbers come from `eval/report.md` (gold set v2: 18 queries, 340 pages; last run on 2026-10-19 on main
+`458e2f0`, after the database swap) and `navigator stats`. Re-run `uv run navigator eval` before presenting and update the numbers here,
 in `docs/REPORT.md` and in the slides. Demo timings were measured on the Docker setup on 2026-10-18 (rehearsal, #34), and the script was
-rehearsed again three times on a fresh stack restored from `checkpoints/demo.dump`, on main after #95.
+rehearsed again three times on a fresh stack restored from `checkpoints/demo.dump`, on main after #95. Those
+rehearsals used the 100-page database: on the 340-page one the demo's scores and results differ, so rehearse
+again before showing it.
 
 ## Slides (5 minutes)
 
@@ -21,27 +23,28 @@ track; the slides use the same numbers.
 3. **The guarantee: no invented facts.**
    - Apertus must give a quote for every fact. The quote is matched against the stored page and saved as the
      exact page text, or the fact is rejected.
-   - 13% of extracted facts were rejected (221 / 1,705), among them people the model made up from the prompt
+   - 16% of extracted facts were rejected (820 / 5,263), among them people the model made up from the prompt
      example and list labels like "Alumni".
    - Traceability in the eval: **100%** of displayed facts are verified and link to their source.
 4. **Results (honest).**
-   - recall@10: **64%** (target 80%), lay-term phrasings 67%, up from 14% after ranking work. Best on cardio
-     (80–100% for all 3 phrasings), weakest on surgery (29–43%: the image-guided therapy chair's head is not in
-     the 100 crawled pages).
-   - Synonyms: the three glucose phrasings share 60% of their top 10 on average; "glucose sensors" and
-     "continuous glucose monitoring" both find Lilian Witthauer, Stavroula Mougiakakou and her AI in Health and
-     Nutrition lab.
-   - Field fill for people: role 100%, affiliation 100% (249 people linked to their lab from member pages).
-     98% of people show **their lab's topics**, labelled as the lab's and linked to the lab page. Personal
-     expertise is 0%: the pages state topics for labs, not for each person, and we don't pretend otherwise.
-   - Precision (LLM judge, PoC): 74% of the top-10 results judged relevant, each result judged on its own. It
-     agrees with the human gold set on 76% of gold hits, so treat this as a signal, not a measurement.
+   - recall@10: **60%** (target 80%) on 18 queries in 6 use cases, lay-term phrasings 61%. Best on cardio (80%
+     for all 3 phrasings), weakest on glucose and rehab (33–67%), where some experts are linked only to hospital
+     pages.
+   - Synonyms: the three phrasings of a use case share 37–62% of their top 10; "glucose sensors" and
+     "continuous glucose monitoring" both find the Diabetes Center Berne and the AI in Health and Nutrition lab.
+   - Field fill for people: role 100%, affiliation 100% (~790 people linked to their lab from member pages).
+     38% of people in the results have **their own expertise**, from their profile pages; the others show their
+     lab's topics, labelled as the lab's.
+   - Precision (LLM judge, PoC): 86% of the top-10 results judged relevant, each result judged on its own. It
+     agrees with the human gold set on 91% of gold hits, but it is the extractor's model family, so treat it as a
+     signal, not a measurement.
+   - Case board: all 4 example companies score in their expected range; 19 of 31 expected matches found.
 5. **Sovereign and cheap to run.** Apertus (Swiss open LLM), local bge-m3 embeddings, Postgres, one
    `docker compose` setup with no connection to cantonal networks. Extraction runs on Apertus 8B (70B was slower
    and, measured on the same pages, not better); quote verification is what makes the small model safe to use. A new site is
    one config block (`config/sources.yaml`).
-6. **Next.** Scale from 100 to ~2,000 pages (config only; profile and facility pages for person-level
-   expertise), recall from 64% towards 80%, and widen the case board from research partners to suppliers,
+6. **Next.** Scale from 340 to ~2,000 pages (config only; more profile and facility pages for person-level
+   expertise), recall from 60% towards 80%, and widen the case board from research partners to suppliers,
    manufacturers and advisors in Canton Bern, with every claim sourced.
 
 ## Demo (4 minutes)
@@ -99,13 +102,13 @@ track; the slides use the same numbers.
 - *Why 8B and not 70B?* We measured both on the same 100 pages. 70B was slower (15 vs ~10 min) and not
   better: recall@10 43% vs 46%, judged precision 46% vs 63%. Every fact still has to pass the quote check, and
   switching is one setting (`EXTRACT_MODEL`).
-- *Why is recall 64% and not 80%?* Every gold expert is in the database; the misses are people ranked 11th to
-  40th behind their own lab, and one head whose member page is not crawled. A cross-encoder reranker adds 1 to
-  3 experts but takes 7–11 s per search on a CPU, so it is off. A deeper crawl with profile pages (#75, 340
-  pages) reaches 62%, after merging the duplicates the resolver kept there; it is used once it is at least level.
+- *Why is recall 60% and not 80%?* Most misses are gaps in the data, not ranking: some experts are linked only
+  to hospital or project pages, not to a lab, so no ranking change brings them in. Ranking constants were swept
+  (#144). A cross-encoder reranker adds 1 to 3 experts but takes 7–11 s per search on a CPU, so it is off. The
+  number is on a different gold set (18 queries over 340 pages); the earlier 64% was on 9 queries over 100 pages.
 - *How do you know a quote supports the fact?* The quote check proves the text is on the page. Whether it
   supports the fact is checked by an LLM judge (PoC), which is the same model family and therefore biased.
-  We report it as a signal, not as proof (judge agreement with the gold set: 76%).
+  We report it as a signal, not as proof (judge agreement with the gold set: 91%).
 - *How is the fit score computed?* Five fixed criteria: research fit (40%, share of needs covered), expert
   pool, research units, infrastructure and running projects. Each counts only references whose verified
   topic claims match a need. It measures fit within our sources, not all of Canton Bern.

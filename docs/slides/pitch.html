@@ -104,8 +104,8 @@
 <h2 style="font-family:'Source Serif 4', Georgia, serif;font-size:72px;font-weight:600;line-height:1.1;color:#F6F3EE">No invented facts. Every fact is a literal slice of a public page.</h2>
 <div style="display:flex;gap:48px">
 <div style="flex:1.2;display:flex;flex-direction:column;gap:16px">
-<p style="font-family:'Source Serif 4', Georgia, serif;font-size:160px;font-weight:700;line-height:1;color:#F2717F">13%</p>
-<p style="font-size:32px;line-height:1.4;color:#CFC6BE">of extracted facts were rejected (221 of 1,705): their quote was not on the page. Among them, people the model made up and list labels like “Alumni”.</p>
+<p style="font-family:'Source Serif 4', Georgia, serif;font-size:160px;font-weight:700;line-height:1;color:#F2717F">16%</p>
+<p style="font-size:32px;line-height:1.4;color:#CFC6BE">of extracted facts were rejected (820 of 5,263): their quote was not on the page. Among them, people the model made up and list labels like “Alumni”.</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:32px">
 <div style="display:flex;flex-direction:column;gap:8px;border-left:4px solid #C8102E;padding:0 0 0 32px">
@@ -130,30 +130,30 @@
 <p style="font-size:32px;line-height:1.4;color:#4A4340">example companies score in their expected range.</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF9;padding:40px;border:1px solid #E2DAD0;border-radius:16px">
-<p style="font-family:'Source Serif 4', Georgia, serif;font-size:120px;font-weight:700;line-height:1;color:#C8102E">0</p>
-<p style="font-size:32px;line-height:1.4;color:#4A4340">for the agritech company with no fit in our sources. Not flattered.</p>
+<p style="font-family:'Source Serif 4', Georgia, serif;font-size:120px;font-weight:700;line-height:1;color:#C8102E">12</p>
+<p style="font-size:32px;line-height:1.4;color:#4A4340">for the agritech company that should not fit: one weak match. Not flattered.</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF9;padding:40px;border:1px solid #E2DAD0;border-radius:16px">
-<p style="font-family:'Source Serif 4', Georgia, serif;font-size:120px;font-weight:700;line-height:1;color:#C8102E">18 / 31</p>
+<p style="font-family:'Source Serif 4', Georgia, serif;font-size:120px;font-weight:700;line-height:1;color:#C8102E">19 / 31</p>
 <p style="font-size:32px;line-height:1.4;color:#4A4340">expected matches found; 20 of 31 are in the references.</p>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 5 · eval/case_report.md, 4 example business models</p>
-<aside>We wrote four fictional business models: Glucora (glucose sensors), Repolar (cardiac arrhythmia and cardiotoxicity testing), Precisa (surgical navigation and robotics) and Vinora (vineyard agritech). The first three should fit Bern, the last one should not. The board gets all four right. The score shows its gaps too: for Glucora, “no matching infrastructure in our sources”.</aside>
+<aside>We wrote four fictional business models: Glucora (glucose sensors), Repolar (cardiac arrhythmia and cardiotoxicity testing), Precisa (surgical navigation and robotics) and Vinora (vineyard agritech). The first three should fit Bern, the last one should not. The board gets all four right; Vinora’s 12 is one weak match, a climate scientist for a climate-adaptation need. The score shows its gaps too: for Glucora, “no matching infrastructure in our sources”.</aside>
 </section>
 <section id="search" data-transition="fade" style="background:#F6F3EE;color:#1F1A1B;font-family:'Public Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <p style="font-size:24px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#C8102E">Results · search, honestly</p>
 <h2 style="font-family:'Source Serif 4', Georgia, serif;font-size:72px;font-weight:600;line-height:1.1;color:#1F1A1B">Below target on recall, and we say so.</h2>
 <table style="font-family:'Public Sans', Arial, sans-serif;font-size:28px;color:#1F1A1B;padding:16px">
 <tr><th style="width:50%;text-align:left">Measure</th><th style="width:16%;text-align:right">Result</th><th style="width:34%;text-align:left">Note</th></tr>
-<tr><td>Expected experts in the top 10 (recall@10)</td><td style="text-align:right">64%</td><td>target 80%; cardio 80–100%, surgery 29–43%</td></tr>
-<tr style="background:#ECE6DE"><td>Lay-term and synonym phrasings</td><td style="text-align:right">67%</td><td>“glucose sensors” vs the site’s words</td></tr>
-<tr><td>People: role · affiliation · lab topics</td><td style="text-align:right">100 · 100 · 98%</td><td>lab topics labelled as the lab’s</td></tr>
-<tr style="background:#ECE6DE"><td>People: personal expertise</td><td style="text-align:right">0%</td><td>pages state topics per lab, not per person</td></tr>
-<tr><td>Top-10 judged relevant (LLM judge)</td><td style="text-align:right">74%</td><td>a signal: judge agrees with gold on 76%</td></tr>
+<tr><td>Expected experts in the top 10 (recall@10)</td><td style="text-align:right">60%</td><td>target 80%; cardio 80%, glucose 48%</td></tr>
+<tr style="background:#ECE6DE"><td>Lay-term and synonym phrasings</td><td style="text-align:right">61%</td><td>“glucose sensors” vs the site’s words</td></tr>
+<tr><td>People: role · affiliation · lab topics</td><td style="text-align:right">100 · 100 · 96%</td><td>lab topics labelled as the lab’s</td></tr>
+<tr style="background:#ECE6DE"><td>People: own expertise</td><td style="text-align:right">38%</td><td>from profile pages, where a lab has them</td></tr>
+<tr><td>Top-10 judged relevant (LLM judge)</td><td style="text-align:right">86%</td><td>a signal: judge agrees with gold on 91%</td></tr>
 </table>
-<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 6 · eval/report.md, 9 gold queries over 100 pages</p>
-<aside>Surgery is weakest because the head of the image-guided therapy chair is not in the 100 pages we crawled. Personal expertise is zero because the pages describe labs, not people; we show each person their lab’s topics, labelled as such, instead of pretending. The judge is the same model family as the extractor, so we treat it as a signal, not a measurement.</aside>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 6 · eval/report.md, 18 gold queries over 340 pages</p>
+<aside>Glucose is weakest because some of its experts are linked only to hospital and project pages, not to a lab, so no ranking change brings them in. Personal expertise comes from profile pages; people without one show their lab’s topics, labelled as such, instead of pretending. The judge is the same model family as the extractor, so we treat it as a signal, not a measurement.</aside>
 </section>
 <section id="sources" data-transition="fade" style="background:#ECE6DE;color:#1F1A1B;font-family:'Public Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:64px">
 <p style="font-size:24px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#C8102E">Sources you can steer</p>
@@ -162,7 +162,7 @@
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF9;padding:40px;border:1px solid #D6CCC0;border-radius:16px">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#C8102E;width:56px;height:56px" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-5"/><path d="M12 16V8"/><path d="M17 16v-9"/></svg>
 <h3 style="font-size:44px;font-weight:700">Ranked pages</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A4340">All 100 pages scored by verified facts, judge rate, quote survival and 👍/👎.</p>
+<p style="font-size:28px;line-height:1.4;color:#4A4340">All 340 pages scored by verified facts, judge rate, quote survival and 👍/👎.</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF9;padding:40px;border:1px solid #D6CCC0;border-radius:16px">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#C8102E;width:56px;height:56px" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
@@ -215,12 +215,12 @@
 <h2 style="font-family:'Source Serif 4', Georgia, serif;font-size:72px;font-weight:600;line-height:1.1;color:#1F1A1B">Same pipeline, more of Bern.</h2>
 <div style="display:flex;gap:32px">
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF9;padding:40px;border:1px solid #E2DAD0;border-radius:16px">
-<p style="font-family:'Source Serif 4', Georgia, serif;font-size:72px;font-weight:700;line-height:1;color:#C8102E">100 → 2,000</p>
+<p style="font-family:'Source Serif 4', Georgia, serif;font-size:72px;font-weight:700;line-height:1;color:#C8102E">340 → 2,000</p>
 <h3 style="font-size:36px;font-weight:700">Pages</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A4340">Config only. Personal profile pages give person-level expertise.</p>
+<p style="font-size:28px;line-height:1.4;color:#4A4340">Config only. More profile pages give more person-level expertise.</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF9;padding:40px;border:1px solid #E2DAD0;border-radius:16px">
-<p style="font-family:'Source Serif 4', Georgia, serif;font-size:72px;font-weight:700;line-height:1;color:#C8102E">64% → 80%</p>
+<p style="font-family:'Source Serif 4', Georgia, serif;font-size:72px;font-weight:700;line-height:1;color:#C8102E">60% → 80%</p>
 <h3 style="font-size:36px;font-weight:700">Recall</h3>
 <p style="font-size:28px;line-height:1.4;color:#4A4340">Tuning the search toward the target, measured on the gold set.</p>
 </div>
@@ -231,7 +231,7 @@
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 9</p>
-<aside>Scaling is a configuration change, not new code. Crawling personal profile pages fixes the 0% personal expertise. The same crawl, verify and cite pipeline can cover the other half of a location report: the companies a newcomer would work with.</aside>
+<aside>Scaling is a configuration change, not new code. Crawling more profile pages raises personal expertise beyond today’s 38%. The same crawl, verify and cite pipeline can cover the other half of a location report: the companies a newcomer would work with.</aside>
 </section>
 <section id="demo" data-transition="fade" style="background:#C8102E;color:#FBF4F0;font-family:'Public Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:space-between">
 <p style="font-size:32px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:#FBE3E3">Live demo</p>
@@ -242,9 +242,9 @@
 <p style="font-size:28px;font-weight:600;color:#C8102E;background:#FBF4F0;padding:12px 28px;border-radius:999px">Evidence</p>
 <p style="font-size:28px;font-weight:600;color:#C8102E;background:#FBF4F0;padding:12px 28px;border-radius:999px">Chat</p>
 <p style="font-size:28px;font-weight:600;color:#C8102E;background:#FBF4F0;padding:12px 28px;border-radius:999px">Pitch</p>
-<p style="font-size:28px;font-weight:600;color:#C8102E;background:#FBF4F0;padding:12px 28px;border-radius:999px">No fit: score 0</p>
+<p style="font-size:28px;font-weight:600;color:#C8102E;background:#FBF4F0;padding:12px 28px;border-radius:999px">No fit: low score</p>
 </div>
-<aside>Follow docs/PITCH.md, “Demo”. 1) Drop glucora-business-model.pdf; the analysis takes about 30 s, the score is about 55–80. 2) Open the case: summary, five criteria, references; point at “no matching infrastructure”. 3) Open a reference’s evidence and its source link. 4) Chat “glucose sensors” and add a result. 5) Start review, Accept, Generate pitch (about 8 s); point at the [ids]. 6) Optional: drop vinora-business-model.pdf, score 0; show the score only, not its references. Optional: Sources, Ranked pages, block a page and undo. Don’t use the reviewer score or notes; they are not served yet.</aside>
+<aside>Follow docs/PITCH.md, “Demo”. 1) Drop glucora-business-model.pdf; the analysis takes about 30 s, the score is about 55–80. 2) Open the case: summary, five criteria, references; point at “no matching infrastructure”. 3) Open a reference’s evidence and its source link. 4) Chat “glucose sensors” and add a result. 5) Start review, Accept, Generate pitch (about 8 s); point at the [ids]. 6) Optional: drop vinora-business-model.pdf, a low score; show the score only, not its references. Optional: Sources, Ranked pages, block a page and undo. Don’t use the reviewer score or notes; they are not served yet.</aside>
 </section>
 </div>
 <div class="notes" aria-live="polite"></div>
