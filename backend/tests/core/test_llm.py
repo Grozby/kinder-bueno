@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from navigator.llm import LLM
-from navigator.settings import Settings
+from navigator.core.llm import LLM
+from navigator.core.settings import Settings
 
 
 def _slow_llm(seconds: float, concurrency: int) -> LLM:

@@ -5,14 +5,14 @@ import logging
 
 import typer
 
-from navigator import db
+from navigator.core import db
 from collections import Counter
 
 from navigator.crawl import crawl_source
 from navigator.extract import extract_pages, reverify as reverify_rows
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.resolve import resolve as run_resolve
-from navigator.settings import get_settings
+from navigator.core.settings import get_settings
 from navigator.sources import load_sources
 
 app = typer.Typer(no_args_is_help=True)
@@ -170,7 +170,7 @@ def embed(source: str | None = typer.Option(None, help="Source id. Default: all 
 
     from navigator import chunks_db
     from navigator.chunk import chunk_page
-    from navigator.embed import embed_documents
+    from navigator.core.embed import embed_documents
 
     settings = get_settings()
     sources = load_sources(settings.sources_file)
@@ -216,7 +216,7 @@ def warm() -> None:
     """Download the local models (bge-m3, the case reranker) into the HuggingFace cache, so neither the first
     start nor the first case upload waits on a ~4.5 GB download."""
     from navigator.analysis import _reranker
-    from navigator.embed import get_model
+    from navigator.core.embed import get_model
 
     typer.echo(f"Embedding model: {get_settings().embed_model}")
     get_model()
@@ -241,7 +241,7 @@ def search(
 
     from navigator import chunks_db
     from navigator.api import run_search
-    from navigator.embed import embed_query
+    from navigator.core.embed import embed_query
     from navigator.expand import expand_query
     from navigator.explain import explain as explain_results
     from navigator.models import EntityType
@@ -375,7 +375,7 @@ def llm_speed(
     model: list[str] = typer.Option([], help="Model to test (repeatable). Default: the 70B and 8B models."),
 ) -> None:
     """Measure the gateway: time to first token and tokens/s per model (#16)."""
-    from navigator.llm import measure_speed
+    from navigator.core.llm import measure_speed
 
     settings = get_settings()
     models = model or [settings.llm_model, "apertus-v1-5-8b"]
@@ -402,7 +402,7 @@ def case_eval(
     from navigator import chunks_db
     from navigator.analysis import read_case, rerank
     from navigator.case_eval import evaluate_case, load_cases, report
-    from navigator.embed import embed_documents, embed_query
+    from navigator.core.embed import embed_documents, embed_query
 
     settings = get_settings()
     gold = gold or settings.eval_dir / "cases.yaml"

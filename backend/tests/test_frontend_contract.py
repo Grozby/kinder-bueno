@@ -4,7 +4,7 @@ Without this, a route the UI waits for (like the review and notes ones, #108) on
 import re
 
 from navigator.api import app
-from navigator.settings import REPO_ROOT
+from navigator.core.settings import REPO_ROOT
 
 CLIENT = REPO_ROOT / "frontend" / "src" / "api" / "index.ts"
 CALL = re.compile(r"(?:api<[^>]+>|apiUrl)\(\s*[`']([^`']+)[`'](?:\s*,\s*\{[^}]*?method:\s*'([A-Z]+)')?", re.DOTALL)

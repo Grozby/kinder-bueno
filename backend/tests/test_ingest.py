@@ -124,9 +124,9 @@ def _fake_pipeline(monkeypatch, pages, fail_at=None):
             return result
         return run
 
-    monkeypatch.setattr("navigator.llm.LLM", lambda *args, **kwargs: object())  # no gateway key needed (CI)
+    monkeypatch.setattr("navigator.core.llm.LLM", lambda *args, **kwargs: object())  # no gateway key needed (CI)
     monkeypatch.setattr("navigator.crawl.crawl_source", crawl)
-    monkeypatch.setattr("navigator.embed.embed_documents", lambda texts: [np.zeros(1024) for _ in texts])
+    monkeypatch.setattr("navigator.core.embed.embed_documents", lambda texts: [np.zeros(1024) for _ in texts])
     monkeypatch.setattr("navigator.extract.extract_pages", extract)
     monkeypatch.setattr("navigator.resolve.resolve", step("resolve"))
     monkeypatch.setattr("navigator.judge.run_judge", step("judge"))
@@ -268,7 +268,7 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
     from navigator.models import CrawlRulesUpdate
     from navigator.rules import save_rules
     from navigator.sources import load_sources
-    from navigator.settings import BACKEND_ROOT
+    from navigator.core.settings import BACKEND_ROOT
 
     sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     test_conn.execute("INSERT INTO source (id, name) VALUES ('artorg', 'ARTORG')")
@@ -295,7 +295,7 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
 
 def test_start_recrawl_unknown_source(test_conn):
     from navigator.sources import load_sources
-    from navigator.settings import BACKEND_ROOT
+    from navigator.core.settings import BACKEND_ROOT
 
     sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     assert not ingest.start_recrawl(test_conn, sources, "nope")

@@ -21,7 +21,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from navigator.explain import _flat, _label, check_sentence, cited_ids, prompt_claims
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.models import Evidence, Pitch, Result
 
 log = logging.getLogger(__name__)

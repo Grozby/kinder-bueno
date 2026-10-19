@@ -10,7 +10,7 @@ from test_api import fake_embed
 
 from navigator import analysis, cases
 from navigator.api import app, get_analyze, get_conn
-from navigator.settings import REPO_ROOT
+from navigator.core.settings import REPO_ROOT
 
 GLUCORA = REPO_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
 

@@ -106,7 +106,7 @@ def search_chunks(
     pass None to get every chunk, e.g. to link chunks to entities (plan 8.4 step 2).
     """
     if embed is None:
-        from navigator.embed import embed_query  # imported lazily: loads torch
+        from navigator.core.embed import embed_query  # imported lazily: loads torch
 
         embed = embed_query
     lists = [keyword_search(conn, query, extra_terms)]

@@ -99,7 +99,7 @@ def test_topic_vectors_are_cached_per_embedding_function():
 
 
 def test_the_api_embed_function_counts_as_the_real_model():
-    from navigator import embed
+    from navigator.core import embed
 
     assert _is_real_model(None) and _is_real_model(embed.embed_query)
     assert not _is_real_model(lambda text: text)

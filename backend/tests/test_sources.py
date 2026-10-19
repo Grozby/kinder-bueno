@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from navigator.settings import BACKEND_ROOT
+from navigator.core.settings import BACKEND_ROOT
 from navigator.sources import SourcesFile, load_sources
 
 

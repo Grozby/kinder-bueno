@@ -5,7 +5,7 @@ from collections import Counter
 import pytest
 from psycopg import sql
 
-from navigator import db
+from navigator.core import db
 from navigator.resolve import (
     acronym_aliases,
     looks_like_person,

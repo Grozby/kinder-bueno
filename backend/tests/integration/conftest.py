@@ -22,7 +22,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from navigator.settings import REPO_ROOT, get_settings
+from navigator.core.settings import REPO_ROOT, get_settings
 
 PROJECT = "navigator-it"
 DB_PORT = int(os.environ.get("IT_DB_PORT", "55432"))

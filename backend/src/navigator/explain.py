@@ -15,7 +15,7 @@ import asyncio
 import logging
 import re
 
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 from navigator.models import Evidence, Result
 
 log = logging.getLogger(__name__)

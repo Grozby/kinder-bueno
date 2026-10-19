@@ -9,7 +9,7 @@ from navigator.case_eval import GoldCase, Outcome, load_cases, report
 from navigator.cases import pdf_text
 from navigator.evaluate import Expected
 from navigator.models import ScoreItem
-from navigator.settings import BACKEND_ROOT
+from navigator.core.settings import BACKEND_ROOT
 
 
 def test_gold_file_loads_and_points_at_readable_pdfs():

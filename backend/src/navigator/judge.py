@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import psycopg
 
-from navigator.llm import LLM
+from navigator.core.llm import LLM
 
 log = logging.getLogger(__name__)
 

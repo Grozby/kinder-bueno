@@ -178,7 +178,7 @@ def _swap_in(conn: psycopg.Connection, source_id: str, pages: list, chunks: list
     transaction. Pages, chunks and results carry the page's index in `pages` instead of its id."""
     from dataclasses import replace
 
-    from navigator import db
+    from navigator.core import db
     from navigator.resolve import resolve
     from navigator.rules import apply_blocks
 
@@ -197,11 +197,11 @@ def run_ingest(slot: psycopg.Connection, source_id: str) -> None:
     closes when done."""
     from navigator.chunk import chunk_page
     from navigator.crawl import crawl_source
-    from navigator.embed import embed_documents
+    from navigator.core.embed import embed_documents
     from navigator.extract import extract_pages
     from navigator.judge import run_judge
-    from navigator.llm import LLM
-    from navigator.settings import get_settings
+    from navigator.core.llm import LLM
+    from navigator.core.settings import get_settings
     from navigator.sources import load_sources
 
     settings = get_settings()

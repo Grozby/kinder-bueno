@@ -12,7 +12,7 @@ import pytest
 from docx import Document
 from pptx import Presentation
 
-from navigator.settings import REPO_ROOT
+from navigator.core.settings import REPO_ROOT
 
 pytestmark = pytest.mark.integration
 
