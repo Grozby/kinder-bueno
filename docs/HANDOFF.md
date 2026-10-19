@@ -1,4 +1,4 @@
-# Running the Navigator (v0.2.1)
+# Running the Navigator (v0.3.0)
 
 How to run the whole Navigator on your own machine: Postgres, the API and the UI, all in Docker. Follow the steps in
 order. Development setup is in the [README](../README.md#local-development-setup).
@@ -18,7 +18,7 @@ order. Development setup is in the [README](../README.md#local-development-setup
 ## 1. Get the code
 
 ```bash
-git clone --branch v0.2.1 https://github.com/Grozby/kinder-bueno.git
+git clone --branch v0.3.0 https://github.com/Grozby/kinder-bueno.git
 cd kinder-bueno
 shasum -a 256 /path/to/demo-340-precisa.dump      # must match the checksum we sent
 mkdir -p checkpoints && cp /path/to/demo-340-precisa.dump checkpoints/demo.dump
@@ -55,7 +55,7 @@ Every release is published as ready-made images for Intel/AMD and ARM (`ghcr.io/
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.handoff.yml:docker-compose.images.yml
-NAVIGATOR_VERSION=0.2.1
+NAVIGATOR_VERSION=0.3.0
 ```
 
 Then run `docker compose pull` instead of `docker compose build` in step 3.

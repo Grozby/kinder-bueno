@@ -53,7 +53,7 @@ track; the slides use the same numbers.
 **Before the demo** (README "Demo"):
 - The script below needs the 340-page data: present from the shared stack, or restore a 340-page snapshot with
   `scripts/demo.sh setup --snapshot <file>`. Either `demo-340.dump` (empty board) or `demo-340-precisa.dump` (the
-  `v0.2.1` handoff snapshot, with one Precisa card); both are git-ignored, so ask for them, or take one with
+  `v0.3.0` handoff snapshot, with one Precisa card); both are git-ignored, so ask for them, or take one with
   `scripts/demo.sh dump demo-340.dump`.
 - `docker compose run --rm restore` loads the snapshot (it replaces every case with the snapshot's; take the
   snapshot from a board without a Glucora card, since the demo uploads Glucora live), then
@@ -69,7 +69,7 @@ track; the slides use the same numbers.
 
 1. **Upload a company** (~25 s). Drop the Glucora PDF on the board. The pop-up shows the analysis; the card
    lands in "New" with a **fit score of about 60–80**: Apertus reads the PDF afresh on each upload, and the
-   needs it reads move the score (60, 60, 60 and 65 after #160, 73 in the v0.2.1 smoke test; one earlier upload read 5 of 5 needs covered
+   needs it reads move the score (60, 60, 60 and 65 after #160, 73 in the v0.3.0 smoke test; one earlier upload read 5 of 5 needs covered
    and scored 81). Read the summary (needle-free
    wearable glucose sensor, Swiss R&D in Bern) and the breakdown: "4 of 5 needs covered … Not covered:
    biocompatibility testing for skin sensors". Say it: the score only counts what our sources prove, and it
