@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError, field_validator
 
 from navigator.llm import LLM, LLMError
-from navigator.resolve import norm_name
+from navigator.resolve import is_person_name, norm_name
 from navigator.verify import PageText, verify_claim, verify_relation
 
 log = logging.getLogger(__name__)
@@ -235,19 +235,6 @@ def parse_items(data: dict) -> tuple[list[Claim], list[Relation], int]:
         except ValidationError:
             dropped += 1
     return claims, relations, dropped
-
-
-# Words that label a list on member pages; the 8B model sometimes turns them into "people".
-LABEL_WORDS = {"alumni", "phone", "phone2", "mail", "e-mail", "funktion", "name", "titel", "staff", "students",
-               "student", "senior", "members", "member", "group", "team", "head", "chair", "administration",
-               "candidates", "thesis", "master", "bachelor", "postdocs", "contact"}
-
-
-def is_person_name(name: str) -> bool:
-    """A real person's name: at least two words after titles, no digits, not only list labels.
-    Rejects "Alumni", "Phone2", "PhD Students" and lone surnames that cannot be told apart."""
-    words = norm_name(name).replace("/", " ").split()
-    return len(words) >= 2 and not any(ch.isdigit() for ch in name) and not set(words) <= LABEL_WORDS
 
 
 def check_items(page: PageText, claims: list[Claim], relations: list[Relation]) -> tuple[list[Checked], list[Checked]]:

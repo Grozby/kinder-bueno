@@ -26,6 +26,11 @@ def test_looks_like_person():
     assert not looks_like_person("Alumni") and not looks_like_person("Phone2") and not looks_like_person("Dr. Muster")
 
 
+def test_norm_name_drops_titles_between_titles():
+    assert norm_name("Dr. med. et phil. nat. Ruben Bill") == "ruben bill"  # #150
+    assert norm_name("Prof. Dr. habil. Anna Muster") == "anna muster"
+
+
 def test_norm_name_drops_titles_and_accents():
     assert norm_name("Prof. Dr. med. Johanna  Kremer Hovinga") == "johanna kremer hovinga"
     assert norm_name("PD Dr. Francesco Clavica") == "francesco clavica"

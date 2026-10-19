@@ -114,6 +114,12 @@ def test_relation_row_inside_claims_is_routed():
     ("Senior Scientific Staff", True),  # 3 words, not all labels: kept (no false negatives on rare names)
     ("Group Head", False),
     ("Room 3.14 Team", False),
+    ("Balmer Lab", False),           # organisations extracted as people (#150)
+    ("Medová group", False),
+    ("Marbacher & Grüter Lab", False),
+    ("ARTORG Center for Biomedical Engineering Research", False),
+    ("group leader", False),
+    ("Dr. med. et phil. nat. Ruben Bill", True),
 ])
 def test_is_person_name(name, ok):
     assert is_person_name(name) is ok
