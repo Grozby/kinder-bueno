@@ -4,9 +4,9 @@ import asyncio
 
 import pytest
 
-from navigator import expand
-from navigator.expand import Expansion, expand_query, parse_expansion
 from navigator.core.llm import LLMError
+from navigator.search import expand
+from navigator.search.expand import Expansion, expand_query, parse_expansion
 
 
 class FakeLLM:

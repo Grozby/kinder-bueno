@@ -13,8 +13,8 @@ from urllib.robotparser import RobotFileParser
 
 import httpx
 
-from navigator.ingest.clean import clean_html
 from navigator.core.sources import CrawlDefaults, SourceConfig
+from navigator.ingest.clean import clean_html
 
 log = logging.getLogger(__name__)
 

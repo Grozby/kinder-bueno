@@ -1,7 +1,7 @@
 import pytest
 
-from navigator.ingest.extract import Claim, check_items, is_person_name, parse_items, reverify, salvage_rows, split_text
 from navigator.core.llm import LLMError, parse_json_object
+from navigator.ingest.extract import Claim, check_items, is_person_name, parse_items, reverify, salvage_rows, split_text
 from navigator.ingest.verify import PageText
 
 PAGE_TEXT = "Odening Lab\nTranslational Cardiology / Electrophysiology\nProf. Dr. Katja Odening\nGroup Leader"

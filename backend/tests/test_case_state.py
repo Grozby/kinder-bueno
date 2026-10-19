@@ -1,8 +1,8 @@
 """Case drawer state kept in the DB (#81): selection, chat-added references, chat history, feedback. Needs Postgres."""
 
 import pytest
-from fastapi.testclient import TestClient
 from fake_chat import SearchModel
+from fastapi.testclient import TestClient
 from test_analysis import new_case, run
 from test_api import fake_embed
 
@@ -14,7 +14,7 @@ from navigator.api import (
     get_expand,
     get_explain,
 )
-from navigator.expand import Expansion
+from navigator.search.expand import Expansion
 
 
 @pytest.fixture

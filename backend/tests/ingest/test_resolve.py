@@ -18,7 +18,7 @@ from navigator.ingest.resolve import (
     unit_variant,
     variant_aliases,
 )
-from navigator.results import build_results
+from navigator.search.results import build_results
 
 
 def test_looks_like_person():

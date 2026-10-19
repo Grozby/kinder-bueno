@@ -1,15 +1,22 @@
 """API routes with TestClient on the fixture graph (tests/conftest.py). Needs Postgres."""
 
 import pytest
-from fastapi.testclient import TestClient
-
 from conftest import onehot
 from fake_chat import SearchModel
+from fastapi.testclient import TestClient
+
 from navigator.api import (
-    app, get_chat_model, get_conn, get_embed, get_expand, get_explain, get_page_rules, get_seeds,
+    app,
+    get_chat_model,
+    get_conn,
+    get_embed,
+    get_expand,
+    get_explain,
+    get_page_rules,
+    get_seeds,
 )
-from navigator.expand import Expansion
 from navigator.ingest.pages import SourceRules, guess_kind
+from navigator.search.expand import Expansion
 
 
 def fake_embed(query: str):

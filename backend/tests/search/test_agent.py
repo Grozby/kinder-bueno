@@ -7,11 +7,11 @@ from fake_chat import Scripted
 from langchain_core.messages import ToolMessage
 from test_api import fake_embed
 
-from navigator import agent
-from navigator.agent import Agent, Previous, check_reply, describe, template, text_tool_call
 from navigator.models import ChatFilters, SearchResponse
-from navigator.rank import rank_entities
-from navigator.results import build_results
+from navigator.search import agent
+from navigator.search.agent import Agent, Previous, check_reply, describe, template, text_tool_call
+from navigator.search.rank import rank_entities
+from navigator.search.results import build_results
 
 
 def search_fn(conn):

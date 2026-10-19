@@ -7,8 +7,7 @@ The chat session of a case is "case-<id>" (frontend/src/stores/cases.ts). Result
 import psycopg
 from psycopg.types.json import Jsonb
 
-from navigator import agent, analysis
-from navigator.explain import recheck
+from navigator import analysis
 from navigator.models import (
     CaseChatTurn,
     CaseFeedback,
@@ -17,7 +16,9 @@ from navigator.models import (
     Expansion,
     Result,
 )
-from navigator.results import build_results
+from navigator.search import agent
+from navigator.search.explain import recheck
+from navigator.search.results import build_results
 
 DEFAULT_SELECTION = 10  # matching references selected for the pitch until the user changes the selection
 # Fewer covered needs than this: nothing is preselected, so no pitch is offered by default. One weak match

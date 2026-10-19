@@ -8,7 +8,6 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-
 def _backend_root() -> Path:
     """`backend/` in a source checkout (`/app` in Docker), else the working directory (installed as a package)."""
     root = Path(__file__).resolve().parents[3]

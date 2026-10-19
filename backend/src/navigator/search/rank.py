@@ -10,8 +10,8 @@ import numpy as np
 import psycopg
 
 from navigator.core.db import shown
-from navigator.search import ChunkHit, keyword_search, search_chunks
 from navigator.ingest.verify import norm
+from navigator.search.chunks import ChunkHit, keyword_search, search_chunks
 
 DEFAULT_TYPES = ["person", "unit"]  # projects / infrastructure only when the filter asks (8.4 step 4)
 MAX_RESULTS = 10

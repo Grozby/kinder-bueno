@@ -14,7 +14,7 @@ from navigator.ingest.judge import (
     parse_verdicts,
     store_verdicts,
 )
-from navigator.results import build_results
+from navigator.search.results import build_results
 
 GLUCOSE = Item("claim", 11, 'person "Anna Muster" — expertise: "glucose sensors"', "Anna works on\nglucose sensors.")
 LISTED = Item("relation", 21, 'relation: person "Anna Muster" listed_in unit "Diabetes Lab"', "Anna Muster, PhD")

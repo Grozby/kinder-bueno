@@ -37,10 +37,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from navigator.explain import cited_ids
-from navigator.models import ChatFilters, EntityType, Expansion, Result, SearchResponse
 from navigator.core.db import shown
-from navigator.results import build_results
+from navigator.models import ChatFilters, EntityType, Expansion, Result, SearchResponse
+from navigator.search.explain import cited_ids
+from navigator.search.results import build_results
 
 log = logging.getLogger(__name__)
 

@@ -5,8 +5,8 @@ import socket
 import pytest
 from fastapi.testclient import TestClient
 
-from navigator.ingest import pipeline
 from navigator.api import app, get_conn, get_ingest, get_ingest_slot, get_seeds
+from navigator.ingest import pipeline
 from navigator.ingest.crawl import CrawledPage
 from navigator.ingest.pipeline import SourceError, add_source, check_url, run_ingest, source_config, source_id_for
 
@@ -265,10 +265,10 @@ def test_failed_recrawl_keeps_the_previous_data(test_conn, test_database_url, mo
 
 
 def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_database_url, monkeypatch, slot):
-    from navigator.models import CrawlRulesUpdate
-    from navigator.ingest.rules import save_rules
-    from navigator.core.sources import load_sources
     from navigator.core.settings import BACKEND_ROOT
+    from navigator.core.sources import load_sources
+    from navigator.ingest.rules import save_rules
+    from navigator.models import CrawlRulesUpdate
 
     sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     test_conn.execute("INSERT INTO source (id, name) VALUES ('artorg', 'ARTORG')")
@@ -294,8 +294,8 @@ def test_recrawl_of_a_sources_yaml_source_uses_its_stored_rules(test_conn, test_
 
 
 def test_start_recrawl_unknown_source(test_conn):
-    from navigator.core.sources import load_sources
     from navigator.core.settings import BACKEND_ROOT
+    from navigator.core.sources import load_sources
 
     sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     assert not pipeline.start_recrawl(test_conn, sources, "nope")

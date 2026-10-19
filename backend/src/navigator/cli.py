@@ -2,18 +2,18 @@
 
 import asyncio
 import logging
+from collections import Counter
 
 import typer
 
 from navigator.core import db
-from collections import Counter
-
-from navigator.ingest.crawl import crawl_source
-from navigator.ingest.extract import extract_pages, reverify as reverify_rows
 from navigator.core.llm import LLM
-from navigator.ingest.resolve import resolve as run_resolve
 from navigator.core.settings import get_settings
 from navigator.core.sources import load_sources
+from navigator.ingest.crawl import crawl_source
+from navigator.ingest.extract import extract_pages
+from navigator.ingest.extract import reverify as reverify_rows
+from navigator.ingest.resolve import resolve as run_resolve
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -168,9 +168,9 @@ def embed(source: str | None = typer.Option(None, help="Source id. Default: all 
     """Chunk pages, embed the chunks and replace the stored chunks of each source."""
     import time
 
+    from navigator.core.embed import embed_documents
     from navigator.ingest import chunks_db
     from navigator.ingest.chunk import chunk_page
-    from navigator.core.embed import embed_documents
 
     settings = get_settings()
     sources = load_sources(settings.sources_file)
@@ -196,8 +196,8 @@ def search_chunks(
 ) -> None:
     """Debug: show the top chunks for a query with page URL and score."""
     from navigator.ingest import chunks_db
-    from navigator.expand import Expansion, expand_query
-    from navigator.search import search_chunks as run_search
+    from navigator.search.chunks import search_chunks as run_search
+    from navigator.search.expand import Expansion, expand_query
 
     settings = get_settings()
     expansion = asyncio.run(expand_query(LLM(settings), query)) if expand else Expansion()
@@ -239,12 +239,12 @@ def search(
     """Rank entities for a query, like GET /api/search: expansion, fusion, fairness cap, explanations."""
     from typing import get_args
 
-    from navigator.ingest import chunks_db
-    from navigator.api import run_search
     from navigator.core.embed import embed_query
-    from navigator.expand import expand_query
-    from navigator.explain import explain as explain_results
+    from navigator.ingest import chunks_db
     from navigator.models import EntityType
+    from navigator.search.expand import expand_query
+    from navigator.search.explain import explain as explain_results
+    from navigator.search.pipeline import run_search
 
     unknown = [t for t in type_ if t not in get_args(EntityType)]
     if unknown:
@@ -317,8 +317,8 @@ def evaluate(
     import json
     from pathlib import Path
 
-    from navigator.ingest import chunks_db
     from navigator.evaluate import load_gold, run
+    from navigator.ingest import chunks_db
 
     settings = get_settings()
     gold = gold or settings.eval_dir / "gold.yaml"
@@ -399,10 +399,10 @@ def case_eval(
     """Run the case analysis read-only on the example PDFs and compare with the expected matches (#73)."""
     from pathlib import Path
 
-    from navigator.ingest import chunks_db
     from navigator.analysis import read_case, rerank
     from navigator.case_eval import evaluate_case, load_cases, report
     from navigator.core.embed import embed_documents, embed_query
+    from navigator.ingest import chunks_db
 
     settings = get_settings()
     gold = gold or settings.eval_dir / "cases.yaml"

@@ -1,15 +1,15 @@
 """Crawl rules per source (#79): stored rules, blocks applied at once, the routes."""
 
 import pytest
+from conftest import onehot
 from fastapi.testclient import TestClient
 
-from conftest import onehot
 from navigator.api import app, get_conn, get_embed, get_expand, get_explain
-from navigator.expand import Expansion
-from navigator.models import CrawlRulesUpdate
-from navigator.ingest.rules import RulesError, apply_blocks, get_rules, save_rules, validate, with_stored
 from navigator.core.settings import BACKEND_ROOT
 from navigator.core.sources import load_sources
+from navigator.ingest.rules import RulesError, apply_blocks, get_rules, save_rules, validate, with_stored
+from navigator.models import CrawlRulesUpdate
+from navigator.search.expand import Expansion
 
 SOURCES = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
 BLOCK_ALICE = {"allow_hosts": ["artorg.example"], "include_patterns": [], "exclude_patterns": [r"/alice$"],

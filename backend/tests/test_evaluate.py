@@ -2,6 +2,7 @@
 
 import pytest
 
+from navigator.core.settings import BACKEND_ROOT
 from navigator.evaluate import (
     Expected,
     field_fill,
@@ -13,9 +14,8 @@ from navigator.evaluate import (
     recall,
     report,
 )
-from navigator.expand import Expansion
 from navigator.models import Result
-from navigator.core.settings import BACKEND_ROOT
+from navigator.search.expand import Expansion
 
 
 def _result(name: str, type: str = "person", **fields) -> Result:

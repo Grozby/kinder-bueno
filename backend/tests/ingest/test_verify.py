@@ -1,6 +1,14 @@
 import pytest
 
-from navigator.ingest.verify import PageText, is_sentence, names_topic, norm, normalise_with_map, verify_claim, verify_relation
+from navigator.ingest.verify import (
+    PageText,
+    is_sentence,
+    names_topic,
+    norm,
+    normalise_with_map,
+    verify_claim,
+    verify_relation,
+)
 
 PAGE = PageText(
     "Group Members\n"

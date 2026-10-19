@@ -4,7 +4,8 @@ import asyncio
 
 import pytest
 
-from navigator.explain import (
+from navigator.models import Evidence, Result
+from navigator.search.explain import (
     MAX_CLAIMS,
     apply_why,
     check_sentence,
@@ -14,7 +15,6 @@ from navigator.explain import (
     parse_why,
     prompt_claims,
 )
-from navigator.models import Evidence, Result
 
 
 def _ev(claim_id: int, field: str, value: str = "v", quote: str = "q", via_unit: str | None = None) -> Evidence:
