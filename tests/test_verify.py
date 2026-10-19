@@ -1,6 +1,6 @@
 import pytest
 
-from navigator.verify import PageText, norm, normalise_with_map, verify_claim, verify_relation
+from navigator.verify import PageText, is_sentence, names_topic, norm, normalise_with_map, verify_claim, verify_relation
 
 PAGE = PageText(
     "Group Members\n"
@@ -144,3 +144,38 @@ def test_topic_with_a_sentence_or_a_heading_that_names_it_is_kept():
 def test_short_topic_without_content_words_is_not_judged_by_the_heading_rule():
     page = PageText("AIMI Lab\nAI\nWe build models.")
     assert verify_claim(page, "AIMI Lab", "expertise", "AI", "AI").ok
+
+
+NAME_BLOCK = "Team\nEnzmann Lab\nName / Titel\nProf. Dr. Volker Enzmann\nFunktion\nGroup Leader"
+
+
+def test_name_block_is_not_prose():
+    """#159: a multi-line name block has 8+ words in total, and "Prof. Dr." looks like sentence punctuation."""
+    assert not is_sentence(NAME_BLOCK)
+    assert not is_sentence("Prof. Dr. med. Alicia Rovó")
+    assert is_sentence("Our research is focused on advancing the mechanistic understanding of cardiac arrhythmias.")
+    assert is_sentence("We build sensors for wearables.")
+
+
+def test_topic_quoted_by_a_name_block_is_rejected():
+    """#159: the head's name was the one word of the value in the quote."""
+    page = PageText(NAME_BLOCK)
+    m = verify_claim(page, "Enzmann Lab", "description",
+                     "Research group led by Prof. Dr. Volker Enzmann focusing on cardiac electrophysiology", NAME_BLOCK)
+    assert not m.ok and m.reason == "description needs a sentence quote"
+    assert not verify_claim(page, "Prof. Dr. Volker Enzmann", "expertise", "cardiac arrhythmia", NAME_BLOCK).ok
+
+
+def test_names_topic_needs_half_of_the_content_words():
+    assert names_topic("cardiac electrophysiology", "Translational Cardiology / Electrophysiology")
+    assert names_topic("heart valve mechanics", "Heart Valves")
+    assert not names_topic("glucose sensor validation studies", "Sensor Lab")
+
+
+def test_description_needs_a_sentence_even_when_the_heading_names_it():
+    page = PageText("Cardiovascular Engineering\nWe study heart valves and blood flow in the aorta.")
+    m = verify_claim(page, "Cardiovascular Engineering", "description", "research in cardiovascular engineering",
+                     "Cardiovascular Engineering")
+    assert not m.ok and m.reason == "description needs a sentence quote"
+    assert verify_claim(page, "Cardiovascular Engineering", "expertise", "cardiovascular engineering",
+                        "Cardiovascular Engineering").ok

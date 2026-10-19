@@ -100,7 +100,7 @@ PROFILE_PROMPT = _COMMON + """
 YOUR TASK: is this page ONE person's own profile page (one person, with a CV, "research interests" or a
 research description)? If not, return {"claims": [], "relations": []}.
 If it is: AT MOST 6 expertise claims for that person, and nothing else. Each is a specific research topic of
-2-5 words, like "computer vision", "dietary assessment", "cardiac electrophysiology", taken from the page.
+2-5 words, like "glacier acoustics" or "lichen genomics" in the example below, taken from the page.
 Never single generic words ("research", "health", "technology", "systems", "medical", "engineering"), and
 never the name of a group or lab. The quote is the sentence that names the topic.
 
