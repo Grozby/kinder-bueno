@@ -1,4 +1,4 @@
-from navigator.chunk import CHUNK_OVERLAP, CHUNK_SIZE, chunk_page, pack_blocks, split_blocks
+from navigator.ingest.chunk import CHUNK_OVERLAP, CHUNK_SIZE, chunk_page, pack_blocks, split_blocks
 
 
 def _text(n_lines: int, line_len: int = 90) -> str:

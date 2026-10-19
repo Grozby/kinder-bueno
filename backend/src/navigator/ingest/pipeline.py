@@ -33,8 +33,8 @@ from urllib.parse import urlsplit
 import psycopg
 from psycopg.types.json import Jsonb
 
-from navigator import chunks_db
-from navigator.sources import CrawlDefaults, SourceConfig, SourcesFile
+from navigator.ingest import chunks_db
+from navigator.core.sources import CrawlDefaults, SourceConfig, SourcesFile
 
 log = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ MAX_EXTRACT_FAILURES = 0.5  # share of pages whose extraction may fail (gateway 
 
 def crawl_config(conn: psycopg.Connection, sources: SourcesFile, source_id: str) -> tuple[SourceConfig, int] | None:
     """The source's crawl config with the stored rules (#79) and its link depth; None for an unknown source."""
-    from navigator.rules import with_stored
+    from navigator.ingest.rules import with_stored
 
     row = conn.execute("SELECT config FROM source WHERE id = %s", (source_id,)).fetchone()
     if row is None:
@@ -179,8 +179,8 @@ def _swap_in(conn: psycopg.Connection, source_id: str, pages: list, chunks: list
     from dataclasses import replace
 
     from navigator.core import db
-    from navigator.resolve import resolve
-    from navigator.rules import apply_blocks
+    from navigator.ingest.resolve import resolve
+    from navigator.ingest.rules import apply_blocks
 
     with conn.transaction():
         conn.execute("DELETE FROM page WHERE source_id = %s", (source_id,))  # cascades to chunks and raw rows
@@ -195,14 +195,14 @@ def _swap_in(conn: psycopg.Connection, source_id: str, pages: list, chunks: list
 def run_ingest(slot: psycopg.Connection, source_id: str) -> None:
     """The background ingest of a new or re-crawled source, on the slot's connection (`try_start`), which it
     closes when done."""
-    from navigator.chunk import chunk_page
-    from navigator.crawl import crawl_source
+    from navigator.ingest.chunk import chunk_page
+    from navigator.ingest.crawl import crawl_source
     from navigator.core.embed import embed_documents
-    from navigator.extract import extract_pages
-    from navigator.judge import run_judge
+    from navigator.ingest.extract import extract_pages
+    from navigator.ingest.judge import run_judge
     from navigator.core.llm import LLM
     from navigator.core.settings import get_settings
-    from navigator.sources import load_sources
+    from navigator.core.sources import load_sources
 
     settings = get_settings()
     try:

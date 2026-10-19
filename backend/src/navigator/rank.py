@@ -9,9 +9,9 @@ from dataclasses import dataclass
 import numpy as np
 import psycopg
 
-from navigator.results import shown
+from navigator.core.db import shown
 from navigator.search import ChunkHit, keyword_search, search_chunks
-from navigator.verify import norm
+from navigator.ingest.verify import norm
 
 DEFAULT_TYPES = ["person", "unit"]  # projects / infrastructure only when the filter asks (8.4 step 4)
 MAX_RESULTS = 10

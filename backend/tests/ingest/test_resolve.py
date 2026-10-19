@@ -6,7 +6,7 @@ import pytest
 from psycopg import sql
 
 from navigator.core import db
-from navigator.resolve import (
+from navigator.ingest.resolve import (
     acronym_aliases,
     looks_like_person,
     norm_name,

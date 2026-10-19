@@ -8,12 +8,12 @@ import typer
 from navigator.core import db
 from collections import Counter
 
-from navigator.crawl import crawl_source
-from navigator.extract import extract_pages, reverify as reverify_rows
+from navigator.ingest.crawl import crawl_source
+from navigator.ingest.extract import extract_pages, reverify as reverify_rows
 from navigator.core.llm import LLM
-from navigator.resolve import resolve as run_resolve
+from navigator.ingest.resolve import resolve as run_resolve
 from navigator.core.settings import get_settings
-from navigator.sources import load_sources
+from navigator.core.sources import load_sources
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -41,7 +41,7 @@ def crawl(
 ) -> None:
     """Crawl and clean pages, then replace the stored pages of each crawled source.
     Rules edited in the UI (#79) replace a source's patterns in config/sources.yaml."""
-    from navigator.rules import apply_blocks, with_stored
+    from navigator.ingest.rules import apply_blocks, with_stored
 
     settings = get_settings()
     sources = load_sources(settings.sources_file)
@@ -168,8 +168,8 @@ def embed(source: str | None = typer.Option(None, help="Source id. Default: all 
     """Chunk pages, embed the chunks and replace the stored chunks of each source."""
     import time
 
-    from navigator import chunks_db
-    from navigator.chunk import chunk_page
+    from navigator.ingest import chunks_db
+    from navigator.ingest.chunk import chunk_page
     from navigator.core.embed import embed_documents
 
     settings = get_settings()
@@ -195,7 +195,7 @@ def search_chunks(
     expand: bool = typer.Option(False, help="Add Apertus search terms (plan 8.1)."),
 ) -> None:
     """Debug: show the top chunks for a query with page URL and score."""
-    from navigator import chunks_db
+    from navigator.ingest import chunks_db
     from navigator.expand import Expansion, expand_query
     from navigator.search import search_chunks as run_search
 
@@ -239,7 +239,7 @@ def search(
     """Rank entities for a query, like GET /api/search: expansion, fusion, fairness cap, explanations."""
     from typing import get_args
 
-    from navigator import chunks_db
+    from navigator.ingest import chunks_db
     from navigator.api import run_search
     from navigator.core.embed import embed_query
     from navigator.expand import expand_query
@@ -295,7 +295,7 @@ def serve(
 @app.command()
 def resolve() -> None:
     """Merge verified raw extractions into entities, claims and relations (re-runnable)."""
-    from navigator.resolve import resolve as run_resolve
+    from navigator.ingest.resolve import resolve as run_resolve
 
     settings = get_settings()
     with db.connect(settings.database_url) as conn:
@@ -317,7 +317,7 @@ def evaluate(
     import json
     from pathlib import Path
 
-    from navigator import chunks_db
+    from navigator.ingest import chunks_db
     from navigator.evaluate import load_gold, run
 
     settings = get_settings()
@@ -348,7 +348,7 @@ def ingest(
 
 
 def _run_judge(conn, settings, source: str | None) -> None:
-    from navigator.judge import run_judge
+    from navigator.ingest.judge import run_judge
 
     model = settings.judge_model or settings.llm_model
     typer.echo(f"Judging claims with {model}...")
@@ -399,7 +399,7 @@ def case_eval(
     """Run the case analysis read-only on the example PDFs and compare with the expected matches (#73)."""
     from pathlib import Path
 
-    from navigator import chunks_db
+    from navigator.ingest import chunks_db
     from navigator.analysis import read_case, rerank
     from navigator.case_eval import evaluate_case, load_cases, report
     from navigator.core.embed import embed_documents, embed_query

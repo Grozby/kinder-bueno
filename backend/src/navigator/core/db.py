@@ -4,13 +4,22 @@ from pathlib import Path
 
 import psycopg
 
-from navigator.sources import SourcesFile
+from navigator.core.sources import SourcesFile
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
 
 
 def connect(database_url: str) -> psycopg.Connection:
     return psycopg.connect(database_url)
+
+
+def shown(alias: str, include_blocked: bool = False) -> str:
+    """SQL condition for a shown claim or relation (plan 7.1): verified, not judged unsupported, and not
+    from a page blocked by a crawl rule (#79). `include_blocked` keeps blocked pages (the pages list)."""
+    cond = f"{alias}.verified AND {alias}.judge_verdict IS DISTINCT FROM 'unsupported'"
+    if include_blocked:
+        return cond
+    return f"{cond} AND NOT EXISTS (SELECT 1 FROM page bp WHERE bp.id = {alias}.page_id AND bp.blocked)"
 
 
 def init_db(conn: psycopg.Connection, sources: SourcesFile) -> None:

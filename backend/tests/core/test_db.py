@@ -6,7 +6,7 @@ import pytest
 
 from navigator.core import db
 from navigator.core.settings import BACKEND_ROOT
-from navigator.sources import load_sources
+from navigator.core.sources import load_sources
 
 
 @pytest.fixture

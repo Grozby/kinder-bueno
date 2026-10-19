@@ -39,7 +39,8 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from navigator.explain import cited_ids
 from navigator.models import ChatFilters, EntityType, Expansion, Result, SearchResponse
-from navigator.results import build_results, shown
+from navigator.core.db import shown
+from navigator.results import build_results
 
 log = logging.getLogger(__name__)
 

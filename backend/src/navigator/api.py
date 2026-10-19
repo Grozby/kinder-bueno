@@ -12,7 +12,11 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import agent, analysis, case_state, cases, chunks_db, documents, ingest, pages, pitch, rules
+from navigator import agent, analysis, case_state, cases, documents, pitch
+from navigator.ingest import chunks_db
+from navigator.ingest import pages
+from navigator.ingest import rules
+from navigator.ingest import pipeline
 from navigator.explain import apply_why, explain as explain_results
 from navigator.expand import Expansion as TermExpansion
 from navigator.expand import expand_query
@@ -52,9 +56,10 @@ from navigator.models import (
     StatsResponse,
 )
 from navigator.rank import rank_entities, warm_topic_vectors
-from navigator.results import build_results, shown
+from navigator.core.db import shown
+from navigator.results import build_results
 from navigator.core.settings import get_settings
-from navigator.sources import load_sources
+from navigator.core.sources import load_sources
 
 log = logging.getLogger(__name__)
 
@@ -387,13 +392,13 @@ def get_source(conn: Conn, seeds: Seeds, source_id: str) -> Source:
 
 def get_ingest() -> Callable[[psycopg.Connection, str], None]:
     """The background ingest of a new (#55) or re-crawled (#80) source, on the ingest slot's connection."""
-    return ingest.run_ingest
+    return pipeline.run_ingest
 
 
 def get_ingest_slot() -> Callable[[], psycopg.Connection | None]:
-    """Takes the ingest slot (`ingest.try_start`). Called inside the route, not as a dependency: a request that
+    """Takes the ingest slot (`pipeline.try_start`). Called inside the route, not as a dependency: a request that
     fails validation must not take it."""
-    return lambda: ingest.try_start(get_settings().database_url)
+    return lambda: pipeline.try_start(get_settings().database_url)
 
 
 IngestSlot = Annotated[Callable[[], psycopg.Connection | None], Depends(get_ingest_slot)]
@@ -414,12 +419,12 @@ def add_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, body: NewS
     with status "crawling"; poll GET /api/sources/{id}. One ingest at a time: 409 while one runs."""
     slot = take_ingest_slot(try_start)
     try:
-        source_id = ingest.add_source(conn, body.url, body.name, body.max_depth, body.max_pages, body.follow_outbound)
-    except ingest.SourceError as exc:
-        ingest.finish(slot)
+        source_id = pipeline.add_source(conn, body.url, body.name, body.max_depth, body.max_pages, body.follow_outbound)
+    except pipeline.SourceError as exc:
+        pipeline.finish(slot)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
-        ingest.finish(slot)
+        pipeline.finish(slot)
         raise
     conn.commit()  # the background ingest reads the source on another connection
     background.add_task(run, slot, source_id)
@@ -434,12 +439,12 @@ def recrawl_source(conn: Conn, seeds: Seeds, background: BackgroundTasks, source
     source keeps its previous pages and facts. 409 while another ingest runs."""
     slot = take_ingest_slot(try_start)
     try:
-        found = ingest.start_recrawl(conn, load_sources(get_settings().sources_file), source_id)
+        found = pipeline.start_recrawl(conn, load_sources(get_settings().sources_file), source_id)
     except Exception:
-        ingest.finish(slot)
+        pipeline.finish(slot)
         raise
     if not found:
-        ingest.finish(slot)
+        pipeline.finish(slot)
         raise HTTPException(status_code=404, detail="Source not found")
     conn.commit()  # the background ingest reads the source on another connection
     background.add_task(run, slot, source_id)

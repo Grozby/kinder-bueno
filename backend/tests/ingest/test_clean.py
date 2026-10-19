@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from navigator.clean import clean_html, decode_email_href
+from navigator.ingest.clean import clean_html, decode_email_href
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
 
 
 def _fixture(name: str) -> str:

@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from navigator import cli
-from navigator.extract import PageResult
+from navigator.ingest.extract import PageResult
 
 runner = CliRunner()
 

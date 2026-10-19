@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import psycopg
 from unidecode import unidecode
 
-from navigator.verify import PageText, norm
+from navigator.ingest.verify import PageText, norm
 
 TITLES = {"prof", "dr", "pd", "med", "phil", "nat", "rer", "sc", "phd", "md", "msc", "bsc", "dipl", "ing",
           "ass", "assoc", "asst", "em", "dent", "dr.-ing",  # "Ass. Prof. Dr." and "Prof. Dr." are one person (#75)
