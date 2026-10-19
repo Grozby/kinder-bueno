@@ -12,15 +12,12 @@ import psycopg
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from navigator import agent, analysis, case_state, cases, documents, pitch
-from navigator.ingest import chunks_db
-from navigator.ingest import pages
-from navigator.ingest import rules
-from navigator.ingest import pipeline
-from navigator.explain import apply_why, explain as explain_results
-from navigator.expand import Expansion as TermExpansion
-from navigator.expand import expand_query
+from navigator import analysis, case_state, cases, documents, pitch
+from navigator.core.db import shown
 from navigator.core.llm import LLM
+from navigator.core.settings import get_settings
+from navigator.core.sources import load_sources
+from navigator.ingest import chunks_db, pages, pipeline, rules
 from navigator.models import (
     AddReference,
     Case,
@@ -29,18 +26,18 @@ from navigator.models import (
     CaseFeedback,
     CaseNote,
     CaseStatusUpdate,
-    DocumentKind,
     ChatFilters,
     ChatRequest,
     ChatResponse,
     CrawledPage,
     CrawlRules,
     CrawlRulesUpdate,
+    DocumentKind,
     EntityType,
-    Expansion,
     FeedbackCounts,
     FeedbackRequest,
     FeedbackResponse,
+    NewSource,
     NoteInput,
     PageDetail,
     Pitch,
@@ -49,17 +46,18 @@ from navigator.models import (
     Result,
     ReviewInput,
     SearchResponse,
-    NewSource,
     Selection,
     Source,
     SourceStats,
     StatsResponse,
 )
-from navigator.rank import rank_entities, warm_topic_vectors
-from navigator.core.db import shown
-from navigator.results import build_results
-from navigator.core.settings import get_settings
-from navigator.core.sources import load_sources
+from navigator.search import agent
+from navigator.search.expand import Expansion as TermExpansion
+from navigator.search.expand import expand_query
+from navigator.search.explain import explain as explain_results
+from navigator.search.pipeline import run_search
+from navigator.search.rank import warm_topic_vectors
+from navigator.search.results import build_results
 
 log = logging.getLogger(__name__)
 
@@ -204,19 +202,6 @@ async def db_unavailable(request: Request, exc: psycopg.OperationalError) -> JSO
 async def internal_error(request: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled error")
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
-
-
-def run_search(
-    conn: psycopg.Connection, embed: Callable, expand: Callable, explain: Callable,
-    q: str, sources: list[str], types: list[EntityType],
-) -> SearchResponse:
-    """The search pipeline shared by /api/search and /api/chat: expand → rank → build → explain."""
-    terms = expand(q)
-    ranking = rank_entities(conn, q, sources=sources, types=types, extra_terms=terms.terms, embed=embed)
-    results = build_results(conn, ranking.ranked)
-    results = apply_why(results, explain(q, results)) if results else results
-    expansion = Expansion(en=terms.en, de=terms.de) if terms.terms else None
-    return SearchResponse(results=results, expansion=expansion, no_result=not results)
 
 
 @app.get("/api/search")

@@ -16,9 +16,9 @@ from datetime import UTC, datetime
 import psycopg
 from psycopg.types.json import Jsonb
 
-from navigator.models import CrawlRules, CrawlRulesUpdate
-from navigator.ingest.pages import SourceRules
 from navigator.core.sources import SourceConfig, SourcesFile, _compile
+from navigator.ingest.pages import SourceRules
+from navigator.models import CrawlRules, CrawlRulesUpdate
 
 KINDS = ("allow_hosts", "include_patterns", "exclude_patterns", "priority_patterns")
 

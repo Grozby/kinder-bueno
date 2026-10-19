@@ -7,7 +7,7 @@ like trafilatura: on team pages trafilatura drops most names and contacts.
 import html as html_lib
 import re
 from dataclasses import dataclass
-from urllib.parse import unquote, urljoin, urldefrag
+from urllib.parse import unquote, urldefrag, urljoin
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 

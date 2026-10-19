@@ -9,15 +9,15 @@ from pathlib import Path
 import psycopg
 import yaml
 
-from navigator.eval_judge import Verdict, judge_all, log_rows, precision
-from navigator.expand import Expansion, expand_query
-from navigator.ingest.judge import JUDGED_FIELDS
-from navigator.core.llm import LLM
-from navigator.models import Result
-from navigator.rank import MAX_RESULTS, rank_entities
-from navigator.ingest.resolve import norm_name, norm_unit
 from navigator.core.db import shown
-from navigator.results import build_results
+from navigator.core.llm import LLM
+from navigator.eval_judge import Verdict, judge_all, log_rows, precision
+from navigator.ingest.judge import JUDGED_FIELDS
+from navigator.ingest.resolve import norm_name, norm_unit
+from navigator.models import Result
+from navigator.search.expand import Expansion, expand_query
+from navigator.search.rank import MAX_RESULTS, rank_entities
+from navigator.search.results import build_results
 
 LAY_PHRASINGS = (1, 2)  # per use case: (a) site wording, (b) lay term, (c) synonym
 MIN_JUDGE_AGREEMENT = 0.8  # below this the eval judge is not reliable (plan 10.2)

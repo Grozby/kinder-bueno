@@ -44,6 +44,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/navigator"]
 
+[tool.ruff]
+line-length = 120  # the code's width; CI checks only E9 and F, so this sets how `ruff check --select I --fix` wraps imports
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-m", "not integration"]  # the Docker stack tests: `uv run pytest -m integration` (tests/integration)

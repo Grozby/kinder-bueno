@@ -2,9 +2,9 @@ import asyncio
 
 import httpx
 
-from navigator.ingest.crawl import LinkFilter, crawl_source
 from navigator.core.settings import BACKEND_ROOT
 from navigator.core.sources import CrawlDefaults, SourceConfig, load_sources
+from navigator.ingest.crawl import LinkFilter, crawl_source
 
 SOURCES = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
 FAST = CrawlDefaults(delay_seconds=0, max_depth=3)

@@ -8,9 +8,10 @@ import pytest
 from conftest import onehot
 from typer.testing import CliRunner
 
-from navigator import cli, expand, explain
+from navigator import cli
 from navigator.core import embed
-from navigator.expand import Expansion
+from navigator.search import expand, explain
+from navigator.search.expand import Expansion
 
 runner = CliRunner()
 

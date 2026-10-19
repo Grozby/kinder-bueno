@@ -5,9 +5,8 @@ from collections import defaultdict
 import psycopg
 
 from navigator.core.db import shown
-from navigator.models import Evidence, Result
 from navigator.ingest.verify import norm
-
+from navigator.models import Evidence, Result
 
 REL_FIELDS = {
     "member_of": "affiliations",

@@ -20,9 +20,9 @@ from datetime import UTC, datetime
 import psycopg
 from psycopg.types.json import Jsonb
 
-from navigator.explain import _flat, _label, check_sentence, cited_ids, prompt_claims
 from navigator.core.llm import LLM
 from navigator.models import Evidence, Pitch, Result
+from navigator.search.explain import _flat, _label, check_sentence, cited_ids, prompt_claims
 
 log = logging.getLogger(__name__)
 

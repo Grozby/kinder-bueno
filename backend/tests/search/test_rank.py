@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 from conftest import onehot
 
-from navigator.rank import (
+from navigator.search.chunks import ChunkHit
+from navigator.search.rank import (
     _is_real_model,
     _topic_vec_of,
     _units,
@@ -17,7 +18,6 @@ from navigator.rank import (
     section_scores,
     topic_scores,
 )
-from navigator.search import ChunkHit
 
 
 def _hit(chunk_id: int, page_id: int, text: str, score: float) -> ChunkHit:
@@ -113,7 +113,7 @@ def test_fairness_cap_allows_three_per_unit():
 
 
 def test_rank_orders_by_relevance(test_conn, graph, monkeypatch):
-    monkeypatch.setattr("navigator.rank.TOPIC_WEIGHT", 0.0)  # chunk evidence only: this embed matches every topic
+    monkeypatch.setattr("navigator.search.rank.TOPIC_WEIGHT", 0.0)  # chunk evidence only: this embed matches every topic
     ranking = rank_entities(test_conn, "glucose", embed=lambda q: onehot({3: 0.8, 1: 0.6}))
     ids = [e for e, _ in ranking.ranked]
     assert ranking.no_result is False
@@ -175,7 +175,7 @@ def test_unit_found_through_its_own_topics(test_conn, graph, monkeypatch):
         return [e for e, _ in rank_entities(test_conn, "zebrafish genetics", embed=embed).ranked]
 
     assert ranked()[0] == graph["lab"]
-    monkeypatch.setattr("navigator.rank.TOPIC_WEIGHT", 0.0)
+    monkeypatch.setattr("navigator.search.rank.TOPIC_WEIGHT", 0.0)
     assert ranked()[-1] == graph["lab"]  # without topics it only has a weak page link
 
 

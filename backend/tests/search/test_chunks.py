@@ -5,7 +5,7 @@ import psycopg
 import pytest
 
 from navigator.ingest import chunks_db
-from navigator.search import (
+from navigator.search.chunks import (
     ChunkHit,
     cap_per_page,
     keyword_search,

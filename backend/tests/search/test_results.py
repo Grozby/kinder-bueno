@@ -1,6 +1,6 @@
 """build_results on the fixture graph (tests/conftest.py). Needs Postgres."""
 
-from navigator.results import build_results
+from navigator.search.results import build_results
 
 
 def by_name(results):
