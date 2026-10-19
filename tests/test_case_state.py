@@ -145,3 +145,15 @@ def test_zero_fit_case_lists_and_preselects_nothing(client, test_conn, graph):
     assert client.get(f"/api/cases/{case_id}/selection").json() == {"entity_ids": []}
     added = client.post(f"/api/cases/{case_id}/references", json={"entity_id": graph["bob"]}).json()
     assert [r["entity_id"] for r in client.get(f"/api/cases/{case_id}/references").json()] == [added["entity_id"]]
+
+
+def test_case_with_one_covered_need_preselects_nothing(client, test_conn):
+    """#158: one weak match (agritech "climate adaptation" <- "climate science") must not preselect a pitch."""
+    case_id = new_case(test_conn)
+    run(test_conn, case_id)
+    test_conn.execute(
+        """UPDATE "case" SET refs = (SELECT jsonb_agg(CASE WHEN r->'needs' = '[]' THEN r
+                                                         ELSE r || '{"needs": ["glucose monitoring"]}' END)
+                                     FROM jsonb_array_elements(refs) r) WHERE id = %s""", (case_id,))
+    assert any(r["why"].startswith("Matches ") for r in client.get(f"/api/cases/{case_id}/references").json())
+    assert client.get(f"/api/cases/{case_id}/selection").json() == {"entity_ids": []}

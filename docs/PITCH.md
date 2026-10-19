@@ -93,10 +93,11 @@ track; the slides use the same numbers.
    generate the pitch. Statements about references carry small numbered citations (#109): click one to show the
    cited fact, its quote and the source page. Sentences about references that cite nothing, or cite facts
    outside the selection, are removed.
-6. *(Optional, skip for now)* **Honest "no fit".** On the 340-page data `vinora-business-model.pdf` (agritech,
-   ~16 s) no longer scores 0 but **12**: one weak match, Dr. Kevin Debeire's "climate science" for the need "soil
-   science irrigation climate adaptation", is preselected, so a pitch would be offered. The other four needs
-   are uncovered. Show it only once that false match is fixed.
+6. *(Optional)* **Honest "low fit".** Drop `vinora-business-model.pdf` (agritech, ~16 s): fit score **about 12**,
+   "1 of 5 needs covered" (a loose one: Dr. Kevin Debeire's "climate science" for "soil science irrigation
+   climate adaptation"), the other four needs listed as not covered. Nothing is preselected and "Generate
+   pitch" stays disabled: with fewer than 2 needs covered, no pitch is offered (#158). Say it: the score shows
+   the gap instead of inventing a fit.
 7. *(Optional)* **Sources** page: the crawl graph, then "Ranked pages": the 340 pages ranked by verified
    facts, judge rate and feedback. Block a page (the ⊘ button): "It no longer appears in results", and its
    facts leave search and cases at once (#79). Press "Undo" in the toast right away. Don't start a re-crawl
