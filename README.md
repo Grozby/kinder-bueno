@@ -1,7 +1,59 @@
-# Research & Expertise Navigator
+# Bern Fit: Research & Expertise Navigator
 
 Find researchers, units, projects and infrastructure in the Bern research ecosystem, with every fact
-linked to a quote on a public page. The build plan is in [`docs/PLAN.md`](docs/PLAN.md).
+linked to a quote on a public page. Upload a company's business model, and see how well Bern's research fits it.
+
+Built in two days at «Hack Apertus» Liebefeld (18–19 October 2026) for the Bern Economic Development Agency's
+challenge. Technical report: [`docs/REPORT.md`](docs/REPORT.md) · pitch: [`docs/PITCH.md`](docs/PITCH.md) ·
+build plan: [`docs/PLAN.md`](docs/PLAN.md).
+
+## The hackathon
+
+«Hack Apertus» is a Switzerland-wide hackathon series built on
+Apertus, Switzerland's open large language model. Teams take partner challenges
+and turn them into working prototypes on Apertus, for sovereign infrastructure in the public and private sector.
+Everything built stays open and reusable.
+
+- **Liebefeld** (`#siliconlovefield`) was the series' 2nd stage and its first on-site event: 18–19 October 2026
+  at WORKSPACE & MORE in Liebefeld near Bern, hosted by the aiLights Association.
+- About 100 builders in teams of up to 5, with the Apertus 8B and 70B models, and 3 partner challenges: the Bern
+  Economic Development Agency, OpenParlData and the University of Bern.
+- On day 2 the top 6 teams pitch at the Liebefeld Finals. The winner qualifies for the Grand Finals in
+  St. Gallen on 14 May 2027.
+
+## The challenge
+
+The **Bern Economic Development Agency** helps companies that are thinking of settling in Canton Bern. One of
+its questions is always the same: what does Bern's research ecosystem offer this company?
+
+- **The problem.** Expertise in Bern is spread over hundreds of faculty, institute, lab and centre pages. People
+  search with other words than the sites use ("glucose sensors" for "continuous glucose monitoring"), in German
+  and English.
+- **The ask.** Type a question and get back people and research units with role, affiliation, expertise,
+  projects and infrastructure, and why each one matches.
+- **The rule.** Every fact shown must come from a public page and link to it. The system must not invent
+  people, roles or projects.
+
+## What we built
+
+- **Search with sources.** One search over ARTORG, the Diabetes Center Berne and UniBE labs (340 pages). Apertus
+  expands the query with synonyms in German and English. A chat refines the results ("more like #2", "who works
+  with #2?").
+- **Verified facts only.** Apertus must give a quote for every fact. The quote is matched against the stored
+  page, or the fact is rejected: 18% of extracted facts were (922 of 5,263). Every fact shown links to its page.
+- **Case board.** Upload a company's business model PDF. Apertus reads its needs, scores how well Bern's research
+  fits (and which needs it does not cover), proposes 25 references, and writes a pitch that cites only verified
+  facts.
+- **Sovereign.** Apertus 8B, local bge-m3 embeddings, Postgres, one `docker compose` stack.
+- **Measured.** recall@10 60% on 18 gold queries (target 80%), 100% of shown facts traceable, all 4 example
+  companies scored in their expected range. Details and limits in [`docs/REPORT.md`](docs/REPORT.md).
+
+## Team
+
+| Name | Role | GitHub |
+|---|---|---|
+| Gabriele Aldeghi | Backend | [@Grozby](https://github.com/Grozby) |
+| Gian-Luca Tehrani | Frontend | [@Gianl-cyber](https://github.com/Gianl-cyber) |
 
 ## How it works
 
@@ -29,7 +81,7 @@ flowchart LR
 
 - **Every fact is a literal slice of a public page.** The extractor must return a quote for each fact. The
   quote is matched against the stored page text and saved as the exact page text, or the fact is rejected
-  (13% of extracted facts were rejected, including names the model made up).
+  (18% of extracted facts were rejected, including names the model made up).
 - **Sovereign:** Apertus (Swiss open LLM) for extraction, query expansion and explanations; bge-m3 embeddings run
   locally; everything runs in Docker with no connection to cantonal networks.
 - **Two models:** extraction runs on `apertus-v1-5-8b` (`EXTRACT_MODEL`), because 70B was slower and, on the
