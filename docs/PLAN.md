@@ -514,8 +514,10 @@ Run after verify, over all sources.
 
 Rules for **persons**:
 1. If the person has a verified email → `norm_key = "email:" + email.lower()`.
-2. Else → `norm_key = "name:" + norm_name(name)`, but only merge two persons with the same normalised name if they share at least one `member_of` unit (same unit `norm_key`), or if they come from the same source. Otherwise keep them separate: add a suffix `"#<source_id>"` to the key.
-3. When an email person and a name-only person have the same normalised name and share a unit → merge into the email person.
+2. Else → `norm_key = "name:" + norm_name(name)`. Mentions of the same normalised name are one person, across sources.
+3. When an email person and a name-only person have the same normalised name → merge into the email person. If the name has two or more email people (evidence of different people), the name-only mention joins the one that shares a unit, else a source, else it stays separate.
+
+As changed in #151 (owner's decision, 2026-10-19). Before, rule 2 merged same-name mentions only within a source or on a shared unit. That split 8 people on the 340-page crawl (Witthauer on artorg and dcb, Balmer on unibe and dcb) and halved their evidence. Rule 1 also uses all of a person's emails: mentions sharing any personal email are joined. Shared mailboxes (`3d-printing@`, `info@`, whose local part holds no word of the name) are not identities.
 
 Rules for **units, projects, infrastructure**: `norm_key = norm_name(name)`. Also strip a leading "the ".
 
