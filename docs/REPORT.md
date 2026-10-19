@@ -115,7 +115,7 @@ the same ranking, so v1 results are not compared with v2.
 | recall@10 | **60%** | 80% |
 | recall@10, lay-term and synonym phrasings | **62%** | 80% |
 | traceability of displayed facts | **100%** | 100% |
-| phrasing overlap (Jaccard of top-10 sets), per use case | 37–62% | report |
+| phrasing overlap (Jaccard of top-10 sets), per use case | 34–62% | report |
 | field fill, people: role, affiliation, lab topics | 100%, 100%, 96% | report |
 | field fill, people: own expertise | 39% | report |
 | judged precision@10 [PoC] | 86% | report |
@@ -161,7 +161,7 @@ duplicates and false people the larger crawl showed (#148–#151):
 | pages | 100 | 340 (110 ARTORG, 30 DCB, 200 UniBE) |
 | chunks | 377 | 773 |
 | entities | 537 | 1,364 |
-| claims | 1,567 | 5,137 |
+| claims | 1,567 | 5,041 |
 | people in results with their own expertise | 0% | 39% |
 
 The gold set grew with the crawl (section 4), so recall on the two databases is not compared.

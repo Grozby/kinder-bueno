@@ -31,7 +31,7 @@ track; the slides use the same numbers.
    - recall@10: **60%** (target 80%) on 18 queries in 6 use cases, lay-term phrasings 62%. Best on cardio (80–100%
      per phrasing), weakest on glucose and rehab (33–67%), where some experts are linked only to hospital
      pages.
-   - Synonyms: the three phrasings of a use case share 37–62% of their top 10; "glucose sensors" and
+   - Synonyms: the three phrasings of a use case share 34–62% of their top 10; "glucose sensors" and
      "continuous glucose monitoring" both find the Diabetes Center Berne and the AI in Health and Nutrition lab.
    - Field fill for people: role 100%, affiliation 100% (~790 people linked to their lab from member pages).
      39% of people in the results have **their own expertise**, from their profile pages; the others show their
