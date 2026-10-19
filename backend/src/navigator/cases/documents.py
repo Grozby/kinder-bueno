@@ -32,10 +32,10 @@ from pptx.util import Inches
 from pptx.util import Pt as SlidePt
 from psycopg.types.json import Jsonb
 
-from navigator import analysis, case_state
+from navigator.cases import analysis, state
+from navigator.cases.pitch import check_pitch, format_prompt
 from navigator.core.llm import LLM
 from navigator.models import CaseDocuments, DocumentKind, Evidence, Result, ScoreItem
-from navigator.pitch import check_pitch, format_prompt
 from navigator.search.explain import _flat, cited_ids, prompt_claims
 from navigator.search.results import build_results
 
@@ -124,7 +124,7 @@ def gather(conn: psycopg.Connection, case_id: str) -> DocContext | None:
     ).fetchone()
     if row is None:
         return None
-    selection = case_state.get_selection(conn, case_id) or []
+    selection = state.get_selection(conn, case_id) or []
     refs = {r.entity_id: r for r in analysis.references(conn, case_id, MAX_REFERENCES) or []}
     other = {r.entity_id: r for r in build_results(conn, [(i, 0.0) for i in selection if i not in refs])}
     partners = [p for i in selection if (p := refs.get(i) or other.get(i))]

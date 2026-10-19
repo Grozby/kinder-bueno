@@ -11,7 +11,7 @@ import yaml
 
 from navigator.core.db import shown
 from navigator.core.llm import LLM
-from navigator.eval_judge import Verdict, judge_all, log_rows, precision
+from navigator.evaluation.judge import Verdict, judge_all, log_rows, precision
 from navigator.ingest.judge import JUDGED_FIELDS
 from navigator.ingest.resolve import norm_name, norm_unit
 from navigator.models import Result

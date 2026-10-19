@@ -215,7 +215,7 @@ def search_chunks(
 def warm() -> None:
     """Download the local models (bge-m3, the case reranker) into the HuggingFace cache, so neither the first
     start nor the first case upload waits on a ~4.5 GB download."""
-    from navigator.analysis import _reranker
+    from navigator.cases.analysis import _reranker
     from navigator.core.embed import get_model
 
     typer.echo(f"Embedding model: {get_settings().embed_model}")
@@ -317,7 +317,7 @@ def evaluate(
     import json
     from pathlib import Path
 
-    from navigator.evaluate import load_gold, run
+    from navigator.evaluation.gold import load_gold, run
     from navigator.ingest import chunks_db
 
     settings = get_settings()
@@ -399,9 +399,9 @@ def case_eval(
     """Run the case analysis read-only on the example PDFs and compare with the expected matches (#73)."""
     from pathlib import Path
 
-    from navigator.analysis import read_case, rerank
-    from navigator.case_eval import evaluate_case, load_cases, report
+    from navigator.cases.analysis import read_case, rerank
     from navigator.core.embed import embed_documents, embed_query
+    from navigator.evaluation.cases import evaluate_case, load_cases, report
     from navigator.ingest import chunks_db
 
     settings = get_settings()

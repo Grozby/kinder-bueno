@@ -9,8 +9,8 @@ from conftest import onehot
 from psycopg.types.json import Jsonb
 from test_api import fake_embed
 
-from navigator import analysis, cases
-from navigator.analysis import CaseInfo, Match
+from navigator.cases import analysis, store
+from navigator.cases.analysis import CaseInfo, Match
 from navigator.models import Result
 
 NEEDS = ["glucose monitoring", "insulin delivery", "zebrafish genetics"]
@@ -146,13 +146,13 @@ def test_no_pairs_no_rerank_call():
 
 
 def new_case(conn) -> str:
-    return cases.create_case(conn, "glucora-business-model.pdf", "Glucora Health builds glucose patches.").id
+    return store.create_case(conn, "glucora-business-model.pdf", "Glucora Health builds glucose patches.").id
 
 
 def test_analyze_stores_needs_references_and_score(test_conn, graph):
     case_id = new_case(test_conn)
     run(test_conn, case_id)
-    case = cases.get_case(test_conn, case_id)
+    case = store.get_case(test_conn, case_id)
     assert case.analysis_status == "done"
     assert (case.company_name, case.industry, case.summary) == ("Glucora Health", "Medical devices", "Glucose patches.")
     assert case.score is not None and len(case.score_breakdown) == 5
@@ -174,7 +174,7 @@ def test_analysis_failure_marks_case_failed(test_conn, graph):
         raise ValueError("gateway down")
 
     run(test_conn, case_id, read=broken)
-    case = cases.get_case(test_conn, case_id)
+    case = store.get_case(test_conn, case_id)
     assert case.analysis_status == "failed"
     assert case.company_name == "Glucora Business Model" and case.score is None and case.score_breakdown == []
     assert analysis.references(test_conn, case_id, 25) == []
@@ -240,4 +240,4 @@ def test_no_transaction_open_during_slow_steps(test_conn, graph):
     analysis.analyze(test_conn, case_id, read=read, embed=fake_embed, embed_many=fake_embed_many, rerank=rerank,
                      explain=explain)
     assert states and set(states) == {TransactionStatus.IDLE}
-    assert cases.get_case(test_conn, case_id).analysis_status == "done"
+    assert store.get_case(test_conn, case_id).analysis_status == "done"
