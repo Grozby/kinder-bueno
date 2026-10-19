@@ -7,7 +7,7 @@ linked to a quote on a public page. The build plan is in [`docs/PLAN.md`](docs/P
 
 ```mermaid
 flowchart LR
-    subgraph Sources["Public pages (config/sources.yaml)"]
+    subgraph Sources["Public pages (backend/config/sources.yaml)"]
         A1[ARTORG] --- A2[Diabetes Center Berne] --- A3[UniBE labs]
     end
     Sources --> C[crawl + clean<br/>robots.txt, emails decoded]
@@ -110,17 +110,19 @@ docker compose up -d app frontend                          # healthy once bge-m3
 ```bash
 cp .env.example .env          # then set KEERA_API_KEY
 docker compose up -d db       # Postgres 16 + pgvector
+cd backend                    # the Python project: every `uv run` command below runs here
 uv sync
-uv run navigator init-db      # schema + sources from config/sources.yaml
+uv run navigator init-db      # schema + sources from backend/config/sources.yaml
 ```
 
-Installed as a package (`pip install` of the wheel) instead of run from the checkout, `navigator` reads `.env`,
+The backend reads the `.env` at the repo root (a `.env` in the working directory overrides it). Installed as a
+package (`pip install` of the wheel) instead of run from the checkout, `navigator` reads `.env`,
 `config/sources.yaml` and `eval/` from the working directory. `NAVIGATOR_ENV_FILE`, `SOURCES_FILE` and `EVAL_DIR`
 point elsewhere.
 
 ## Pipeline
 
-Run the steps in this order, for all sources or one source with `--source ID`:
+Run the steps in this order, in `backend/`, for all sources or one source with `--source ID`:
 
 ```bash
 uv run navigator ingest       # all of the steps below, in order
@@ -172,20 +174,20 @@ API's result objects; `--no-explain` skips the Apertus explanation calls. Read-o
 ## Evaluation
 
 ```bash
-uv run navigator eval             # 18 gold queries (eval/gold.yaml, v2) through the /api/search pipeline
+uv run navigator eval             # 18 gold queries (backend/eval/gold.yaml, v2) through the /api/search pipeline
 uv run navigator eval --no-expand --no-judge  # no gateway needed
-uv run navigator case-eval        # case analysis on 4 example PDFs (eval/cases.yaml), read-only
+uv run navigator case-eval        # case analysis on 4 example PDFs (backend/eval/cases.yaml), read-only
 ```
 
 Prints the plan 10.2 metrics (recall@10, phrasing overlap, traceability, field fill, coverage, drop rate,
-judged precision@10) and saves them to `eval/report.md`. The eval judge's verdicts and reasons go to
-`eval/judge_log.jsonl` for spot checks. Re-run it after every change to extraction, resolve or ranking.
+judged precision@10) and saves them to `backend/eval/report.md`. The eval judge's verdicts and reasons go to
+`backend/eval/judge_log.jsonl` for spot checks. Re-run it after every change to extraction, resolve or ranking.
 
 ## Sharing the backend with a teammate
 
 ```bash
 echo "API_TOKEN=$(openssl rand -hex 24)" >> .env
-uv run navigator serve --host 0.0.0.0
+cd backend && uv run navigator serve --host 0.0.0.0
 ```
 
 The teammate runs only the frontend: `BACKEND_URL=http://<host-ip>:8000 BACKEND_TOKEN=<token> npm run dev`.
@@ -193,7 +195,7 @@ Details and caveats in [`docs/SHARED_SERVER.md`](docs/SHARED_SERVER.md).
 
 ## Add a new source
 
-No code change: one block in `config/sources.yaml`, then ingest that source.
+No code change: one block in `backend/config/sources.yaml`, then ingest that source.
 
 ```yaml
   - id: insel
@@ -244,11 +246,12 @@ printed with headless Chrome (`CHROME=` for another path).
 ## Tests
 
 ```bash
+cd backend
 uv run pytest -q              # database tests are skipped when Postgres is not running
 uv run pytest -m integration  # the whole stack in Docker on a checkpoint of the database, ~10–15 min
 ```
 
-The integration tests (`tests/integration/`) start their own compose project, `navigator-it`, on ports 55432,
+The integration tests (`backend/tests/integration/`) start their own compose project, `navigator-it`, on ports 55432,
 18000 and 15173, and remove it at the end. They write only to the stack's own database.
 
 1. On the first run, they take a checkpoint of the current database with `pg_dump` into

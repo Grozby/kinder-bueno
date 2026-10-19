@@ -6,6 +6,4 @@
 __pycache__
 *.pyc
 .pytest_cache
-frontend
 eval/report.md
-checkpoints

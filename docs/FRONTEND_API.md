@@ -207,7 +207,7 @@ shared_needs: string[], shared_references: int}`. Only cases uploaded **before**
   `discovered` (`{url, parent, depth, status}`) as a live graph: the first 60 URLs the crawler met, in
   crawl order. `queued` URLs left when the page cap is reached end as `skipped`.
 - `pages`, `entities`, `verified_claims` map to the counts from `navigator stats` / `GET /api/stats`.
-- `validated` means the source is in `config/sources.yaml`, and `root_url` is its first seed. Sources
+- `validated` means the source is in `backend/config/sources.yaml`, and `root_url` is its first seed. Sources
   crawled before #55 have no recorded tree: `discovered` is then their stored pages as seeds.
 
 `POST /api/sources` (#55) stores the source (`validated: false`) and returns at once with
@@ -222,7 +222,7 @@ judge call the LLM, and the judge re-checks every source because resolve rebuild
   after a failure reuses the failed source.
 - `status: "failed"` with `error` (`"<stage>: <message>"`): its pages are deleted, the crawl graph stays.
   A judge error leaves the source `ready`, with `error` set.
-- Its crawl rules are stored in `source.config` (the database), not in `config/sources.yaml`.
+- Its crawl rules are stored in `source.config` (the database), not in `backend/config/sources.yaml`.
 - **Shared backend:** a new source is written to the backend's database, so every teammate sees it, and
   it changes the eval numbers. Try it on a separate stack first.
 
@@ -262,7 +262,7 @@ A failed fetch scores 0 on the first three parts. The same numbers come back as 
 plus `kind` (`team` | `lab` | `project` | `infrastructure` | `other`, a guess from the URL or the
 entity types on the page is fine).
 
-**Rules** default to the source's block in `config/sources.yaml` (or its stored config, for a source
+**Rules** default to the source's block in `backend/config/sources.yaml` (or its stored config, for a source
 added from the UI); a `PUT` stores all four lists, which then replace the defaults, also for
 `navigator crawl` and the re-crawl. Patterns are regular expressions matched with `re.search` on the URL (the UI only uses syntax JavaScript shares). The UI writes:
 

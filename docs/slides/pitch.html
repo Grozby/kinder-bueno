@@ -10,7 +10,7 @@
   PDF (one slide per page):
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --no-pdf-header-footer \
       --virtual-time-budget=5000 --print-to-pdf=dist/pitch-slides.pdf "file://$PWD/docs/slides/pitch.html"
-  Numbers come from eval/report.md and eval/case_report.md: update them here after each eval run.
+  Numbers come from backend/eval/report.md and backend/eval/case_report.md: update them here after each eval run.
 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400..700&family=Public+Sans:wght@400;600;700&display=swap">
 <style>
@@ -118,7 +118,7 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#A89E96">Bern Fit · 4 · eval/report.md</p>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#A89E96">Bern Fit · 4 · backend/eval/report.md</p>
 <aside>Apertus must return a quote for every fact. We match the quote against the stored page text and save the exact page text, or we drop the fact. That check is what makes a small open model safe to use here.</aside>
 </section>
 <section id="cases" data-transition="fade" style="background:#F6F3EE;color:#1F1A1B;font-family:'Public Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:64px">
@@ -138,7 +138,7 @@
 <p style="font-size:32px;line-height:1.4;color:#4A4340">expected matches found; 20 of 31 are in the references.</p>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 5 · eval/case_report.md, 4 example business models</p>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 5 · backend/eval/case_report.md, 4 example business models</p>
 <aside>We wrote four fictional business models: Glucora (glucose sensors), Repolar (cardiac arrhythmia and cardiotoxicity testing), Precisa (surgical navigation and robotics) and Vinora (vineyard agritech). The first three should fit Bern, the last one should not. The board gets all four right; Vinora’s 12 is one weak match, a climate scientist for a climate-adaptation need. The score shows its gaps too: for Glucora, “no matching infrastructure in our sources”.</aside>
 </section>
 <section id="search" data-transition="fade" style="background:#F6F3EE;color:#1F1A1B;font-family:'Public Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
@@ -152,7 +152,7 @@
 <tr style="background:#ECE6DE"><td>People: own expertise</td><td style="text-align:right">39%</td><td>from profile pages, where a lab has them</td></tr>
 <tr><td>Top-10 judged relevant (LLM judge)</td><td style="text-align:right">86%</td><td>a signal: judge agrees with gold on 91%</td></tr>
 </table>
-<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 6 · eval/report.md, 18 gold queries over 340 pages</p>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 6 · backend/eval/report.md, 18 gold queries over 340 pages</p>
 <aside>Glucose is weakest because some of its experts are linked only to hospital and project pages, not to a lab, so no ranking change brings them in. Personal expertise comes from profile pages; people without one show their lab’s topics, labelled as such, instead of pretending. The judge is the same model family as the extractor, so we treat it as a signal, not a measurement.</aside>
 </section>
 <section id="sources" data-transition="fade" style="background:#ECE6DE;color:#1F1A1B;font-family:'Public Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:64px">
@@ -172,7 +172,7 @@
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF9;padding:40px;border:1px solid #D6CCC0;border-radius:16px">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#C8102E;width:56px;height:56px" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg>
 <h3 style="font-size:44px;font-weight:700">Add a website</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A4340">From the UI, or one block in config/sources.yaml. Same pipeline, in the background.</p>
+<p style="font-size:28px;line-height:1.4;color:#4A4340">From the UI, or one block in backend/config/sources.yaml. Same pipeline, in the background.</p>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#7A706A">Bern Fit · 7</p>

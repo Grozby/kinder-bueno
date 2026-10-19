@@ -10,9 +10,9 @@ from test_api import fake_embed
 
 from navigator import analysis, cases
 from navigator.api import app, get_analyze, get_conn
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import REPO_ROOT
 
-GLUCORA = PROJECT_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
+GLUCORA = REPO_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
 
 
 @pytest.fixture

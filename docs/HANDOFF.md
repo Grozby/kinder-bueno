@@ -123,7 +123,7 @@ docker compose run --rm app uv run navigator init-db
 
 ## Building the data from scratch instead of the snapshot
 
-`ingest` crawls the sources in `config/sources.yaml`, embeds the pages and extracts the facts with Apertus. It takes
+`ingest` crawls the sources in `backend/config/sources.yaml`, embeds the pages and extracts the facts with Apertus. It takes
 about 15–20 minutes for 100 pages.
 
 ```bash

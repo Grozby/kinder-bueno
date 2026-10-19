@@ -12,11 +12,11 @@ import pytest
 from docx import Document
 from pptx import Presentation
 
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import REPO_ROOT
 
 pytestmark = pytest.mark.integration
 
-GLUCORA_PDF = PROJECT_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
+GLUCORA_PDF = REPO_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
 QUERY = "continuous glucose monitoring"
 CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 ANALYSIS_TIMEOUT = 600  # seconds; the frontend polls the same way

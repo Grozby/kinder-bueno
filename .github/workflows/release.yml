@@ -23,7 +23,7 @@ jobs:
         image: [app, frontend]
         platform: [linux/amd64, linux/arm64]
         include:
-          - { image: app, context: . }
+          - { image: app, context: backend }
           - { image: frontend, context: frontend }
           - { platform: linux/amd64, runner: ubuntu-24.04 }
           - { platform: linux/arm64, runner: ubuntu-24.04-arm }

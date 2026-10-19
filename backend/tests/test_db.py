@@ -5,7 +5,7 @@ import psycopg
 import pytest
 
 from navigator import db
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import BACKEND_ROOT
 from navigator.sources import load_sources
 
 
@@ -15,7 +15,7 @@ def conn(test_conn):
 
 
 def test_init_db_is_idempotent(conn):
-    sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+    sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     db.init_db(conn, sources)
     db.init_db(conn, sources)
     ids = [r[0] for r in conn.execute("SELECT id FROM source ORDER BY id").fetchall()]
@@ -24,12 +24,12 @@ def test_init_db_is_idempotent(conn):
 
 
 def test_stats_lists_every_source(conn):
-    db.init_db(conn, load_sources(PROJECT_ROOT / "config" / "sources.yaml"))
+    db.init_db(conn, load_sources(BACKEND_ROOT / "config" / "sources.yaml"))
     assert {r[0] for r in db.stats(conn)} >= {"artorg", "dcb", "unibe"}
 
 
 def test_pages_for_extraction_filters(conn):
-    db.init_db(conn, load_sources(PROJECT_ROOT / "config" / "sources.yaml"))
+    db.init_db(conn, load_sources(BACKEND_ROOT / "config" / "sources.yaml"))
     with conn.transaction(force_rollback=True):  # test rows never reach the real data
         conn.execute("INSERT INTO source (id, name) VALUES ('t_src', 'Test')")
         for url in ("https://t.test/a/group_members/x", "https://t.test/a/index", "https://t.test/b/group_members/y"):
@@ -47,7 +47,7 @@ def test_pages_for_extraction_filters(conn):
 
 
 def test_relation_accepts_listed_in_and_rejects_unknown(conn):
-    sources = load_sources(PROJECT_ROOT / "config" / "sources.yaml")
+    sources = load_sources(BACKEND_ROOT / "config" / "sources.yaml")
     db.init_db(conn, sources)
     db.init_db(conn, sources)  # re-creating the constraint is idempotent
     with conn.transaction(force_rollback=True):  # test rows never reach the real data

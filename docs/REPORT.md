@@ -1,7 +1,7 @@
 # Research & Expertise Navigator: technical report
 
 HackApertus 2026, challenge "Research & Expertise Navigator". Code: github.com/Grozby/kinder-bueno. Numbers
-from the eval run of 2026-10-19 on main `f43dd0e` (`eval/report.md`, `eval/case_report.md`), on the 340-page
+from the eval run of 2026-10-19 on main `f43dd0e` (`backend/eval/report.md`, `backend/eval/case_report.md`), on the 340-page
 database with gold set v2 (18 queries).
 
 ## 1. Problem and approach
@@ -27,7 +27,7 @@ On top of the search sits a **case board** for location promotion:
 
 ```mermaid
 flowchart TB
-    subgraph Sources["Public pages (config/sources.yaml)"]
+    subgraph Sources["Public pages (backend/config/sources.yaml)"]
         A1[ARTORG] --- A2[Diabetes Center Berne] --- A3[UniBE labs]
     end
     Sources --> C[crawl + clean<br/>robots.txt, emails decoded]
@@ -50,7 +50,7 @@ flowchart TB
 **Ingest** (`navigator ingest`, one command, or the steps on their own):
 
 - **Crawl and clean.** Seeds, allowed hosts and include, exclude and priority patterns per source, all in
-  `config/sources.yaml`. robots.txt is respected, obfuscated e-mail addresses are decoded and navigation is
+  `backend/config/sources.yaml`. robots.txt is respected, obfuscated e-mail addresses are decoded and navigation is
   stripped. Crawl rules can be edited in the UI and a source re-crawled from there.
 - **Chunk and embed.** bge-m3 (1,024 dimensions, multilingual), run locally. Chunks are stored with their vector
   (HNSW index, cosine) and a full-text column (GIN index).
@@ -104,10 +104,10 @@ Every fact shown is a literal slice of a public page.
 
 ## 4. Results
 
-Gold set v2 (`eval/gold.yaml`): 6 use cases (glucose monitoring, computer-assisted surgery, cardiovascular
+Gold set v2 (`backend/eval/gold.yaml`): 6 use cases (glucose monitoring, computer-assisted surgery, cardiovascular
 engineering, neurorehabilitation, cancer immunotherapy, gut microbiome), each with three phrasings (site wording,
 lay term, synonym) and 5–7 expected entities confirmed by the project owner. 18 queries over 340 crawled pages.
-v1 (9 queries, 3 use cases, 100 pages) is kept in `eval/gold_v1.yaml`; the two sets give different numbers for
+v1 (9 queries, 3 use cases, 100 pages) is kept in `backend/eval/gold_v1.yaml`; the two sets give different numbers for
 the same ranking, so v1 results are not compared with v2.
 
 | Metric | Result | Target |
@@ -136,7 +136,7 @@ the same ranking, so v1 results are not compared with v2.
   extractor's model family. It agrees with the human gold set on 91% of gold hits, so it is a useful signal, but
   not a measurement.
 
-**Case eval** (4 fictional business models in `docs/examples`, expected matches in `eval/cases.yaml`):
+**Case eval** (4 fictional business models in `docs/examples`, expected matches in `backend/eval/cases.yaml`):
 
 | Case | Score | Expected range | Expected matches found | False matches |
 |---|---|---|---|---|
@@ -152,7 +152,7 @@ score, vary between uploads (Glucora gave 60–69 in 4 uploads on the 340-page d
 
 ## 5. How it scales
 
-**Pages.** Going from 100 to ~2,000 pages is a change in `config/sources.yaml`, not in code. The demo database
+**Pages.** Going from 100 to ~2,000 pages is a change in `backend/config/sources.yaml`, not in code. The demo database
 went from 100 to 340 pages on 2026-10-19 (#75: ARTORG profile pages and more UniBE labs), after fixes for the
 duplicates and false people the larger crawl showed (#148–#151):
 
@@ -199,7 +199,7 @@ workers (`navigator serve --workers N`, ~3 GB RAM each) or replicas on one datab
 runs in the worker that started it; if that worker dies, the source shows "interrupted" and the analysis stays
 "pending" until the PDF is uploaded again.
 
-**New sources and other domains.** A new site is one block in `config/sources.yaml` (seeds, allowed hosts,
+**New sources and other domains.** A new site is one block in `backend/config/sources.yaml` (seeds, allowed hosts,
 patterns, page budget), then `navigator ingest --source <id>`. The pipeline is not specific to research: the same
 crawl, quote-verified extraction and sourced search can serve location reports for companies settling in Canton
 Bern (suppliers, manufacturers, advisors), with a different extraction prompt and entity types.

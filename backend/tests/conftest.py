@@ -13,7 +13,7 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from navigator import chunks_db, db
-from navigator.settings import PROJECT_ROOT, get_settings
+from navigator.settings import BACKEND_ROOT, get_settings
 from navigator.sources import load_sources
 
 TEST_DB_PREFIX = "navigator_test_"
@@ -55,7 +55,7 @@ def test_database_url():
         pytest.skip("Postgres not running")
     url = make_conninfo(**{**base, "dbname": TEST_DB})
     with db.connect(url) as conn:
-        db.init_db(conn, load_sources(PROJECT_ROOT / "config" / "sources.yaml"))
+        db.init_db(conn, load_sources(BACKEND_ROOT / "config" / "sources.yaml"))
     yield url
     with psycopg.connect(admin_url, autocommit=True) as admin:
         admin.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(TEST_DB)))

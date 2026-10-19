@@ -9,21 +9,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 
-def _project_root() -> Path:
-    """The source checkout when running from one, else the working directory (navigator installed as a package)."""
+def _backend_root() -> Path:
+    """`backend/` in a source checkout (`/app` in Docker), else the working directory (installed as a package)."""
     root = Path(__file__).resolve().parents[2]
     return root if (root / "pyproject.toml").is_file() else Path.cwd()
 
 
-PROJECT_ROOT = _project_root()
+BACKEND_ROOT = _backend_root()  # config/, eval/
+REPO_ROOT = BACKEND_ROOT.parent  # .env, checkpoints/, docs/, frontend/ and the compose files
 # 70B was slower and not better for extraction (plan 3, #16). The default lives here, not in docker-compose.yml,
 # so host runs (`uv run navigator ingest`) extract with the same model as Docker.
 EXTRACT_MODEL = "apertus-v1-5-8b"
 
 
 class Settings(BaseSettings):
-    # NAVIGATOR_ENV_FILE points at a .env outside the working directory
-    model_config = SettingsConfigDict(env_file=os.environ.get("NAVIGATOR_ENV_FILE", ".env"), extra="ignore")
+    # The repo root's .env, so commands work from the root and from backend/; a .env in the working directory
+    # overrides it. NAVIGATOR_ENV_FILE points at another file instead.
+    model_config = SettingsConfigDict(
+        env_file=os.environ.get("NAVIGATOR_ENV_FILE") or (REPO_ROOT / ".env", ".env"), extra="ignore")
 
     keera_api_key: str = ""
     llm_base_url: str = "https://gateway.keera.ch/api/v1"
@@ -37,8 +40,8 @@ class Settings(BaseSettings):
     rerank_model: str = "BAAI/bge-reranker-v2-m3"  # case need matching (analysis.py)
     database_url: str = "postgresql://navigator:navigator@localhost:5432/navigator"
     api_token: str = ""  # when set, /api requires `Authorization: Bearer <token>`
-    sources_file: Path = PROJECT_ROOT / "config" / "sources.yaml"
-    eval_dir: Path = PROJECT_ROOT / "eval"  # gold sets and the reports `navigator eval` / `case-eval` write
+    sources_file: Path = BACKEND_ROOT / "config" / "sources.yaml"
+    eval_dir: Path = BACKEND_ROOT / "eval"  # gold sets and the reports `navigator eval` / `case-eval` write
 
     @field_validator("extract_model", mode="before")
     @classmethod

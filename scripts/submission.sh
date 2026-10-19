@@ -4,7 +4,7 @@
 #   scripts/submission.sh      # writes dist/technical-report.pdf
 #
 # The report is printed with headless Chrome (CHROME=/path/to/chrome to use another one). Re-run
-# `navigator eval` and `navigator case-eval` first and update the numbers in docs/REPORT.md, so they match eval/.
+# `navigator eval` and `navigator case-eval` first and update the numbers in docs/REPORT.md, so they match backend/eval/.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,7 +19,7 @@ out=dist/technical-report.pdf
 mkdir -p dist
 rm -f "$out"
 
-uv run --quiet --with markdown python scripts/report_html.py docs/REPORT.md dist/report.html
+uv run --quiet --no-project --with markdown python scripts/report_html.py docs/REPORT.md dist/report.html
 # The budget gives mermaid time to draw the diagram before printing
 "$CHROME" --headless --disable-gpu --no-pdf-header-footer --virtual-time-budget=15000 \
   --print-to-pdf="$out" "file://$PWD/dist/report.html" 2>/dev/null

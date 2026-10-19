@@ -18,7 +18,7 @@ services:
       retries: 10
 
   app:
-    build: .
+    build: ./backend
     env_file: .env
     environment:
       DATABASE_URL: postgresql://navigator:${POSTGRES_PASSWORD:-navigator}@db:5432/navigator
@@ -28,8 +28,8 @@ services:
     ports: ["${API_PORT:-8000}:8000"]
     volumes:
       - hf_cache:/cache/hf          # keeps the bge-m3 download (~2.3 GB) between runs
-      - ./config:/app/config
-      - ./eval:/app/eval
+      - ./backend/config:/app/config
+      - ./backend/eval:/app/eval
     command: uv run navigator serve --host 0.0.0.0 --port 8000
     healthcheck:                    # the API is ready once the embedding model is loaded; sends API_TOKEN if set
       test: ["CMD", "python", "-c", "import os, urllib.request as u; u.urlopen(u.Request('http://localhost:8000/api/stats', headers={'Authorization': 'Bearer ' + os.environ.get('API_TOKEN', '')}))"]

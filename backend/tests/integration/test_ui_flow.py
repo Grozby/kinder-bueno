@@ -12,11 +12,11 @@ import pytest
 from docx import Document
 from pptx import Presentation
 
-from navigator.settings import PROJECT_ROOT
+from navigator.settings import REPO_ROOT
 
 pytestmark = pytest.mark.integration
 
-GLUCORA_PDF = PROJECT_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
+GLUCORA_PDF = REPO_ROOT / "docs" / "examples" / "glucora-business-model.pdf"
 POLL_S = 1.5  # the store's poll interval
 TIMEOUT_S = 600
 NOTE = "Internal: call them before Friday."  # notes are internal: never in a pitch or a document

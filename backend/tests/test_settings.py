@@ -4,14 +4,21 @@ import os
 import subprocess
 import sys
 
-from navigator.settings import PROJECT_ROOT, get_settings
+from navigator.settings import BACKEND_ROOT, REPO_ROOT, Settings, get_settings
 
 
 def test_defaults_point_into_the_checkout():
     s = get_settings()
-    assert s.eval_dir == PROJECT_ROOT / "eval"
-    assert s.sources_file == PROJECT_ROOT / "config" / "sources.yaml"
+    assert s.eval_dir == BACKEND_ROOT / "eval"
+    assert s.sources_file == BACKEND_ROOT / "config" / "sources.yaml"
     assert s.rerank_model == "BAAI/bge-reranker-v2-m3"
+
+
+def test_env_file_is_the_repo_roots():
+    """Commands run in backend/ read the repo root's .env (#164); a .env in the working directory overrides it."""
+    assert BACKEND_ROOT.name == "backend" and REPO_ROOT == BACKEND_ROOT.parent
+    if "NAVIGATOR_ENV_FILE" not in os.environ:
+        assert Settings.model_config["env_file"] == (REPO_ROOT / ".env", ".env")
 
 
 def test_env_file_and_paths_from_another_directory(tmp_path):
