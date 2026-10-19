@@ -2,7 +2,7 @@
 
 Rebuilds the three tables from the verified rows of raw_claim and raw_relation on every run,
 so it is idempotent. Entity ids stay stable across runs (upsert on type + norm_key).
-No fuzzy matching: a few duplicates are fine, a wrong merge of two people is not.
+No fuzzy matching: people merge on a personal email or an exact normalised name with no conflicting email (#151).
 """
 
 import re
@@ -72,47 +72,63 @@ class _Person:
     units: set[str] = field(default_factory=set)  # unit keys via member_of
 
 
+def is_personal_email(email: str, name: str) -> bool:
+    """A mailbox of this person: its local part holds a word of the name ("stef.weber" for Stefan Weber). Shared
+    mailboxes ("3d-printing@", "e-lab.artorg@", "info@") are contacts, not identities (#151)."""
+    local = re.sub(r"[^a-z]", "", unidecode(email.split("@")[0]).lower())
+    return any(len(w) >= 3 and re.sub(r"[^a-z]", "", w) in local for w in norm_name(name).split())
+
+
 def person_keys(people: dict[Mention, _Person]) -> dict[Mention, str]:
-    """norm_key per person mention, with the email / shared unit / same source rules of PLAN 7.7."""
+    """norm_key per person mention (PLAN 7.7, as changed in #151).
+
+    1. Mentions sharing a personal email are one person, across names and sources; the key is the cluster's
+       smallest personal email.
+    2. Name-only mentions of a normalised name join the name's one email person. With no email person they are
+       one name person, whatever the source.
+    3. A name with two or more email people is ambiguous: a name-only mention joins the one that shares a unit,
+       else a source, else it stays a separate name person.
+    """
+    uf = _UnionFind()
+    personal = {m: {e for e in p.emails if is_personal_email(e, p.name)} for m, p in people.items()}
+    by_email: dict[str, Mention] = {}
+    for m, emails in personal.items():
+        uf.find(m)
+        for e in emails:
+            if e in by_email:
+                uf.union(m, by_email[e])
+            else:
+                by_email[e] = m
+    clusters: dict[Mention, list[Mention]] = defaultdict(list)
+    for m in people:
+        if personal[m]:
+            clusters[uf.find(m)].append(m)
     keys: dict[Mention, str] = {}
-    email_units: dict[str, defaultdict] = defaultdict(lambda: defaultdict(set))  # norm name -> email -> units
-    email_sources: dict[str, defaultdict] = defaultdict(lambda: defaultdict(set))  # norm name -> email -> sources
+    email_people: dict[str, list[tuple[str, set[str], set[str]]]] = defaultdict(list)  # name -> (key, units, sources)
+    for members in clusters.values():
+        key = "email:" + min(e for m in members for e in personal[m])
+        for m in members:
+            keys[m] = key
+        for name in {norm_name(people[m].name) for m in members}:
+            email_people[name].append((key, set().union(*(people[m].units for m in members)),
+                                       {people[m].source for m in members}))
+
     by_name: dict[str, list[Mention]] = defaultdict(list)
     for m, p in people.items():
-        if p.emails:
-            keys[m] = "email:" + min(p.emails)
-            email_units[norm_name(p.name)][min(p.emails)] |= p.units
-            email_sources[norm_name(p.name)][min(p.emails)].add(p.source)
-        else:
+        if m not in keys:
             by_name[norm_name(p.name)].append(m)
-
     for name, mentions in by_name.items():
-        # Name-only mentions of the same name merge if they share a unit or a source.
-        uf = _UnionFind()
-        for i, a in enumerate(mentions):
-            uf.find(a)
-            for b in mentions[i + 1:]:
-                if people[a].source == people[b].source or people[a].units & people[b].units:
-                    uf.union(a, b)
-        clusters: dict = defaultdict(list)
+        candidates = email_people.get(name, [])
         for m in mentions:
-            clusters[uf.find(m)].append(m)
-        for members in clusters.values():
-            units = set().union(*(people[m].units for m in members))
-            sources = {people[m].source for m in members}
-            # Rule 3: merge into the one email person of the same name that shares a unit, else a source
-            # (same-source name-only mentions merge too, rule 2). Two candidates: keep apart.
-            matches = [e for e, e_units in email_units.get(name, {}).items() if units & e_units]
-            if not matches:
-                matches = [e for e, e_srcs in email_sources.get(name, {}).items() if sources & e_srcs]
-            if len(matches) == 1:
-                key = "email:" + matches[0]
-            elif len(clusters) > 1:
-                key = f"name:{name}#{min(people[m].source for m in members)}"
+            if len(candidates) == 1:
+                keys[m] = candidates[0][0]
+            elif not candidates:
+                keys[m] = "name:" + name
             else:
-                key = "name:" + name
-            for m in members:
-                keys[m] = key
+                p = people[m]
+                match = [k for k, units, _ in candidates if p.units & units] or \
+                        [k for k, _, sources in candidates if p.source in sources]
+                keys[m] = match[0] if len(match) == 1 else "name:" + name
     return keys
 
 

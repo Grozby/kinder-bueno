@@ -99,12 +99,33 @@ def test_email_merges_across_pages_and_titles(conn):
     }
 
 
-def test_same_name_in_other_source_without_shared_unit_stays_separate(conn):
-    p1, p2 = _page(conn, "artorg", "https://a/1"), _page(conn, "unibe", "https://u/1")
-    _claim(conn, p1, "person", "Peter Meier", "role", "Engineer")
-    _claim(conn, p2, "person", "Dr. Peter Meier", "role", "Historian")
+def test_same_name_in_other_source_merges_without_a_conflicting_email(conn):
+    """#151 (owner's decision, 2026-10-19): no shared unit is needed. "Prof. Lilian Witthauer" on dcb and on artorg
+    were two entities, each with half the evidence."""
+    p1, p2 = _page(conn, "artorg", "https://a/1"), _page(conn, "dcb", "https://d/1")
+    _claim(conn, p1, "person", "Prof. Dr. phil. Lilian Witthauer", "role", "Group Head")
+    _claim(conn, p2, "person", "Prof. Lilian Witthauer", "role", "Tenure track professor")
     resolve(conn)
-    assert _people(conn) == {"name:peter meier#artorg": ["Engineer"], "name:peter meier#unibe": ["Historian"]}
+    assert _people(conn) == {"name:lilian witthauer": ["Group Head", "Tenure track professor"]}
+
+
+def test_name_only_person_in_other_source_merges_into_the_one_email_person(conn):
+    p1, p2 = _page(conn, "unibe", "https://u/1"), _page(conn, "dcb", "https://d/1")
+    _claim(conn, p1, "person", "Prof. Dr. med., Dr. phil. nat. Maria Luisa Balmer", "email", "maria.balmer@unibe.ch")
+    _claim(conn, p2, "person", "Prof. Dr. Maria Luisa Balmer", "role", "SNSF-Eccellenza Professor")
+    resolve(conn)
+    assert _people(conn) == {"email:maria.balmer@unibe.ch": ["maria.balmer@unibe.ch", "SNSF-Eccellenza Professor"]}
+
+
+def test_all_personal_emails_of_a_person_join_and_shared_mailboxes_are_not_identities(conn):
+    p1, p2, p3, p4 = (_page(conn, "artorg", f"https://a/{i}") for i in (1, 2, 3, 4))
+    _claim(conn, p1, "person", "Raphael Andonie", "email", "raphael.andonie@unibe.ch")
+    _claim(conn, p1, "person", "Raphael Andonie", "email", "raphael.andonie@insel.ch")
+    _claim(conn, p2, "person", "Raphael Andonie", "email", "raphael.andonie@insel.ch")
+    _claim(conn, p3, "person", "Raphael Schranz", "email", "3d-printing@artorg.unibe.ch")
+    _claim(conn, p4, "person", "Raphael Schranz", "email", "e-lab.artorg@unibe.ch")
+    resolve(conn)
+    assert set(_people(conn)) == {"email:raphael.andonie@insel.ch", "name:raphael schranz"}
 
 
 def test_same_name_merges_on_shared_unit_or_same_source(conn):
