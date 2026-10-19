@@ -1,6 +1,7 @@
 """Case analysis (#53): parsing, merge, need matching, score, and the stored references. Needs Postgres
 for the tests that use the fixture graph (tests/conftest.py)."""
 
+import asyncio
 import zlib
 
 import numpy as np
@@ -241,3 +242,71 @@ def test_no_transaction_open_during_slow_steps(test_conn, graph):
                      explain=explain)
     assert states and set(states) == {TransactionStatus.IDLE}
     assert cases.get_case(test_conn, case_id).analysis_status == "done"
+
+
+MATCHES = {
+    1: [Match("glucose monitoring", "continuous glucose monitoring", None, 0.9, 0.9)],
+    2: [Match("glucose monitoring", "clinical studies", None, 0.6, 0.2),
+        Match("insulin delivery", "automated insulin delivery", None, 0.8, 0.5)],
+}
+
+
+def test_match_check_keeps_direct_matches_and_returns_the_others():
+    """#158: a broad topic ("clinical studies") passes the reranker but is not a match."""
+    labels = {"continuous glucose monitoring": "direct", "clinical studies": "partial",
+              "automated insulin delivery": "direct"}
+    kept, rejected = analysis.check_matches(MATCHES, lambda pairs: [labels[v] for _, v in pairs])
+    assert [m.value for m in kept[1]] == ["continuous glucose monitoring"]
+    assert [m.value for m in kept[2]] == ["automated insulin delivery"]
+    assert [(m.value, m.label) for m in rejected[2]] == [("clinical studies", "partial")]
+
+
+def test_failed_match_check_keeps_all_matches_unchecked():
+    def broken(pairs):
+        raise ValueError("2 labels for 3 pairs")
+    kept, rejected = analysis.check_matches(MATCHES, broken)
+    assert kept == MATCHES and rejected == {}
+
+
+class LabelLLM:
+    def __init__(self, labels):
+        self.labels, self.user = labels, None
+
+    async def chat_json(self, system: str, user: str, max_tokens: int = 4096, timeout: float | None = None) -> dict:
+        self.user = user
+        return {"labels": self.labels}
+
+
+def test_label_matches_sends_numbered_pairs_with_the_needs():
+    llm = LabelLLM({"1": "Direct", "2": "unrelated"})
+    pairs = [("glucose monitoring", "glucose sensors"), ("insulin delivery", "zebrafish")]
+    assert asyncio.run(analysis.label_matches(llm, NEEDS, pairs)) == ["direct", "unrelated"]
+    assert "Company needs: glucose monitoring; insulin delivery; zebrafish genetics" in llm.user
+    assert '2. need: "insulin delivery" | topic: "zebrafish"' in llm.user
+
+
+def test_label_matches_leaves_missing_or_unknown_labels_empty():
+    """A short answer must not shift the labels onto the wrong pairs (it once gave 17 labels for 19 pairs)."""
+    pairs = [("a", "b"), ("c", "d"), ("e", "f")]
+    assert asyncio.run(analysis.label_matches(LabelLLM({"1": "partial", "3": "maybe"}), NEEDS, pairs)) == [
+        "partial", None, None]
+
+
+@pytest.mark.parametrize("labels", [["direct", "direct"], None])
+def test_label_matches_without_labels_fails(labels):
+    with pytest.raises(ValueError):
+        asyncio.run(analysis.label_matches(LabelLLM(labels), NEEDS, [("a", "b"), ("c", "d")]))
+
+
+def test_unlabelled_pair_counts_unchecked():
+    kept, rejected = analysis.check_matches(MATCHES, lambda pairs: ["partial", None, "direct"])
+    assert [m.value for m in kept[2]] == ["clinical studies", "automated insulin delivery"]
+    assert kept[2][0].label is None and 1 in rejected
+
+
+def test_analyze_counts_only_checked_matches(test_conn, graph):
+    case_id = new_case(test_conn)
+    analysis.analyze(test_conn, case_id, read=fake_read, embed=fake_embed, embed_many=fake_embed_many,
+                     rerank=fake_rerank, explain=no_explain, label=lambda needs, pairs: ["unrelated"] * len(pairs))
+    score, refs = test_conn.execute('SELECT score, refs FROM "case" WHERE id = %s', (case_id,)).fetchone()
+    assert score == 0 and refs and all(r["needs"] == [] for r in refs)

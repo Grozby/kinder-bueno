@@ -149,6 +149,7 @@ def get_analyze(request: Request) -> Callable[[str], None]:
                     embed_many=embed_documents,
                     rerank=analysis.rerank,
                     explain=lambda q, results: anyio.from_thread.run(explain_results, explain_llm, q, results),
+                    label=lambda needs, pairs: anyio.from_thread.run(analysis.label_matches, llm, needs, pairs),
                 )
         except Exception:
             log.exception("case analysis failed: %s", case_id)

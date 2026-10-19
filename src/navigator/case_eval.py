@@ -85,9 +85,10 @@ def evaluate_case(
     conn: psycopg.Connection, case: GoldCase, read: Callable[[str], CaseInfo],
     embed: Callable[[str], np.ndarray], embed_many: Callable[[list[str]], np.ndarray],
     rerank: Callable[[list[tuple[str, str]]], np.ndarray],
+    label: Callable[[list[str], list[tuple[str, str]]], list[str]] | None = None,
 ) -> Outcome:
     needs = case.needs or read(pdf_text(Path(case.pdf).read_bytes())).needs
-    return Outcome(case, needs, score_needs(conn, needs, embed, embed_many, rerank))
+    return Outcome(case, needs, score_needs(conn, needs, embed, embed_many, rerank, label))
 
 
 def _share(part: int, whole: int) -> str:
@@ -132,9 +133,12 @@ def report(outcomes: list[Outcome]) -> str:
                 for e in missed))
         if o.false_matches:
             lines.append("- False matches: " + "; ".join(e.name for e in o.false_matches))
-        lines += ["", "| Matched entity | Type | Need | Claim | Reranker | Cosine |", "|---|---|---|---|---|---|"]
+        lines += ["", "| Matched entity | Type | Need | Claim | Reranker | Cosine | Check |", "|---|---|---|---|---|---|---|"]
         for r in o.scored.results:
-            for m in o.scored.matches.get(r.entity_id, []):
+            # Rejected matches are listed too (struck through): they show what the match check (#158) removed
+            for m in o.scored.matches.get(r.entity_id, []) + o.scored.rejected.get(r.entity_id, []):
                 via = f" (via {m.via})" if m.via else ""
-                lines.append(f"| {r.name} | {r.type} | {m.need} | {m.value}{via} | {m.score:.2f} | {m.sim:.2f} |")
+                name = r.name if m.label in (None, "direct") else f"~~{r.name}~~"
+                lines.append(f"| {name} | {r.type} | {m.need} | {m.value}{via} | {m.score:.2f} | {m.sim:.2f} "
+                             f"| {m.label or '–'} |")
     return "\n".join(lines) + "\n"

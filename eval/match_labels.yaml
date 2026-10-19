@@ -1,0 +1,50 @@
+# Match labels (#158): every (need, topic) pair the case analysis matched for the example cases in
+# eval/cases.yaml (pinned needs, 340-page DB after #159), labelled by hand. Only "direct" should count.
+# direct: the topic is the need, a synonym of it, or a specific part of it.
+# partial: the same broad field, not the need itself (a general method or area).
+# unrelated: a different subject.
+# Labelled by an agent on 2026-10-19; not yet reviewed by a human.
+
+pairs:
+  - {case: glucora, need: "AI for meal carbohydrate estimation", topic: "artificial intelligence in nutrition", label: direct}
+  - {case: glucora, need: "continuous glucose monitoring research", topic: "predictive modeling of blood glucose dynamics", label: direct}
+  - {case: glucora, need: "continuous glucose monitoring research", topic: "continuous glucose monitoring", label: direct}
+  - {case: glucora, need: "clinical validation of sensor accuracy", topic: "clinical studies", label: partial}
+  - {case: glucora, need: "continuous glucose monitoring research", topic: "research on diabetes management and insulin activity", label: partial}
+  - {case: glucora, need: "artificial pancreas systems", topic: "automated insulin delivery systems", label: direct}
+  - {case: glucora, need: "wearable biosensor interface development", topic: "biomedical imaging systems development", label: partial}
+  - {case: glucora, need: "AI for meal carbohydrate estimation", topic: "machine learning", label: partial}
+  - {case: glucora, need: "continuous glucose monitoring research", topic: "glucose monitoring", label: direct}
+  - {case: glucora, need: "AI for meal carbohydrate estimation", topic: "a digital solution for accurate carbohydrate estimation to support insulin dosage", label: direct}
+  - {case: glucora, need: "AI for meal carbohydrate estimation", topic: "Intelligent Nutrition", label: partial}
+  - {case: glucora, need: "continuous glucose monitoring research", topic: "Diabetes and endocrinology research", label: partial}
+  - {case: glucora, need: "continuous glucose monitoring research", topic: "a patient education mobile app to increase knowledge and improve outcomes among people with diabetes using continuous glucose monitoring (CGM)", label: direct}
+  - {case: glucora, need: "continuous glucose monitoring research", topic: "research on insulin stability and activity for diabetes management", label: unrelated}
+  - {case: repolar, need: "transgenic animal models of arrhythmia", topic: "transgenic models", label: direct}
+  - {case: repolar, need: "cardiac electrophysiology research expertise", topic: "electrophysiology", label: direct}
+  - {case: repolar, need: "human iPSC-derived cardiomyocytes for cardiotoxicity testing", topic: "patient-derived cell culture", label: partial}
+  - {case: repolar, need: "human iPSC-derived cardiomyocytes for cardiotoxicity testing", topic: "human iPSC-derived cardiomyocytes", label: direct}
+  - {case: repolar, need: "cardiac electrophysiology research expertise", topic: "clinical research", label: unrelated}
+  - {case: repolar, need: "transgenic animal models of arrhythmia", topic: "transgenic rabbit models", label: direct}
+  - {case: repolar, need: "cardiac electrophysiology research expertise", topic: "promote the cardiovascular research teams in Bern as leaders in the understanding of cardiovascular (patho)physiology and in the development of approaches to reduce disease burden", label: partial}
+  - {case: repolar, need: "cardiac electrophysiology research expertise", topic: "multidisciplinary research", label: unrelated}
+  - {case: precisa, need: "image-guided surgical navigation", topic: "imaging-guided therapy", label: direct}
+  - {case: precisa, need: "surgical robotics precision validation", topic: "medical robotics", label: direct}
+  - {case: precisa, need: "image-guided surgical navigation", topic: "medical imaging", label: partial}
+  - {case: precisa, need: "patient-specific 3D anatomical models for surgery", topic: "surgery", label: partial}
+  - {case: precisa, need: "surgical robotics precision validation", topic: "surgical diagnostics", label: unrelated}
+  - {case: precisa, need: "cochlear implantation clinical trials", topic: "biomedical optics research", label: unrelated}
+  - {case: precisa, need: "surgical robotics precision validation", topic: "precision neurosurgery", label: partial}
+  - {case: precisa, need: "image-guided surgical navigation", topic: "medical navigation", label: direct}
+  - {case: precisa, need: "surgical robotics precision validation", topic: "precision medicine", label: unrelated}
+  - {case: precisa, need: "image-guided surgical navigation", topic: "image processing", label: partial}
+  - {case: precisa, need: "patient-specific 3D anatomical models for surgery", topic: "customised patient specific skull implant molds", label: direct}
+  - {case: precisa, need: "surgical robotics precision validation", topic: "surgical precision", label: direct}
+  - {case: precisa, need: "cochlear implantation clinical trials", topic: "hearing implant", label: direct}
+  - {case: precisa, need: "temporal bone CT segmentation AI", topic: "artificial anatomical models", label: partial}
+  - {case: precisa, need: "image-guided surgical navigation", topic: "surgical precision", label: partial}
+  - {case: precisa, need: "patient-specific 3D anatomical models for surgery", topic: "artificial anatomical models", label: direct}
+  - {case: precisa, need: "image-guided surgical navigation", topic: "medical image analysis", label: partial}
+  - {case: precisa, need: "cochlear implantation clinical trials", topic: "clinical studies", label: partial}
+  - {case: precisa, need: "temporal bone CT segmentation AI", topic: "OCT Segmentation", label: partial}
+  - {case: vinora, need: "soil science irrigation climate adaptation", topic: "climate science", label: partial}

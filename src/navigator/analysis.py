@@ -8,6 +8,9 @@
    "bioinformatics" (0.67) from "continuous glucose monitoring" (0.63) for a wearable-sensor need, the
    reranker can (case eval, eval/case_report.md). People have no topic claims of their own (only roles),
    so a person matches through their lab's topics.
+   Apertus then labels each (need, topic) pair: only "direct" ones count. Reranker and cosine cannot tell a
+   broad topic from a specific one: "climate science" scores 0.62 for "soil science irrigation climate
+   adaptation", above correct matches like "transgenic rabbit models" (0.06) (#158).
 5. The score counts matches only (plan 1: no invented facts). Each row names the matches behind it.
    Market access or an industry network would need data about companies and markets, which we do not have.
 
@@ -20,7 +23,7 @@ import logging
 import re
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 
 import numpy as np
@@ -53,6 +56,23 @@ RERANK_MIN = 0.10
 COSINE_ALONE = 0.72
 TOPIC_FIELDS = {"expertise", "description", "unit_expertise"}
 NAME_TYPES = {"project", "infrastructure"}  # their names say what they are ("Cleanroom")
+MATCH_TIMEOUT = 120.0  # seconds per request once it has an LLM slot (#152); in the background
+MATCH_LABELS = ("direct", "partial", "unrelated")
+
+MATCH_SYSTEM = """You check research partners for a company. Each numbered line pairs one of the company's needs
+with a research topic of a possible partner. Say for each pair whether the topic serves that need.
+Return ONLY JSON: {"labels": {"1": "direct", "2": ...}}, one label for every line number.
+- "direct": the topic is the need, a synonym of it, or a specific part of it.
+- "partial": the same broad field, but not the need itself: a general method or area that would fit many
+  other needs too.
+- "unrelated": a different subject.
+
+Example, company needs: seabird population monitoring; drone flight in strong wind
+1. need: "seabird population monitoring" | topic: "puffin colony counts"
+2. need: "seabird population monitoring" | topic: "ecology"
+3. need: "drone flight in strong wind" | topic: "UAV control in gusts"
+4. need: "drone flight in strong wind" | topic: "wind turbine blade fatigue"
+{"labels": {"1": "direct", "2": "partial", "3": "direct", "4": "unrelated"}}"""
 
 # criterion, weight, points per match (score = min(100, matches * points)); research fit is a share of needs
 CRITERIA = [
@@ -136,6 +156,7 @@ class Match:
     via: str | None  # the person's unit, when the value is the unit's topic
     sim: float     # bge-m3 cosine (pre-filter)
     score: float   # reranker score, 0-1
+    label: str | None = None  # Apertus' match label (#158); None: not checked
 
 
 @lru_cache
@@ -177,6 +198,46 @@ def match_needs(
     for (entity_id, _), m in best.items():
         matches[entity_id].append(m)
     return {e: sorted(ms, key=lambda m: -m.score) for e, ms in matches.items()}
+
+
+async def label_matches(
+    llm: LLM, needs: list[str], pairs: list[tuple[str, str]], timeout: float = MATCH_TIMEOUT
+) -> list[str | None]:
+    """A label per (need, topic) pair, in order; None where the answer has no valid label for it (keyed by line
+    number: a list came back short). No labels at all -> ValueError."""
+    lines = "\n".join(f'{i}. need: "{n}" | topic: "{v}"' for i, (n, v) in enumerate(pairs, 1))
+    data = await llm.chat_json(
+        MATCH_SYSTEM, f"Company needs: {'; '.join(needs)}\n{lines}", max_tokens=200 + 12 * len(pairs), timeout=timeout,
+    )
+    labels = data.get("labels") if isinstance(data, dict) else None
+    if not isinstance(labels, dict):
+        raise ValueError("no labels in the answer")
+    got = [str(labels.get(str(i), "")).strip().lower() for i in range(1, len(pairs) + 1)]
+    return [label if label in MATCH_LABELS else None for label in got]
+
+
+def check_matches(
+    matches: dict[int, list[Match]], label: Callable[[list[tuple[str, str]]], list[str]]
+) -> tuple[dict[int, list[Match]], dict[int, list[Match]]]:
+    """(direct matches, the others), each match with its label. A pair without a label stays unchecked and
+    counts; if labelling fails, all do, and it is logged: a case scores as before #158 rather than failing."""
+    pairs = list(dict.fromkeys((m.need, m.value) for ms in matches.values() for m in ms))
+    if not pairs:
+        return matches, {}
+    try:
+        labels = dict(zip(pairs, label(pairs)))
+    except Exception as e:
+        log.warning("match check failed, keeping %d unchecked matches: %s: %s", len(pairs), type(e).__name__, e)
+        return matches, {}
+    if missing := sum(label is None for label in labels.values()):
+        log.warning("match check: no label for %d of %d pairs, kept unchecked", missing, len(pairs))
+    kept: dict[int, list[Match]] = defaultdict(list)
+    rejected: dict[int, list[Match]] = defaultdict(list)
+    for entity_id, ms in matches.items():
+        for m in ms:
+            m = replace(m, label=labels[(m.need, m.value)])
+            (kept if m.label in (None, "direct") else rejected)[entity_id].append(m)
+    return dict(kept), dict(rejected)
 
 
 def _names(names: list[str], limit: int = 3) -> str:
@@ -251,19 +312,24 @@ class Scored:
     matches: dict[int, list[Match]]
     score: int
     rows: list[ScoreItem]
+    rejected: dict[int, list[Match]] = field(default_factory=dict)  # matches the check did not label direct
 
 
 def score_needs(
     conn: psycopg.Connection, needs: list[str], embed: Callable[[str], np.ndarray],
     embed_many: Callable[[list[str]], np.ndarray], rerank: Callable[[list[tuple[str, str]]], np.ndarray],
+    label: Callable[[list[str], list[tuple[str, str]]], list[str]] | None = None,
 ) -> Scored:
-    """References, matches and score for a list of needs; no LLM call (also used by `navigator case-eval`)."""
+    """References, matches and score for a list of needs (also used by `navigator case-eval`). `label` is the
+    match check (#158); None skips it."""
     refs = find_references(conn, needs, embed)
     results = build_results(conn, [(e, s) for e, s, _ in refs])
     conn.commit()  # the reranker takes seconds: end the read transaction first
-    matches = match_needs(results, needs, embed_many, rerank)
+    matches, rejected = match_needs(results, needs, embed_many, rerank), {}
+    if label is not None:
+        matches, rejected = check_matches(matches, lambda pairs: label(needs, pairs))
     score, rows = score_case(needs, results, matches)
-    return Scored(refs, results, matches, score, rows)
+    return Scored(refs, results, matches, score, rows, rejected)
 
 
 def analyze(
@@ -274,6 +340,7 @@ def analyze(
     embed_many: Callable[[list[str]], np.ndarray],
     rerank: Callable[[list[tuple[str, str]]], np.ndarray],
     explain: Callable[[str, list[Result]], dict[int, str]],
+    label: Callable[[list[str], list[tuple[str, str]]], list[str]] | None = None,
 ) -> None:
     """Run the analysis of a pending case and store it; on any error the case is marked failed."""
     row = conn.execute("""SELECT pdf_text FROM "case" WHERE id = %s AND analysis_status = 'pending'""", (case_id,))
@@ -283,7 +350,7 @@ def analyze(
         return
     try:
         info = read(found[0])
-        scored = score_needs(conn, info.needs, embed, embed_many, rerank)
+        scored = score_needs(conn, info.needs, embed, embed_many, rerank, label)
         conn.commit()
         refs, results, matches, score, rows = scored.refs, scored.results, scored.matches, scored.score, scored.rows
         # The need each reference is explained with: its best match, else the first need it was found for
