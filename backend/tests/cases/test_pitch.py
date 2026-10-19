@@ -5,7 +5,8 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
-from navigator.api import app, get_conn, get_write_pitch
+from navigator.api import app
+from navigator.api.deps import get_conn, get_write_pitch
 from navigator.cases.pitch import check_pitch, format_prompt, template, write_pitch
 from navigator.models import Evidence, Result
 

@@ -4,7 +4,8 @@ import pytest
 
 from cases.test_pitch import template
 from cases.test_store import GLUCORA, client, upload  # noqa: F401  (client is a fixture)
-from navigator.api import app, get_write_pitch
+from navigator.api import app
+from navigator.api.deps import get_write_pitch
 from navigator.cases import documents
 
 SECRET = "Internal: the CEO asked us not to mention the Basel offer."

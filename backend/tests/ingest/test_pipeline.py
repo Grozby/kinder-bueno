@@ -5,7 +5,8 @@ import socket
 import pytest
 from fastapi.testclient import TestClient
 
-from navigator.api import app, get_conn, get_ingest, get_ingest_slot, get_seeds
+from navigator.api import app
+from navigator.api.deps import get_conn, get_ingest, get_ingest_slot, get_seeds
 from navigator.ingest import pipeline
 from navigator.ingest.crawl import CrawledPage
 from navigator.ingest.pipeline import SourceError, add_source, check_url, run_ingest, source_config, source_id_for

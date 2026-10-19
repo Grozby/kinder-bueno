@@ -8,7 +8,8 @@ from pypdf import PdfWriter
 from test_api import fake_embed
 
 from cases.test_analysis import fake_embed_many, fake_read, fake_rerank, no_explain
-from navigator.api import app, get_analyze, get_conn
+from navigator.api import app
+from navigator.api.deps import get_analyze, get_conn
 from navigator.cases import analysis, store
 from navigator.core.settings import REPO_ROOT
 

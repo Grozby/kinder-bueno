@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 from pptx import Presentation
 from psycopg.types.json import Jsonb
 
-from navigator.api import app, get_conn, get_make_documents
+from navigator.api import app
+from navigator.api.deps import get_conn, get_make_documents
 from navigator.cases import documents
 from navigator.cases.documents import (
     DocContext,
