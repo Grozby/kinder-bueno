@@ -15,7 +15,16 @@ from unidecode import unidecode
 from navigator.verify import PageText, norm
 
 TITLES = {"prof", "dr", "pd", "med", "phil", "nat", "rer", "sc", "phd", "md", "msc", "bsc", "dipl", "ing",
-          "ass", "assoc", "asst", "em", "dent", "dr.-ing"}  # "Ass. Prof. Dr." and "Prof. Dr." are one person (#75)
+          "ass", "assoc", "asst", "em", "dent", "dr.-ing",  # "Ass. Prof. Dr." and "Prof. Dr." are one person (#75)
+          "et", "habil", "h.c", "mult"}  # "Dr. med. et phil. nat.", "Dr. habil.", "Dr. h.c. mult." (#150)
+# Words that label a list on member pages; the 8B model sometimes turns them into "people".
+LABEL_WORDS = {"alumni", "phone", "phone2", "mail", "e-mail", "funktion", "name", "titel", "staff", "students",
+               "student", "senior", "members", "member", "group", "team", "head", "chair", "administration",
+               "candidates", "thesis", "master", "bachelor", "postdocs", "contact", "leader", "lead"}
+# A name with one of these words is an organisation, not a person ("Balmer Lab", "Medová group") (#150)
+ORG_WORDS = {"lab", "labs", "laboratory", "laboratories", "group", "groups", "team", "center", "centre", "institute",
+             "department", "clinic", "unit", "office", "facility", "university", "hospital", "foundation", "ag",
+             "gmbh"}
 
 Mention = tuple[str, str, int]  # (entity_type, raw name, page_id)
 
@@ -113,9 +122,16 @@ def parent_url(url: str) -> str | None:
     return m.group(1) + (m.group(2) or "") if m else None
 
 
-def looks_like_person(name: str) -> bool:
-    """Guard for listed_in: the extractor sometimes takes headings or labels ("Alumni", "Phone2") for people."""
-    return len(norm_name(name).split()) >= 2 and not re.search(r"\d", name)
+def is_person_name(name: str) -> bool:
+    """A real person's name: at least two words after titles, no digits, not only list labels, no organisation word.
+    Rejects "Alumni", "Phone2", "PhD Students", "Balmer Lab", and lone surnames that cannot be told apart. Used by
+    extraction (claims and relations) and by resolve (listed_in), so both apply the same rule."""
+    words = norm_name(name).replace("/", " ").replace("&", " ").split()
+    return (len(words) >= 2 and not any(ch.isdigit() for ch in name) and not set(words) <= LABEL_WORDS
+            and not ORG_WORDS & set(words))
+
+
+looks_like_person = is_person_name  # the listed_in guard
 
 
 def first_line(text: str) -> str:
