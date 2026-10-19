@@ -1,7 +1,7 @@
 # Research & Expertise Navigator: technical report
 
 HackApertus 2026, challenge "Research & Expertise Navigator". Code: github.com/Grozby/kinder-bueno. Numbers
-from the eval run of 2026-10-19 on main `458e2f0` (`eval/report.md`, `eval/case_report.md`), on the 340-page
+from the eval run of 2026-10-19 on main `f43dd0e` (`eval/report.md`, `eval/case_report.md`), on the 340-page
 database with gold set v2 (18 queries).
 
 ## 1. Problem and approach
@@ -91,12 +91,12 @@ Every fact shown is a literal slice of a public page.
 
 - Apertus must return a quote for each fact. The quote is matched against the stored page text and saved as the
   exact text found there. If it is not found, the fact is rejected.
-- **16% of extracted facts were rejected (820 of 5,263).** Among them: people the model made up from the
+- **18% of extracted facts were rejected (922 of 5,263).** Among them: people the model made up from the
   prompt example, invented entity names, author abbreviations, list labels such as "Alumni", and topics quoted
   only by a heading that does not name them.
 - **Traceability: 100%** of displayed facts in the eval are verified, not judged unsupported, and link to their
   source page.
-- Claim judge [PoC] on 1,707 verified topic claims: 1,268 supported, 378 partial, 60 unsupported (hidden), 1 not
+- Claim judge [PoC] on 1,611 verified topic claims: 1,234 supported, 328 partial, 48 unsupported (hidden), 1 not
   judged.
 - Generated text (why it matches, chat answers, pitch, partner report) cites facts by claim id. A sentence
   that cites no claim, or a claim that is not shown with that result, is dropped and replaced by a fixed template
@@ -113,21 +113,21 @@ the same ranking, so v1 results are not compared with v2.
 | Metric | Result | Target |
 |---|---|---|
 | recall@10 | **60%** | 80% |
-| recall@10, lay-term and synonym phrasings | **61%** | 80% |
+| recall@10, lay-term and synonym phrasings | **62%** | 80% |
 | traceability of displayed facts | **100%** | 100% |
 | phrasing overlap (Jaccard of top-10 sets), per use case | 37–62% | report |
 | field fill, people: role, affiliation, lab topics | 100%, 100%, 96% | report |
-| field fill, people: own expertise | 38% | report |
+| field fill, people: own expertise | 39% | report |
 | judged precision@10 [PoC] | 86% | report |
 | eval judge agreement with the gold hits [PoC] | 91% (63 of 69) | report |
-| extraction drop rate (quote not found) | 16% (820 of 5,263) | report |
+| extraction drop rate (quote not found) | 18% (922 of 5,263) | report |
 
-- **Recall is 60% on gold set v2.** It is best on cardio (80% for all three phrasings) and microbiome (57–71%),
+- **Recall is 60% on gold set v2.** It is best on cardio (80–100%) and microbiome (57–71%),
   and weakest on glucose (43–57%) and rehab (33–67%). The glucose queries miss Stavroula Mougiakakou, Christoph
   Stettler and the Bally Lab; Stettler is linked only to hospital and project pages, not to a lab. On gold set
   v1, ranking work raised recall from 14% to 64% on the 100-page database, and to 68% with the last change to
   inheritance (#144).
-- **38% of people in the results have their own expertise**, from their profile pages (#75); it was 0% on the
+- **39% of people in the results have their own expertise**, from their profile pages (#75); it was 0% on the
   100-page database, whose pages state topics for labs only. Everyone else shows their lab's topics, labelled as
   the lab's.
 - **Judged precision is 86%**, with the judge rating each result in its own call. It used to rate all 10 results
@@ -162,7 +162,7 @@ duplicates and false people the larger crawl showed (#148–#151):
 | chunks | 377 | 773 |
 | entities | 537 | 1,364 |
 | claims | 1,567 | 5,137 |
-| people in results with their own expertise | 0% | 38% |
+| people in results with their own expertise | 0% | 39% |
 
 The gold set grew with the crawl (section 4), so recall on the two databases is not compared.
 
@@ -225,7 +225,7 @@ Bern (suppliers, manufacturers, advisors), with a different extraction prompt an
 - **The gold set is small:** 18 queries in 6 use cases. A difference of ±2 points is noise.
 - **The LLM judge is a proof of concept:** 91% agreement with the gold set, and the same model family as the
   extractor. A human-labelled precision set would replace it.
-- **Personal expertise** is 38%: it needs a profile page per person, and not every lab has them (#75).
+- **Personal expertise** is 39%: it needs a profile page per person, and not every lab has them (#75).
 - **Done since the first demo:** crawl rules and re-crawl from the UI (#79, #80, #105), persisted cases with
   review, notes and similar cases (#81, #108), partner report and slides (#96), chat agent (#97),
   multi-worker API (#103), CI and published images (#101), deleting a case and its data (#134), the deeper crawl

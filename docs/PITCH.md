@@ -1,9 +1,10 @@
 # Pitch and demo script
 
 Numbers come from `eval/report.md` (gold set v2: 18 queries, 340 pages; last run on 2026-10-19 on main
-`458e2f0`, after the database swap) and `navigator stats`. Re-run `uv run navigator eval` before presenting and update the numbers here,
+`f43dd0e`, on the shared DB after #160) and `navigator stats`. Re-run `uv run navigator eval` before presenting and update the numbers here,
 in `docs/REPORT.md` and in the slides. The demo below was re-rehearsed on 2026-10-19 on the 340-page database
-(main `eb39e41`, a copy of the shared DB): every step was run through the API, with 4 Glucora uploads. The UI
+(main `eb39e41`, a copy of the shared DB): every step was run through the API, with 4 Glucora uploads; steps 1–3
+and 6 again after #160 and #161 (main `f43dd0e`). The UI
 clicks were last rehearsed on the 100-page database (2026-10-18, #34 and after #95), so click through once more
 before presenting.
 
@@ -23,17 +24,17 @@ track; the slides use the same numbers.
 3. **The guarantee: no invented facts.**
    - Apertus must give a quote for every fact. The quote is matched against the stored page and saved as the
      exact page text, or the fact is rejected.
-   - 16% of extracted facts were rejected (820 / 5,263), among them people the model made up from the prompt
+   - 18% of extracted facts were rejected (922 / 5,263), among them people the model made up from the prompt
      example and list labels like "Alumni".
    - Traceability in the eval: **100%** of displayed facts are verified and link to their source.
 4. **Results (honest).**
-   - recall@10: **60%** (target 80%) on 18 queries in 6 use cases, lay-term phrasings 61%. Best on cardio (80%
-     for all 3 phrasings), weakest on glucose and rehab (33–67%), where some experts are linked only to hospital
+   - recall@10: **60%** (target 80%) on 18 queries in 6 use cases, lay-term phrasings 62%. Best on cardio (80–100%
+     per phrasing), weakest on glucose and rehab (33–67%), where some experts are linked only to hospital
      pages.
    - Synonyms: the three phrasings of a use case share 37–62% of their top 10; "glucose sensors" and
      "continuous glucose monitoring" both find the Diabetes Center Berne and the AI in Health and Nutrition lab.
    - Field fill for people: role 100%, affiliation 100% (~790 people linked to their lab from member pages).
-     38% of people in the results have **their own expertise**, from their profile pages; the others show their
+     39% of people in the results have **their own expertise**, from their profile pages; the others show their
      lab's topics, labelled as the lab's.
    - Precision (LLM judge, PoC): 86% of the top-10 results judged relevant, each result judged on its own. It
      agrees with the human gold set on 91% of gold hits, but it is the extractor's model family, so treat it as a
@@ -51,7 +52,8 @@ track; the slides use the same numbers.
 
 **Before the demo** (README "Demo"):
 - The script below needs the 340-page data. `checkpoints/demo.dump` (the `v0.1.1` handoff snapshot) still holds
-  the 100 pages: present from the shared stack, or first take a new snapshot with `scripts/demo.sh dump`.
+  the 100 pages: present from the shared stack, or restore a 340-page snapshot (`scripts/demo.sh setup --snapshot
+  demo-340.dump`; it is git-ignored, ask for it, or take one with `scripts/demo.sh dump demo-340.dump`).
 - `docker compose run --rm restore` loads the snapshot (it replaces every case with the snapshot's; take the
   snapshot from a board without a Glucora card, since the demo uploads Glucora live), then
   `docker compose run --rm app uv run navigator init-db` (adds what a snapshot older than the code lacks), then
@@ -66,7 +68,8 @@ track; the slides use the same numbers.
 
 1. **Upload a company** (~25 s). Drop the Glucora PDF on the board. The pop-up shows the analysis; the card
    lands in "New" with a **fit score of about 60–70**: Apertus reads the PDF afresh on each upload, and the
-   needs it reads move the score (60, 69, 69 and 69 in the 340-page rehearsal). Read the summary (needle-free
+   needs it reads move the score (60, 60, 60 and 65 after #160; one earlier upload read 5 of 5 needs covered
+   and scored 81). Read the summary (needle-free
    wearable glucose sensor, Swiss R&D in Bern) and the breakdown: "4 of 5 needs covered … Not covered:
    biocompatibility testing for skin sensors". Say it: the score only counts what our sources prove, and it
    shows the gap.
@@ -74,7 +77,8 @@ track; the slides use the same numbers.
    two kinds of "why": "Matches 'closed-loop artificial pancreas systems': …" (a verified topic claim matches a
    need, so it counts in the score) and "Found for '…'" (the search found it, but no claim matches, so it does
    not count and is never preselected).
-3. **Traceability.** Open Dr. med. Dr. phil. Lia Bally's evidence (a preselected reference, rank 7–10). Each row
+3. **Traceability.** Open Dr. med. Dr. phil. Lia Bally's evidence (a preselected reference, rank 7–10; in 1 of 4
+   uploads she was not among the references, then open the Bally Lab instead). Each row
    is a quote from a public page: her role "Group Leader" from the Bally Lab team page on dbmr.unibe.ch, and her
    lab's "closed-loop automated insulin delivery systems" from the Bally Lab page. Click the link and find the
    same text on the live page. The flag button on a row reports a wrong fact; nothing is changed automatically.
