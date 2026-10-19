@@ -14,6 +14,7 @@ FUZZY_MIN_SCORE = 95.0
 VALUE_IN_QUOTE_FIELDS = {"name", "role", "email", "phone"}
 TOPIC_FIELDS = {"expertise", "description"}  # the quote must be a sentence or name the topic (#149)
 MIN_SENTENCE_WORDS = 8
+MIN_TOPIC_SHARE = 0.5  # of a topic's content words that a heading-only quote must contain (#159)
 MAX_PAIR_DISTANCE = 200  # max characters between a person's name and their role/email/phone
 
 _CHAR_MAP = str.maketrans({
@@ -134,28 +135,39 @@ class PageText:
 
 
 def names_topic(value: str, quote: str) -> bool:
-    """A content word of the value (its first 5 letters, so "valves" names "valve") is in the quote, or the value
-    has no content words to look for ("AI")."""
+    """At least half of the value's content words (their first 5 letters, so "valves" names "valve") are in the
+    quote, or the value has no content words to look for ("AI"). One word is not enough: "Research group led by
+    Prof. X focusing on cardiac electrophysiology" shares only the head's name with a team block (#159)."""
     words = [w[:5] for w in re.findall(r"[^\W\d_]{4,}", norm(value))]
     q = norm(quote)
-    return not words or any(w in q for w in words)
+    return not words or sum(w in q for w in words) >= MIN_TOPIC_SHARE * len(words)
 
 
 def is_sentence(quote: str) -> bool:
-    """Prose, not a heading or a label: long enough, or with sentence punctuation."""
-    return len(re.findall(r"\w+", quote)) >= MIN_SENTENCE_WORDS or bool(re.search(r"[.;:!?](\s|$)", quote.strip()))
+    """Prose, not a heading or a label: a line long enough, or a line of 4+ words ending like a sentence. Per line,
+    so a name block ("Team / X Lab / Name / Titel / Prof. Dr. X / Funktion / Group Leader") is not prose (#159)."""
+    for line in quote.splitlines():
+        words = len(re.findall(r"\w+", line))
+        if words >= MIN_SENTENCE_WORDS or (words >= 4 and re.search(r"[.;!?]\s*$", line)):
+            return True
+    return False
 
 
 def verify_claim(page: PageText, entity_name: str, field: str, value: str, quote: str) -> QuoteMatch:
     """Checks 1-3 of PLAN 7.6. On success, `quote` is replaced by the exact page text.
-    A topic (expertise, description) quoted only by a heading or label that does not name it is rejected: on pages
-    without research text the model copies the prompt's example topics and quotes "Team" or the lab name (#149)."""
+    A topic quoted only by a heading or label is rejected unless the heading names it (expertise), and always for a
+    description: on pages without research text the model copies the prompt's example topics and quotes "Team",
+    the lab name or a name block (#149, #159)."""
     if not page.contains(entity_name):
         return QuoteMatch(False, quote, reason="entity name not on page")
     match = page.find_quote(quote)
     if field in TOPIC_FIELDS:
-        if match.ok and not is_sentence(match.quote) and not names_topic(value, match.quote):
-            return QuoteMatch(False, match.quote, reason="topic not named in a heading-only quote")
+        if match.ok and not is_sentence(match.quote):
+            # A description says what a unit does: a heading or a name block cannot (#159)
+            if field == "description":
+                return QuoteMatch(False, match.quote, reason="description needs a sentence quote")
+            if not names_topic(value, match.quote):
+                return QuoteMatch(False, match.quote, reason="topic not named in a heading-only quote")
         return match
     if field not in VALUE_IN_QUOTE_FIELDS:
         return match
