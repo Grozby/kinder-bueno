@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError, field_validator
 
 from navigator.llm import LLM, LLMError
-from navigator.resolve import is_person_name, norm_name
+from navigator.resolve import is_person_name
 from navigator.verify import PageText, verify_claim, verify_relation
 
 log = logging.getLogger(__name__)
@@ -96,7 +96,25 @@ travels through sea ice and what it reveals about ice thickness.":
  "relations": []}
 """
 
-PROMPTS = ((PEOPLE_PROMPT, MAX_ANSWER_TOKENS), (TOPICS_PROMPT, MAX_TOPICS_TOKENS))
+PROFILE_PROMPT = _COMMON + """
+YOUR TASK: is this page ONE person's own profile page (one person, with a CV, "research interests" or a
+research description)? If not, return {"claims": [], "relations": []}.
+If it is: AT MOST 6 expertise claims for that person, and nothing else. Each is a specific research topic of
+2-5 words, like "computer vision", "dietary assessment", "cardiac electrophysiology", taken from the page.
+Never single generic words ("research", "health", "technology", "systems", "medical", "engineering"), and
+never the name of a group or lab. The quote is the sentence that names the topic.
+
+Example, profile page "Prof. Dr. Xyla Qorvant" with the text
+"Prof. Dr. Xyla Qorvant\nGroup Head\nHer research interests include glacier acoustics and lichen genomics.":
+{"claims": [["person", "Prof. Dr. Xyla Qorvant", "expertise", "glacier acoustics", "Her research interests include glacier acoustics and lichen genomics."],
+            ["person", "Prof. Dr. Xyla Qorvant", "expertise", "lichen genomics", "Her research interests include glacier acoustics and lichen genomics."]],
+ "relations": []}
+"""
+
+# Profile topics have their own call (#75): in the people prompt they cost member_of relations on list pages
+PROMPTS = (
+    (PEOPLE_PROMPT, MAX_ANSWER_TOKENS), (TOPICS_PROMPT, MAX_TOPICS_TOKENS), (PROFILE_PROMPT, MAX_TOPICS_TOKENS),
+)
 
 EntityType = Literal["person", "unit", "project", "infrastructure"]
 
